@@ -89,7 +89,7 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak` to acc
 - [ ] Finish warden commands.
 - [ ] Finish deputy commands.
 - [ ] Finish configuring deputy and warden roles.
-- [ ] Finish configuring rebel system.
+- [X] Finish configuring rebel system.
 - [ ] Finish configuring freeday system.
 - [ ] Finish warden menu.
 - [X] Configure team ratio.
