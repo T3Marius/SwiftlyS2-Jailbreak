@@ -28,15 +28,95 @@ public sealed class WardenMenu
 
         var toggleCells = new SubmenuMenuOption(player.Localizer["warden_menu_option.toggle_cells"], () => ToggleCellsSubmenu(player));
         var toggleBox = new SubmenuMenuOption(player.Localizer["warden_menu_option.toggle_box"], () => ToggleBoxSubmenu(player));
-
+        var toggleVoice = new SubmenuMenuOption(player.Localizer["warden_menu_option.toggle_voice"], () => ToggleVoiceSubmenu(player));
 
 
         builder.AddOption(toggleCells);
         builder.AddOption(toggleBox);
+        builder.AddOption(toggleVoice);
 
         var built = builder.Build();
         _core.MenusAPI.OpenMenuForPlayer(player.Player, built);
         
+    }
+    private IMenuAPI ToggleVoiceSubmenu(IJBPlayer player)
+    {
+        var builder = _core.MenusAPI.CreateBuilder().Design
+            .SetMenuTitle(player.Localizer["voice_submenu.title"]);
+
+        var unmuteAllPrisoner = new ButtonMenuOption(player.Localizer["voice_submenu_option.unmute_all_prisoner"]);
+        unmuteAllPrisoner.Click += (sender, args) =>
+        {
+            _core.Scheduler.NextWorldUpdate(() =>
+            {
+                foreach (var p in _players.GetPlayersByTeam(JBTeam.Prisoner))
+                {
+                    p.Unmute();
+                    p.WasUnmutedByWarden = true;
+                }
+                _players.SendMessage(MessageType.Chat, "all_prisoners_unmuted_warden", true);
+            });
+            return ValueTask.CompletedTask;
+        };
+        var muteAllPrisoner = new ButtonMenuOption(player.Localizer["voice_submenu_option.mute_all_prisoner"]);
+        muteAllPrisoner.Click += (sender, args) => 
+        {
+            _core.Scheduler.NextWorldUpdate(() =>
+            {
+                foreach (var p in _players.GetPlayersByTeam(JBTeam.Prisoner))
+                {
+                    p.Mute();
+                    p.WasUnmutedByWarden = false;
+                }
+                _players.SendMessage(MessageType.Chat, "all_prisoners_muted_warden", true);
+            });
+            return ValueTask.CompletedTask;
+        };
+
+        foreach (var prisoner in _players.GetPlayersByTeam(JBTeam.Prisoner))
+        {
+            var prisonerSubMenu = new SubmenuMenuOption(prisoner.Player.Name, () => TogglePrisonerVoiceSubmenu(player, prisoner));
+            builder.AddOption(prisonerSubMenu);
+        }
+
+        builder.AddOption(unmuteAllPrisoner);
+        builder.AddOption(muteAllPrisoner);
+
+        return builder.Build();
+    }
+    private IMenuAPI TogglePrisonerVoiceSubmenu(IJBPlayer player, IJBPlayer prisoner)
+    {
+        var builder = _core.MenusAPI.CreateBuilder().Design
+            .SetMenuTitle(prisoner.Player.Name);
+
+        var mute = new ButtonMenuOption(player.Localizer["voice_submenu_option.mute_prisoner"]);
+        mute.Click += (sender, args) =>
+        {
+            _core.Scheduler.NextWorldUpdate(() =>
+            {
+                prisoner.Mute();
+                prisoner.WasUnmutedByWarden = false;
+                _players.SendMessage(MessageType.Chat, "prisoner_muted_warden", true, args: prisoner.Player.Name);
+            });
+            return ValueTask.CompletedTask;
+        };
+
+        var unmute = new ButtonMenuOption(player.Localizer["voice_submenu_option.unmute_prisoner"]);
+        unmute.Click += (sender, args) =>
+        {
+            _core.Scheduler.NextWorldUpdate(() =>
+            {
+                prisoner.Unmute();
+                prisoner.WasUnmutedByWarden = true;
+                _players.SendMessage(MessageType.Chat, "prisoner_unmuted_warden", true, args: prisoner.Player.Name);
+            });
+            return ValueTask.CompletedTask;
+        };
+
+        builder.AddOption(mute);
+        builder.AddOption(unmute);
+
+        return builder.Build();
     }
     private IMenuAPI ToggleBoxSubmenu(IJBPlayer player)
     {
@@ -70,6 +150,7 @@ public sealed class WardenMenu
             });
             return ValueTask.CompletedTask;  
         };
+
 
         builder.AddOption(startBox);
         builder.AddOption(stopBox);
