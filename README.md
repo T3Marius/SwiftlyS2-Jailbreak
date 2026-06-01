@@ -92,4 +92,5 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak` to acc
 - [ ] Finish configuring rebel system.
 - [ ] Finish configuring freeday system.
 - [ ] Finish warden menu.
+- [ ] Configure team ratio.
 - [ ] Add more TODO list 😂
