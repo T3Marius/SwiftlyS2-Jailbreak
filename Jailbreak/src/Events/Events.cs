@@ -196,6 +196,7 @@ public sealed class Events
                     continue;
 
                 p.Mute();
+                _players.SendMessage(MessageType.Chat, "prisoners_muted_roundstart", true, args: [_voiceConfig.KeepPrisonersMutedForSecondsOnRoundStart]);
             }
 
             _core.Scheduler.DelayBySeconds(_voiceConfig.KeepPrisonersMutedForSecondsOnRoundStart, () =>
@@ -206,6 +207,7 @@ public sealed class Events
                         continue;
                     
                     p.Unmute();
+                    _players.SendMessage(MessageType.Chat, "prisoners_unmuted", true);
                 }
             });
         }

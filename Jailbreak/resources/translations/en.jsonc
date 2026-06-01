@@ -37,5 +37,8 @@
     "box_enabled": "Box [lime]enabled[silver] by [blue]Warden[silver]!",
     "box_disabled": "Box [red]disabled[silver] by [blue]Warden[silver]!",
 
+    "prisoners_muted_roundstart": "All prisoners are muted for [red]{0} seconds[silver].",
+    "prisoners_unmuted": "All prisoners have been unmuted.",
+
     "none": "—"
 }
