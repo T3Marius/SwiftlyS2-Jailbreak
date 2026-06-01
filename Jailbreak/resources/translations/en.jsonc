@@ -40,5 +40,6 @@
     "prisoners_muted_roundstart": "All prisoners are muted for [red]{0} seconds[silver].",
     "prisoners_unmuted": "All prisoners have been unmuted.",
 
-    "none": "—"
+    "none": "—",
+    "team_ratio_full": "Guards are [red]full[silver]. The ratio is [lime]{0} prisoners[silver] per [lime]1 guard[silver]."
 }
