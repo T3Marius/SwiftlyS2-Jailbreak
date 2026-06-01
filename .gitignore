@@ -1,0 +1,15 @@
+# Build output
+bin/
+obj/
+build/
+
+# IDE
+.vs/
+.vscode/
+
+# Dependency / vendor
+swiftlys2/
+
+# OS
+Thumbs.db
+.DS_Store

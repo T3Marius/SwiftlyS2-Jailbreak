@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Jailbreak.Contract/Jailbreak.Contract.csproj" />
+  <Project Path="Jailbreak/Jailbreak.csproj" />
+</Solution>

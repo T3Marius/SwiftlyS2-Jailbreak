@@ -1,0 +1,84 @@
+using SwiftlyS2.Shared;
+using SwiftlyS2.Shared.Plugins;
+using Microsoft.Extensions.DependencyInjection;
+using Jailbreak.Contract;
+using Tomlyn.Extensions.Configuration;
+
+namespace Jailbreak;
+
+[PluginMetadata(
+    Name = "Jailbreak",
+    Id = "Jailbreak",
+    Author = "Marius",
+    Version = "1.0.0"
+)]
+public sealed class Main : BasePlugin
+{
+    private ServiceProvider? _provider;
+
+    public Main(ISwiftlyCore core) : base(core) { }
+
+    public override void ConfigureSharedInterface(IInterfaceManager interfaceManager)
+    {
+        if (_provider == null)
+            return;
+
+        var api = _provider.GetRequiredService<Api>();
+        interfaceManager.AddSharedInterface<IJailbreak, Api>(IJailbreak.Key, api);
+    }
+    public override void Load(bool hotReload)
+    {
+        ServiceCollection collection = new();
+
+        Core.Configuration.InitializeTomlWithModel<WardenConfig>("warden.toml", "Warden")
+             .Configure(b => b.AddTomlFile("warden.toml", false, true));
+        Core.Configuration.InitializeTomlWithModel<IconsConfig>("icons.toml", "Icons")
+             .Configure(b => b.AddTomlFile("icons.toml", false, true));
+        Core.Configuration.InitializeTomlWithModel<ModelsConfig>("models.toml", "Models")
+             .Configure(b => b.AddTomlFile("models.toml", false, true));
+        Core.Configuration.InitializeTomlWithModel<UtilsConfig>("utils.toml", "Utils")
+             .Configure(b => b.AddTomlFile("utils.toml", false, true));
+
+        collection.AddSwiftly(Core)
+                  .AddSingleton<IconManager>()
+                  .AddSingleton<CellManager>()
+                  .AddSingleton<IJBPlayerManagement, JBPlayerManagement>()
+                  .AddSingleton<Api>()
+                  .AddSingleton<Events>()
+                  .AddSingleton<Listeners>()
+                  .AddSingleton<WardenCommands>()
+                  .AddSingleton<WardenMenu>()
+                  .AddSingleton<BoxManager>();
+
+        collection.AddOptionsWithValidateOnStart<WardenConfig>()
+                  .BindConfiguration("Warden");
+
+        collection.AddOptionsWithValidateOnStart<IconsConfig>()
+                  .BindConfiguration("Icons");
+
+        collection.AddOptionsWithValidateOnStart<ModelsConfig>()
+                  .BindConfiguration("Models");
+
+        collection.AddOptionsWithValidateOnStart<UtilsConfig>()
+                  .BindConfiguration("Utils");
+
+        _provider = collection.BuildServiceProvider();
+
+        _provider.GetRequiredService<WardenCommands>().Register();
+        _provider.GetRequiredService<Events>().Register();
+        _provider.GetRequiredService<Listeners>().Register();
+
+    }
+    public override void Unload()
+    {
+        if (_provider == null)
+            return;
+
+        _provider.GetRequiredService<WardenCommands>().Unregister();
+        _provider.GetRequiredService<Events>().Unregister();
+        _provider.GetRequiredService<Listeners>().Unregister();
+        _provider.GetRequiredService<IconManager>().CleanupAll();
+        _provider.Dispose();
+        _provider = null;
+    }
+}

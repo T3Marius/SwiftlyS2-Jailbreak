@@ -1,0 +1,41 @@
+{
+    "prefix": "[silver]▶[red] Jailbreak[silver] | ",
+
+    "current_ct_roles.center": "Current Warden: {0}\nCurrent Deputy: {1}",
+    "warden_already_exists": "A [blue]Warden[silver] already exists.",
+    "you_already_warden": "You are already the [blue]Warden[silver].",
+    "you_are_new_warden": "You are the new [blue]Warden[silver]. Use [lime]!whelp[silver] to see your commands.",
+    "new_warden_alert": "{0} is the new Warden.",
+    "no_warden_alert": "ALERT! THERE IS NO WARDEN!",
+    "warden_removed.giveup": "{0} has given up [blue]Warden[silver]. Use [lime]!w[silver] to become the new one.",
+    "warden_removed.killed": "{0} was killed by {1} and is no longer the [blue]Warden[silver]. Use [lime]!w[silver] to become the new one.",
+    "warden_removed": "{0} is no longer the [blue]Warden[silver]. Use [lime]!w[silver] to become the new one.", // fallback,
+    "you_are_not_warden": "You are not the [blue]Warden[silver].",
+    "warden_not_guard": "You need to be guard in order to become the [blue]Warden[silver].",
+    "cannot_become_warden": "You can't become the [blue]Warden[silver] right now.",
+
+    "warden_help.header": "Warden Commands:",
+    "warden_help.become": "[lime]!w[silver] - Become the Warden.",
+    "warden_help.giveup": "[lime]!uw[silver] - Give up being the Warden.",
+    "warden_help.menu": "[lime]!wmenu[silver] - Open the Warden menu.",
+    "warden_help.sd": "[lime]!sd[silver] - Open the Special Days menu.",
+    "warden_help.box": "[lime]!box[silver] - Toggle friendly fire for prisoners",
+
+    "warden_menu.title": "Warden Menu",
+    "cells_submenu.title": "Toggle Cells",
+    "box_submenu.title": "Toggle Box",
+    "warden_menu_option.toggle_cells": "Toggle Cells",
+    "warden_menu_option.toggle_box": "Toggle Box",
+    "box_submenu_option.start_box": "Start Box",
+    "box_submenu_option.stop_box": "Stop Box",
+    "cells_submenu_option.open_cells": "Open Cells",
+    "cells_submenu_option.close_cells": "Close Cells",
+    "cells_opened_warden": "[blue]Warden[silver] has opened the cells.",
+    "cells_closed_warden": "[blue]Warden[silver] has closed the cells.",
+
+    "cells_opened_automatically": "The cells have been opened automatically.",
+    "box_enabled": "Box [lime]enabled[silver] by [blue]Warden[silver]!",
+    "box_disabled": "Box [red]disabled[silver] by [blue]Warden[silver]!",
+
+    "none": "—"
+}
