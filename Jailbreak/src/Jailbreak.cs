@@ -44,6 +44,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<CellManager>()
                   .AddSingleton<IJBPlayerManagement, JBPlayerManagement>()
                   .AddSingleton<TeamManager>()
+                  .AddSingleton<RebelManager>()
                   .AddSingleton<Api>()
                   .AddSingleton<Events>()
                   .AddSingleton<Listeners>()
