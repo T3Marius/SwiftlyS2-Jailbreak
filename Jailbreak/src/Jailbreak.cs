@@ -38,6 +38,8 @@ public sealed class Main : BasePlugin
              .Configure(b => b.AddTomlFile("models.toml", false, true));
         Core.Configuration.InitializeTomlWithModel<UtilsConfig>("utils.toml", "Utils")
              .Configure(b => b.AddTomlFile("utils.toml", false, true));
+        Core.Configuration.InitializeTomlWithModel<VoiceConfig>("voice.toml", "Voice")
+             .Configure(b => b.AddTomlFile("voice.toml", false, true));
 
         collection.AddSwiftly(Core)
                   .AddSingleton<IconManager>()
@@ -46,6 +48,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<Api>()
                   .AddSingleton<Events>()
                   .AddSingleton<Listeners>()
+                  .AddSingleton<NetMessages>()
                   .AddSingleton<WardenCommands>()
                   .AddSingleton<WardenMenu>()
                   .AddSingleton<BoxManager>();
@@ -62,11 +65,20 @@ public sealed class Main : BasePlugin
         collection.AddOptionsWithValidateOnStart<UtilsConfig>()
                   .BindConfiguration("Utils");
 
+        collection.AddOptionsWithValidateOnStart<VoiceConfig>()
+                  .BindConfiguration("Voice");
+
         _provider = collection.BuildServiceProvider();
+
+        if (hotReload)
+        {
+            _provider.GetRequiredService<JBPlayerManagement>().SyncTeams();
+        }
 
         _provider.GetRequiredService<WardenCommands>().Register();
         _provider.GetRequiredService<Events>().Register();
         _provider.GetRequiredService<Listeners>().Register();
+        _provider.GetRequiredService<NetMessages>().Register();
 
     }
     public override void Unload()
@@ -77,6 +89,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<WardenCommands>().Unregister();
         _provider.GetRequiredService<Events>().Unregister();
         _provider.GetRequiredService<Listeners>().Unregister();
+        _provider.GetRequiredService<NetMessages>().Unregister();
         _provider.GetRequiredService<IconManager>().CleanupAll();
         _provider.Dispose();
         _provider = null;

@@ -19,6 +19,7 @@ public sealed class Events
     private readonly WardenConfig        _wardenConfig;
     private readonly ModelsConfig        _modelsConfig;
     private readonly UtilsConfig         _utilsConfig;
+    private readonly VoiceConfig         _voiceConfig;
     /* ----------------------------------------------- */
 
     private readonly Dictionary<ulong, CancellationTokenSource> _centerTimers = [];
@@ -34,6 +35,7 @@ public sealed class Events
 
     private CancellationTokenSource? _wardenCheckCts;
     private CancellationTokenSource? _doorsCheckCts;
+    private CancellationTokenSource? _checkPrisonersVoiceCts;
     private Random _random = new();
 
     public Events(
@@ -43,7 +45,8 @@ public sealed class Events
         BoxManager boxManager,
         IOptions<WardenConfig> wardenConfig, 
         IOptions<ModelsConfig> modelsConfig, 
-        IOptions<UtilsConfig> utilsConfig)
+        IOptions<UtilsConfig> utilsConfig,
+        IOptions<VoiceConfig> voiceConfig)
     {
         _core = core;
         _players = playerManagement;
@@ -52,6 +55,7 @@ public sealed class Events
         _wardenConfig = wardenConfig.Value;
         _modelsConfig = modelsConfig.Value;
         _utilsConfig = utilsConfig.Value;
+        _voiceConfig = voiceConfig.Value;
     }
     
     public void Register()
@@ -169,6 +173,42 @@ public sealed class Events
 
     private HookResult OnRoundStart(EventRoundStart e)
     {
+        foreach (var p in _players.GetAllPlayers())
+            p.WasUnmutedByWarden = false;
+
+        if (_voiceConfig.KeepPrisonersMutedDuringRound)
+        {
+            foreach (var p in _players.GetPlayersByTeam(JBTeam.Prisoner).Where(p => !p.IsMuted))
+            {
+                if (_core.Permission.PlayerHasPermissions(p.SteamID, _voiceConfig.SkipVoicePenalties))
+                    continue;
+
+                p.Mute();
+            }
+
+            StartCheckPrisonerVoiceTimer();
+        }
+        else if (_voiceConfig.KeepPrisonersMutedForSecondsOnRoundStart > 0)
+        {
+            foreach (var p in _players.GetPlayersByTeam(JBTeam.Prisoner).Where(p => !p.IsMuted))
+            {
+                if (_core.Permission.PlayerHasPermissions(p.SteamID, _voiceConfig.SkipVoicePenalties))
+                    continue;
+
+                p.Mute();
+            }
+
+            _core.Scheduler.DelayBySeconds(_voiceConfig.KeepPrisonersMutedForSecondsOnRoundStart, () =>
+            {
+                foreach (var p in _players.GetPlayersByTeam(JBTeam.Prisoner).Where(p => p.IsMuted))
+                {
+                    if (_core.Permission.PlayerHasPermissions(p.SteamID, _voiceConfig.SkipVoicePenalties))
+                        continue;
+                    
+                    p.Unmute();
+                }
+            });
+        }
         _cellManager.CellsOpen = false;
         _boxManager.BoxEnabled = false;
 
@@ -237,6 +277,17 @@ public sealed class Events
     
     private HookResult OnRoundEnd(EventRoundEnd e)
     {
+        foreach (var p in _players.GetAllPlayers())
+            p.WasUnmutedByWarden = false;
+
+        StopCheckPrisonerVoiceTimer();
+
+        if (_voiceConfig.UnmutePrisonersOnRoundEnd)
+        {
+            foreach (var p in _players.GetPlayersByTeam(JBTeam.Prisoner).Where(p => p.IsMuted))
+                p.Unmute();
+        }
+
         _boxManager.StopBox();
         var currentWarden = _players.GetWarden();
         if (currentWarden != null)
@@ -290,6 +341,44 @@ public sealed class Events
         {
             cts.Cancel();
             _centerTimers.Remove(steamId);
+        }
+    }
+    private void StartCheckPrisonerVoiceTimer()
+    {
+        _checkPrisonersVoiceCts?.Cancel();
+        _checkPrisonersVoiceCts = null;
+
+        _checkPrisonersVoiceCts = _core.Scheduler.RepeatBySeconds(0.5f, () =>
+        {
+            foreach (var prisoner in _players.GetPlayersByTeam(JBTeam.Prisoner))
+            {
+                if (_core.Permission.PlayerHasPermissions(prisoner.SteamID, _voiceConfig.SkipVoicePenalties))
+                    continue;
+
+                if (prisoner.WasUnmutedByWarden)
+                    continue;
+
+                if (!prisoner.IsMuted)
+                {
+                    prisoner.Mute();
+                }
+            }
+        });
+    }
+    private void StopCheckPrisonerVoiceTimer()
+    {
+        _checkPrisonersVoiceCts?.Cancel();
+        _checkPrisonersVoiceCts = null;   
+        
+        foreach (var prisoner in _players.GetPlayersByTeam(JBTeam.Prisoner))
+        {
+            if (_core.Permission.PlayerHasPermissions(prisoner.SteamID, _voiceConfig.SkipVoicePenalties))
+                continue;
+            
+            if (prisoner.IsMuted)
+            {
+                prisoner.Unmute();
+            }
         }
     }
 }

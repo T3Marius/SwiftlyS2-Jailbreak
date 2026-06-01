@@ -37,6 +37,20 @@ public sealed class JBPlayerManagement : IJBPlayerManagement
         _players.Remove(steamId);
     }
 
+    public void SyncTeams()
+    {
+        _players.Clear();
+
+        foreach (var rawPlayer in _core.PlayerManager.GetAllValidPlayers())
+        {
+            var player = GetOrCreatePlayer(rawPlayer);
+            if (player == null)
+                continue;
+
+            player.SyncTeam();
+        }
+    }
+
     public IEnumerable<IJBPlayer> GetAllPlayers()               => _players.Values;
     public IEnumerable<IJBPlayer> GetPlayersByRole(JBRole role) => _players.Values.Where(p => p.Role == role);
     public IEnumerable<IJBPlayer> GetPlayersByTeam(JBTeam team) => _players.Values.Where(p => p.Team == team);

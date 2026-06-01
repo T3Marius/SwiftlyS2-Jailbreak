@@ -22,8 +22,11 @@ public sealed class JBPlayer : IJBPlayer
     public bool IsRebel         => Role == JBRole.Rebel;
     public bool IsDeputy        => Role == JBRole.Deputy;
     public bool IsWarden        => Role == JBRole.Warden;
-    public bool IsCuffed        { get; set; } = false;
-    public bool CanBecomeWarden { get; set; } = true;
+
+    public bool IsCuffed           { get; set; } = false;
+    public bool CanBecomeWarden    { get; set; } = true;
+    public bool IsMuted            { get; set; } = false;
+    public bool WasUnmutedByWarden { get; set; } = false;
 
     // ── Localizer (falls back to server locale when player is no longer valid) ─
     public ILocalizer Localizer => Player.IsValid
@@ -193,6 +196,17 @@ public sealed class JBPlayer : IJBPlayer
                 PlayerUtils.Color(Player, new Color(255, 255, 255, 255), _core.Scheduler);
             }
         }
+    }
+
+    public void Mute()
+    {
+        Player.VoiceFlags = VoiceFlagValue.Muted;
+        IsMuted = true;
+    }
+    public void Unmute()
+    {
+        Player.VoiceFlags = VoiceFlagValue.Normal;
+        IsMuted = false;
     }
 
     // ── Team sync ─────────────────────────────────────────────────────────────

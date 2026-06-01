@@ -13,6 +13,8 @@ namespace Jailbreak.Contract
         IEnumerable<IJBPlayer> GetPlayersByRole(JBRole role);
         IEnumerable<IJBPlayer> GetPlayersByTeam(JBTeam team);
 
+        void SyncTeams();
+
         /// <param name="durationMs">How long HTML-overlay messages stay on screen, in milliseconds.</param>
         void SendMessage(MessageType type, string key, bool prefix = true, int durationMs = 5000, params object[] args);
     }

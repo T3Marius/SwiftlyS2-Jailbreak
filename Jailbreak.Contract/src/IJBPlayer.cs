@@ -42,6 +42,8 @@ namespace Jailbreak.Contract
         bool IsWarden { get; }
         bool IsCuffed { get; set; }
         bool CanBecomeWarden { get; set; }
+        bool IsMuted { get; set; }
+        bool WasUnmutedByWarden { get; set; }
 
         ILocalizer Localizer { get; }
 
@@ -50,6 +52,9 @@ namespace Jailbreak.Contract
         void SetDeputy(bool state, string? offReason = null);
         void SetRebel(bool state, string? offReason = null);
         void SetFreeday(bool state, string? offReason = null);
+
+        void Mute();
+        void Unmute();
 
         void SyncTeam();
 
