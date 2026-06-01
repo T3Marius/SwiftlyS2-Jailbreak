@@ -31,6 +31,7 @@ public sealed class Listeners
 
     private void OnPrecacheResource(IOnPrecacheResourceEvent @event)
     {
+        @event.AddItem(IconManager.CoinModelPath);
         @event.AddItem(_modelsConfig.WardenModel);
         @event.AddItem(_modelsConfig.DeputyModel);
         @event.AddItem(_modelsConfig.FreedayModel);

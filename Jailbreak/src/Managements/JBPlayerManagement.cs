@@ -8,18 +8,16 @@ namespace Jailbreak;
 public sealed class JBPlayerManagement : IJBPlayerManagement
 {
     private readonly ISwiftlyCore           _core;
-    private readonly IOptions<IconsConfig>  _iconsConfig;
-    private readonly IOptions<ModelsConfig> _modelsConfig;
-    private readonly IconManager            _icons;
+    private readonly IOptions<ModelsConfig>  _modelsConfig;
+    private readonly IconManager             _iconManager;
     
     private readonly Dictionary<ulong, JBPlayer> _players = [];
 
-    public JBPlayerManagement(ISwiftlyCore core, IOptions<IconsConfig> iconsConfig, IOptions<ModelsConfig> modelsConfig, IconManager icons)
+    public JBPlayerManagement(ISwiftlyCore core, IOptions<ModelsConfig> modelsConfig, IconManager iconManager)
     {
         _core         = core;
-        _iconsConfig  = iconsConfig;
         _modelsConfig = modelsConfig;
-        _icons        = icons;
+        _iconManager  = iconManager;
     }
 
     public IJBPlayer? GetOrCreatePlayer(IPlayer player)
@@ -27,7 +25,7 @@ public sealed class JBPlayerManagement : IJBPlayerManagement
         if (_players.TryGetValue(player.SteamID, out var jbPlayer))
             return jbPlayer;
 
-        jbPlayer = new JBPlayer(player, _core, _modelsConfig, _iconsConfig, _icons);
+        jbPlayer = new JBPlayer(player, _core, _modelsConfig, _iconManager);
         _players[player.SteamID] = jbPlayer;
         return jbPlayer;
     }

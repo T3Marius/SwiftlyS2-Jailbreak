@@ -4,6 +4,7 @@ using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.GameEventDefinitions;
 using SwiftlyS2.Shared.GameEvents;
 using SwiftlyS2.Shared.Misc;
+using SwiftlyS2.Shared.Natives;
 using SwiftlyS2.Shared.Players;
 
 namespace Jailbreak;
@@ -118,6 +119,7 @@ public sealed class Events
         if (player == null)
             return HookResult.Continue;
 
+        PlayerUtils.Color(player.Player, new Color(255, 255, 255, 255), _core.Scheduler);
         player.SyncTeam();
 
         if (player.Team == JBTeam.Guard)

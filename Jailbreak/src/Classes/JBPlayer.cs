@@ -34,19 +34,17 @@ public sealed class JBPlayer : IJBPlayer
         : _core.Localizer;
 
     // ── Private deps ──────────────────────────────────────────────────────────
-    private readonly ISwiftlyCore _core;
-    private readonly ModelsConfig _modelsConfig;
-    private readonly IconsConfig  _iconsConfig;
-    private readonly IconManager  _icons;
+    private readonly ISwiftlyCore  _core;
+    private readonly ModelsConfig  _modelsConfig;
+    private readonly IconManager   _iconManager;
 
-    public JBPlayer(IPlayer player, ISwiftlyCore core, IOptions<ModelsConfig> modelsConfig, IOptions<IconsConfig> iconsConfig, IconManager icons)
+    public JBPlayer(IPlayer player, ISwiftlyCore core, IOptions<ModelsConfig> modelsConfig, IconManager iconManager)
     {
         Player        = player;
         SteamID       = player.SteamID;
         _core         = core;
         _modelsConfig = modelsConfig.Value;
-        _iconsConfig  = iconsConfig.Value;
-        _icons        = icons;
+        _iconManager  = iconManager;
     }
 
     // ── Role transitions ──────────────────────────────────────────────────────
@@ -56,7 +54,7 @@ public sealed class JBPlayer : IJBPlayer
         if (state)
         {
             Role = JBRole.Warden;
-            _icons.CreateIcon(Player, _iconsConfig.WardenIcon);
+            _iconManager.SpawnCoin(Player);
             if (!silent)
                 _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["new_warden_alert", Player.Name]);
 
@@ -71,7 +69,7 @@ public sealed class JBPlayer : IJBPlayer
         else
         {
             Role = JBRole.None;
-            _icons.RemoveIcon(SteamID);
+            _iconManager.DespawnCoin();
 
             var key  = offReason != null ? $"warden_removed.{offReason}" : "warden_removed";
             var args = killerName != null
@@ -115,7 +113,6 @@ public sealed class JBPlayer : IJBPlayer
         if (state)
         {
             Role = JBRole.Deputy;
-            _icons.CreateIcon(Player, _iconsConfig.DeputyIcon);
 
             if (!string.IsNullOrEmpty(_modelsConfig.DeputyModel))
                 PlayerUtils.SetModel(Player, _modelsConfig.DeputyModel, _core.Scheduler);
@@ -123,7 +120,6 @@ public sealed class JBPlayer : IJBPlayer
         else
         {
             if (Role == JBRole.Deputy) Role = JBRole.None;
-            _icons.RemoveIcon(SteamID);
 
             SyncTeam();
             if (Team == JBTeam.Guard)
@@ -148,14 +144,12 @@ public sealed class JBPlayer : IJBPlayer
         if (state)
         {
             Role = JBRole.Rebel;
-            _icons.CreateIcon(Player, _iconsConfig.RebelIcon);
             PlayerUtils.Color(Player, new Color(255, 0, 0, 255), _core.Scheduler);
         }
         else
         {
             if (Role == JBRole.Rebel) Role = JBRole.None;
             PlayerUtils.Color(Player, new Color(255, 255, 255, 255), _core.Scheduler);
-            _icons.RemoveIcon(SteamID);
         }
     }
 
@@ -164,7 +158,6 @@ public sealed class JBPlayer : IJBPlayer
         if (state)
         {
             Role = JBRole.Freeday;
-            _icons.CreateIcon(Player, _iconsConfig.FreedayIcon);
 
             if (!string.IsNullOrEmpty(_modelsConfig.FreedayModel))
                 PlayerUtils.SetModel(Player, _modelsConfig.FreedayModel, _core.Scheduler);
@@ -177,7 +170,6 @@ public sealed class JBPlayer : IJBPlayer
         else
         {
             if (Role == JBRole.Freeday) Role = JBRole.None;
-            _icons.RemoveIcon(SteamID);
 
             if (_modelsConfig.PrisonerModels.Any())
             {

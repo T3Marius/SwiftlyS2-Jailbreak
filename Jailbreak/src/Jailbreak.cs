@@ -32,8 +32,6 @@ public sealed class Main : BasePlugin
 
         Core.Configuration.InitializeTomlWithModel<WardenConfig>("warden.toml", "Warden")
              .Configure(b => b.AddTomlFile("warden.toml", false, true));
-        Core.Configuration.InitializeTomlWithModel<IconsConfig>("icons.toml", "Icons")
-             .Configure(b => b.AddTomlFile("icons.toml", false, true));
         Core.Configuration.InitializeTomlWithModel<ModelsConfig>("models.toml", "Models")
              .Configure(b => b.AddTomlFile("models.toml", false, true));
         Core.Configuration.InitializeTomlWithModel<UtilsConfig>("utils.toml", "Utils")
@@ -55,9 +53,6 @@ public sealed class Main : BasePlugin
 
         collection.AddOptionsWithValidateOnStart<WardenConfig>()
                   .BindConfiguration("Warden");
-
-        collection.AddOptionsWithValidateOnStart<IconsConfig>()
-                  .BindConfiguration("Icons");
 
         collection.AddOptionsWithValidateOnStart<ModelsConfig>()
                   .BindConfiguration("Models");
