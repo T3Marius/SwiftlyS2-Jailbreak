@@ -93,5 +93,5 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak` to acc
 - [ ] Finish configuring freeday system.
 - [ ] Finish warden menu.
 - [ ] Configure team ratio.
-- [X] Mute priosners system (When Warden is speaking, first x seconds of round start, etc...)
+- [X] Mute prisoners system (When Warden is speaking, first x seconds of round start, etc...)
 - [ ] Add more TODO list 😂
