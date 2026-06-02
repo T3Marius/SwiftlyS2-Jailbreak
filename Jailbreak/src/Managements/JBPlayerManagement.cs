@@ -7,7 +7,7 @@ namespace Jailbreak;
 
 public sealed class JBPlayerManagement : IJBPlayerManagement
 {
-    private readonly ISwiftlyCore           _core;
+    private readonly ISwiftlyCore            _core;
     private readonly IOptions<ModelsConfig>  _modelsConfig;
     private readonly IconManager             _iconManager;
     

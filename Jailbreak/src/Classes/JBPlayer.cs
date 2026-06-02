@@ -4,7 +4,6 @@ using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Natives;
 using SwiftlyS2.Shared.Players;
 using SwiftlyS2.Shared.Translation;
-using CsTeam = SwiftlyS2.Shared.Players.Team;
 
 namespace Jailbreak;
 

@@ -8,9 +8,9 @@ namespace Jailbreak;
 
 public sealed class WardenMenu
 {
-    private readonly ISwiftlyCore        _core;
-    private readonly CellManager         _cellManager;
-    private readonly BoxManager          _boxManager;
+    private readonly ISwiftlyCore _core;
+    private readonly CellManager _cellManager;
+    private readonly BoxManager _boxManager;
     private readonly IJBPlayerManagement _players;
 
     public WardenMenu(ISwiftlyCore core, CellManager cellManager, BoxManager boxManager, IJBPlayerManagement players)
@@ -21,31 +21,130 @@ public sealed class WardenMenu
         _players = players;
     }
 
+    // ─── Root ────────────────────────────────────────────────────────────────
+
     public void Show(IJBPlayer player)
     {
         var builder = _core.MenusAPI.CreateBuilder().Design
             .SetMenuTitle(player.Localizer["warden_menu.title"]);
 
-        var toggleCells = new SubmenuMenuOption(player.Localizer["warden_menu_option.toggle_cells"], () => ToggleCellsSubmenu(player));
-        var toggleBox = new SubmenuMenuOption(player.Localizer["warden_menu_option.toggle_box"], () => ToggleBoxSubmenu(player));
-        var toggleVoice = new SubmenuMenuOption(player.Localizer["warden_menu_option.toggle_voice"], () => ToggleVoiceSubmenu(player));
+        builder.AddOption(new SubmenuMenuOption(player.Localizer["warden_menu_option.toggle_cells"], () => CellsSubmenu(player)));
+        builder.AddOption(new SubmenuMenuOption(player.Localizer["warden_menu_option.toggle_box"], () => BoxSubmenu(player)));
+        builder.AddOption(new SubmenuMenuOption(player.Localizer["warden_menu_option.toggle_voice"], () => VoiceSubmenu(player)));
+        builder.AddOption(new SubmenuMenuOption(player.Localizer["warden_menu_option.manage_deputy"], () => DeputySubmenu(player)));
 
-
-        builder.AddOption(toggleCells);
-        builder.AddOption(toggleBox);
-        builder.AddOption(toggleVoice);
-
-        var built = builder.Build();
-        _core.MenusAPI.OpenMenuForPlayer(player.Player, built);
-        
+        _core.MenusAPI.OpenMenuForPlayer(player.Player, builder.Build());
     }
-    private IMenuAPI ToggleVoiceSubmenu(IJBPlayer player)
+
+    // ─── Cells ───────────────────────────────────────────────────────────────
+
+    private IMenuAPI CellsSubmenu(IJBPlayer player)
+    {
+        var builder = _core.MenusAPI.CreateBuilder().Design
+            .SetMenuTitle(player.Localizer["cells_submenu.title"]);
+
+        var openCells = new ButtonMenuOption(player.Localizer["cells_submenu_option.open_cells"])
+        {
+            // Only actionable when cells are currently closed
+            Enabled = !_cellManager.CellsOpen
+        };
+        openCells.Click += (_, _) =>
+        {
+            _core.Scheduler.NextWorldUpdate(() =>
+            {
+                if (_cellManager.CellsOpen) return;
+                _cellManager.OpenCells();
+                _players.SendMessage(MessageType.Chat, "cells_opened_warden");
+            });
+            return ValueTask.CompletedTask;
+        };
+
+        var closeCells = new ButtonMenuOption(player.Localizer["cells_submenu_option.close_cells"])
+        {
+            // Only actionable when cells are currently open
+            Enabled = _cellManager.CellsOpen
+        };
+        closeCells.Click += (_, _) =>
+        {
+            _core.Scheduler.NextWorldUpdate(() =>
+            {
+                if (!_cellManager.CellsOpen) return;
+                _cellManager.CloseCells();
+                _players.SendMessage(MessageType.Chat, "cells_closed_warden");
+            });
+            return ValueTask.CompletedTask;
+        };
+
+        builder.AddOption(openCells);
+        builder.AddOption(closeCells);
+
+        return builder.Build();
+    }
+
+    // ─── Box ─────────────────────────────────────────────────────────────────
+
+    private IMenuAPI BoxSubmenu(IJBPlayer player)
+    {
+        var builder = _core.MenusAPI.CreateBuilder().Design
+            .SetMenuTitle(player.Localizer["box_submenu.title"]);
+
+        var startBox = new ButtonMenuOption(player.Localizer["box_submenu_option.start_box"])
+        {
+            Enabled = !_boxManager.BoxEnabled
+        };
+        startBox.Click += (_, _) =>
+        {
+            _core.Scheduler.NextWorldUpdate(() =>
+            {
+                if (_boxManager.BoxEnabled) return;
+                _boxManager.StartBox();
+                _players.SendMessage(MessageType.Chat, "box_enabled");
+            });
+            return ValueTask.CompletedTask;
+        };
+
+        var stopBox = new ButtonMenuOption(player.Localizer["box_submenu_option.stop_box"])
+        {
+            Enabled = _boxManager.BoxEnabled
+        };
+        stopBox.Click += (_, _) =>
+        {
+            _core.Scheduler.NextWorldUpdate(() =>
+            {
+                if (!_boxManager.BoxEnabled) return;
+                _boxManager.StopBox();
+                _players.SendMessage(MessageType.Chat, "box_disabled");
+            });
+            return ValueTask.CompletedTask;
+        };
+
+        builder.AddOption(startBox);
+        builder.AddOption(stopBox);
+
+        return builder.Build();
+    }
+
+    // ─── Voice ───────────────────────────────────────────────────────────────
+
+    private IMenuAPI VoiceSubmenu(IJBPlayer player)
     {
         var builder = _core.MenusAPI.CreateBuilder().Design
             .SetMenuTitle(player.Localizer["voice_submenu.title"]);
 
-        var unmuteAllPrisoner = new ButtonMenuOption(player.Localizer["voice_submenu_option.unmute_all_prisoner"]);
-        unmuteAllPrisoner.Click += (sender, args) =>
+        // Per-prisoner submenus listed first for quick access
+        foreach (var prisoner in _players.GetPlayersByTeam(JBTeam.Prisoner))
+        {
+            // Show current mute state in the label so the warden can see at a glance
+            var label = prisoner.IsMuted
+                ? player.Localizer["voice_submenu_option.prisoner_muted_label", prisoner.Player.Name]
+                : player.Localizer["voice_submenu_option.prisoner_unmuted_label", prisoner.Player.Name];
+
+            builder.AddOption(new SubmenuMenuOption(label, () => PrisonerVoiceSubmenu(player, prisoner)));
+        }
+
+        // Bulk actions at the bottom
+        var unmuteAll = new ButtonMenuOption(player.Localizer["voice_submenu_option.unmute_all_prisoner"]);
+        unmuteAll.Click += (_, _) =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
@@ -58,8 +157,9 @@ public sealed class WardenMenu
             });
             return ValueTask.CompletedTask;
         };
-        var muteAllPrisoner = new ButtonMenuOption(player.Localizer["voice_submenu_option.mute_all_prisoner"]);
-        muteAllPrisoner.Click += (sender, args) => 
+
+        var muteAll = new ButtonMenuOption(player.Localizer["voice_submenu_option.mute_all_prisoner"]);
+        muteAll.Click += (_, _) =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
@@ -73,24 +173,23 @@ public sealed class WardenMenu
             return ValueTask.CompletedTask;
         };
 
-        foreach (var prisoner in _players.GetPlayersByTeam(JBTeam.Prisoner))
-        {
-            var prisonerSubMenu = new SubmenuMenuOption(prisoner.Player.Name, () => TogglePrisonerVoiceSubmenu(player, prisoner));
-            builder.AddOption(prisonerSubMenu);
-        }
-
-        builder.AddOption(unmuteAllPrisoner);
-        builder.AddOption(muteAllPrisoner);
+        builder.AddOption(unmuteAll);
+        builder.AddOption(muteAll);
 
         return builder.Build();
     }
-    private IMenuAPI TogglePrisonerVoiceSubmenu(IJBPlayer player, IJBPlayer prisoner)
+
+    private IMenuAPI PrisonerVoiceSubmenu(IJBPlayer player, IJBPlayer prisoner)
     {
         var builder = _core.MenusAPI.CreateBuilder().Design
             .SetMenuTitle(prisoner.Player.Name);
 
-        var mute = new ButtonMenuOption(player.Localizer["voice_submenu_option.mute_prisoner"]);
-        mute.Click += (sender, args) =>
+        var mute = new ButtonMenuOption(player.Localizer["voice_submenu_option.mute_prisoner"])
+        {
+            // Disable if already muted
+            Enabled = !prisoner.IsMuted
+        };
+        mute.Click += (_, _) =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
@@ -101,8 +200,12 @@ public sealed class WardenMenu
             return ValueTask.CompletedTask;
         };
 
-        var unmute = new ButtonMenuOption(player.Localizer["voice_submenu_option.unmute_prisoner"]);
-        unmute.Click += (sender, args) =>
+        var unmute = new ButtonMenuOption(player.Localizer["voice_submenu_option.unmute_prisoner"])
+        {
+            // Disable if already unmuted
+            Enabled = prisoner.IsMuted
+        };
+        unmute.Click += (_, _) =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
@@ -118,82 +221,76 @@ public sealed class WardenMenu
 
         return builder.Build();
     }
-    private IMenuAPI ToggleBoxSubmenu(IJBPlayer player)
+
+    // ─── Deputy ──────────────────────────────────────────────────────────────
+
+    private IMenuAPI DeputySubmenu(IJBPlayer player)
     {
         var builder = _core.MenusAPI.CreateBuilder().Design
-            .SetMenuTitle(player.Localizer["box_submenu.title"]);
+            .SetMenuTitle(player.Localizer["manage_deputy_submenu.title"]);
 
-        var startBox = new ButtonMenuOption(player.Localizer["box_submenu_option.start_box"]);
-        startBox.Click += (sender, args) =>
+        var currentDeputy = _players.GetDeputy();
+
+        // Informational label showing who (if anyone) is currently deputy
+        var statusLabel = currentDeputy != null
+            ? player.Localizer["manage_deputy_submenu_option.current_deputy", currentDeputy.Player.Name]
+            : player.Localizer["manage_deputy_submenu_option.current_deputy_none"];
+
+        builder.AddOption(new TextMenuOption(statusLabel));
+
+        // Remove deputy — only actionable when one exists
+        var removeDeputy = new ButtonMenuOption(player.Localizer["manage_deputy_submenu_option.remove_deputy"])
+        {
+            Enabled = currentDeputy != null
+        };
+        removeDeputy.Click += (_, _) =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
-                if (_boxManager.BoxEnabled)
-                    return;
+                var deputy = _players.GetDeputy();
+                if (deputy == null) return;
 
-                _boxManager.StartBox();
-                _players.SendMessage(MessageType.Chat, "box_enabled");
+                deputy.SetDeputy(false);
+                _players.SendMessage(MessageType.Chat, "deputy_removed_warden", true, args: deputy.Player.Name);
             });
             return ValueTask.CompletedTask;
         };
+        builder.AddOption(removeDeputy);
 
-        var stopBox = new ButtonMenuOption(player.Localizer["box_submenu_option.stop_box"]);
-        stopBox.Click += (sender, args) =>
+        // Assign from alive guards (exclude the warden themselves and the current deputy)
+        var candidates = _players.GetPlayersByTeam(JBTeam.Guard)
+            .Where(g => !g.IsWarden && !(g.IsDeputy))
+            .ToList();
+
+        if (candidates.Count > 0)
         {
-            _core.Scheduler.NextWorldUpdate(() =>
+            builder.AddOption(new TextMenuOption(player.Localizer["manage_deputy_submenu_option.assign_deputy_header"]));
+
+            foreach (var guard in candidates)
             {
-                if (!_boxManager.BoxEnabled)
-                    return;
+                var guardRef = guard; // capture for closure
+                var assignOption = new ButtonMenuOption(guardRef.Player.Name);
+                assignOption.Click += (_, _) =>
+                {
+                    _core.Scheduler.NextWorldUpdate(() =>
+                    {
+                        // Remove previous deputy first if one exists
+                        var previousDeputy = _players.GetDeputy();
+                        if (previousDeputy != null)
+                        {
+                            previousDeputy.SetDeputy(false);
+                            _players.SendMessage(MessageType.Chat, "deputy_removed_warden", true, args: previousDeputy.Player.Name);
+                        }
 
-                _boxManager.StopBox();
-                _players.SendMessage(MessageType.Chat, "box_disabled");
-            });
-            return ValueTask.CompletedTask;  
-        };
-
-
-        builder.AddOption(startBox);
-        builder.AddOption(stopBox);
+                        guardRef.SetDeputy(true);
+                        _players.SendMessage(MessageType.Chat, "deputy_assigned_warden", true, args: guardRef.Player.Name);
+                    });
+                    return ValueTask.CompletedTask;
+                };
+                builder.AddOption(assignOption);
+            }
+        }
 
         return builder.Build();
     }
-    private IMenuAPI ToggleCellsSubmenu(IJBPlayer player)
-    {
-        var builder = _core.MenusAPI.CreateBuilder().Design
-            .SetMenuTitle(player.Localizer["cells_submenu.title"]);
-
-        var openCells = new ButtonMenuOption(player.Localizer["cells_submenu_option.open_cells"]);
-        openCells.Click += (sender, args) =>
-        {
-            _core.Scheduler.NextWorldUpdate(() =>
-            {
-                if (_cellManager.CellsOpen)
-                    return;
-
-                _cellManager.OpenCells();
-                _players.SendMessage(MessageType.Chat, "cells_opened_warden");
-            });
-            return ValueTask.CompletedTask;
-        };
-
-        var closeCells = new ButtonMenuOption(player.Localizer["cells_submenu_option.close_cells"]);
-        closeCells.Click += (sender, args) =>
-        {
-            _core.Scheduler.NextWorldUpdate(() =>
-            {
-                if (!_cellManager.CellsOpen)
-                    return;
-
-                _cellManager.CloseCells();
-                _players.SendMessage(MessageType.Chat, "cells_closed_warden");
-            });
-            return ValueTask.CompletedTask;
-        };
-
-        builder.AddOption(openCells);
-        builder.AddOption(closeCells);
-
-        return builder.Build();
-    }
-
 }
