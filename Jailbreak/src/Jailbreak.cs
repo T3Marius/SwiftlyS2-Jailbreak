@@ -38,6 +38,8 @@ public sealed class Main : BasePlugin
              .Configure(b => b.AddTomlFile("utils.toml", false, true));
         Core.Configuration.InitializeTomlWithModel<VoiceConfig>("voice.toml", "Voice")
              .Configure(b => b.AddTomlFile("voice.toml", false, true));
+        Core.Configuration.InitializeTomlWithModel<DeputyConfig>("deputy.toml", "Deputy")
+             .Configure(b => b.AddTomlFile("deputy.toml", false, true));
 
         collection.AddSwiftly(Core)
                   .AddSingleton<CuffsManager>()
@@ -66,6 +68,9 @@ public sealed class Main : BasePlugin
 
         collection.AddOptionsWithValidateOnStart<VoiceConfig>()
                   .BindConfiguration("Voice");
+        
+        collection.AddOptionsWithValidateOnStart<DeputyConfig>()
+                  .BindConfiguration("Deputy");
 
         _provider = collection.BuildServiceProvider();
 

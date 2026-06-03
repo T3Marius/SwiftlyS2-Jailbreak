@@ -117,11 +117,15 @@ public sealed class JBPlayer : IJBPlayer
             if (!string.IsNullOrEmpty(_modelsConfig.DeputyModel))
                 PlayerUtils.SetModel(livePlayer, _modelsConfig.DeputyModel, _core.Scheduler);
 
+            _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["new_deputy_alert", Player.Name]);
+
             return;
         }
 
         if (Role == JBRole.Deputy)
             Role = JBRole.None;
+        
+        _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["no_deputy_alert"]);
 
         SyncTeam();
         ApplyTeamDefaults();

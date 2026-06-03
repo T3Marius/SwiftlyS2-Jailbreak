@@ -3,15 +3,23 @@
 
     "current_ct_roles.center": "Current Warden: {0}\nCurrent Deputy: {1}",
     "warden_already_exists": "A [blue]Warden[silver] already exists.",
+    "deputy_already_exists": "A [gold]Deputy[silver] already exists.",
     "you_already_warden": "You are already the [blue]Warden[silver].",
     "you_are_new_warden": "You are the new [blue]Warden[silver]. Use [lime]!whelp[silver] to see your commands.",
+    "you_are_new_deputy": "You are the new [gold]Deputy[silver]. Use [lime]!dhelp[silver] to see your commands.",
+    "new_deputy_alert": "{0} is the new Deputy.",
     "new_warden_alert": "{0} is the new Warden.",
     "no_warden_alert": "ALERT! THERE IS NO WARDEN!",
+    "no_deputy_alert": "ALERT! THERE IS NO DEPUTY!",
     "warden_removed.giveup": "{0} has given up [blue]Warden[silver]. Use [lime]!w[silver] to become the new one.",
+    "deputy_removed.giveup": "{0} has give up [gold]Deputy[silver]. Use [lime]!d[silver] to become the new one.",
     "warden_removed.killed": "{0} was killed by {1} and is no longer the [blue]Warden[silver]. Use [lime]!w[silver] to become the new one.",
     "warden_removed": "{0} is no longer the [blue]Warden[silver]. Use [lime]!w[silver] to become the new one.", // fallback,
     "you_are_not_warden": "You are not the [blue]Warden[silver].",
+    "you_are_not_deputy": "You are not the [gold]Deputy[silver].",
     "warden_not_guard": "You need to be guard in order to become the [blue]Warden[silver].",
+    "deputy_not_guard": "You need to be guard in order to become the [blue]Deputy[silver].",
+    "deputy_no_warden": "There is not [blue]Warden[silver] to become [gold]Deputy[silver] to.",
     "cannot_become_warden": "You can't become the [blue]Warden[silver] right now.",
 
     "warden_help.header": "Warden Commands:",
@@ -47,8 +55,9 @@
     "voice_submenu_option.prisoner_unmuted_label": "{0}",
     "manage_deputy_submenu_option.assign_deputy_header": "— Assign Deputy —",
     "deputy_assigned_warden": "{0} has been assigned as Deputy Warden.",
-    "cells_opened_warden": "[blue]Warden[silver] has opened the cells.",
-    "cells_closed_warden": "[blue]Warden[silver] has closed the cells.",
+
+    "cells_opened_sender": "[blue]{0}[silver] has opened the cells.",
+    "cells_closed_sender": "[blue]{0}[silver] has closed the cells.",
 
     "all_prisoners_unmuted_warden": "[blue]Warden[silver] unmuted all prisoners.",
     "all_prisoners_muted_warden": "[blue]Warden[silver] muted all prisoners.",
@@ -71,6 +80,8 @@
     "became_rebel_alert": "{0} is now a rebel!",
     "became_rebel_chat": "{0} is now a [red]rebel[silver]!",
     "guard_death": "Guard [blue]{0}[silver] was killed by rebel [red]{1}[default].",
+
+    "you_are_not_warden&deputy": "You need to be [blue]Warden[silver] or [gold]Deputy[silver] in order to use this command!",
 
     "freeday_given": "[blue]Warden[silver] gave freeday to [orange]{0}[silver].",
     "freeday_removed": "[blue]Warden[silver] removed [orange]{0}'s[silver] freeday.",

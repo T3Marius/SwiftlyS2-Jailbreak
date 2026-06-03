@@ -276,23 +276,27 @@ public sealed class WardenCommands
         if (player == null)
             return;
 
-        if (!player.IsWarden)
+        if (!player.IsWarden || !player.IsDeputy)
         {
-            player.SendMessage(MessageType.Chat, "you_are_not_warden", true);
+            player.SendMessage(MessageType.Chat, "you_are_not_warden&deputy", true);
             return;
         }
 
         _cellManager.CellsOpen = !_cellManager.CellsOpen;
 
+        string sender = player.IsDeputy
+            ? "Deputy"
+            : "Warden";
+
         if (_cellManager.CellsOpen)
         {
             _cellManager.OpenCells();
-            _players.SendMessage(MessageType.Chat, "cells_opened_warden", true);
+            _players.SendMessage(MessageType.Chat, "cells_opened_warden", true, args: sender);
         }
         else
         {
             _cellManager.CloseCells();
-            _players.SendMessage(MessageType.Chat, "cells_closed_warden", true);
+            _players.SendMessage(MessageType.Chat, "cells_closed_warden", true, args: sender);
         }
     }
 }
