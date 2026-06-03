@@ -88,7 +88,7 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak` to acc
 - [ ] Create some SpecialDays modules.
 - [ ] Finish warden commands.
 - [X] Finish deputy commands.
-- [ ] Finish configuring deputy and warden roles.
+- [X] Finish configuring deputy and warden roles.
 - [X] Finish configuring rebel system.
 - [X] Finish configuring freeday system.
 - [ ] Finish warden menu.
