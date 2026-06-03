@@ -32,8 +32,75 @@ public sealed class WardenMenu
         builder.AddOption(new SubmenuMenuOption(player.Localizer["warden_menu_option.toggle_box"], () => BoxSubmenu(player)));
         builder.AddOption(new SubmenuMenuOption(player.Localizer["warden_menu_option.toggle_voice"], () => VoiceSubmenu(player)));
         builder.AddOption(new SubmenuMenuOption(player.Localizer["warden_menu_option.manage_deputy"], () => DeputySubmenu(player)));
+        builder.AddOption(new SubmenuMenuOption(player.Localizer["warden_menu_option.manage_freeday"], () => FreedaySubmenu(player)));
 
         _core.MenusAPI.OpenMenuForPlayer(player.Player, builder.Build());
+    }
+
+    private IMenuAPI FreedaySubmenu(IJBPlayer player)
+    {
+        var builder = _core.MenusAPI.CreateBuilder().Design
+            .SetMenuTitle(player.Localizer["freeday_submenu.title"]);
+
+        builder.AddOption(new SubmenuMenuOption(player.Localizer["freeday_submenu_option.give_freeday"], () => GiveFreedaySubmenu(player)));
+        builder.AddOption(new SubmenuMenuOption(player.Localizer["freeday_submenu_option.remove_freeday"], () => RemoveFreedaySubmenu(player)));
+
+        return builder.Build();
+    }
+
+    private IMenuAPI GiveFreedaySubmenu(IJBPlayer player)
+    {
+        var builder = _core.MenusAPI.CreateBuilder().Design
+            .SetMenuTitle(player.Localizer["give_freeday_submenu.title"]);
+
+        var prisoners = _players.GetPlayersByTeam(JBTeam.Prisoner).ToList();
+
+        foreach (var prisoner in prisoners)
+        {
+            if (prisoner.IsFreeday)
+                continue;
+
+            var option = new ButtonMenuOption(prisoner.Player.Name);
+            option.Click += async (_, _) =>
+            {
+                _core.Scheduler.NextWorldUpdate(() =>
+                {
+                    prisoner.SetFreeday(true);
+                    _players.SendMessage(MessageType.Chat, "freeday_given", true, 0, prisoner.Player.Name);
+                });
+            };
+
+            builder.AddOption(option);
+        }
+
+        return builder.Build();
+    }
+
+    private IMenuAPI RemoveFreedaySubmenu(IJBPlayer player)
+    {
+        var builder = _core.MenusAPI.CreateBuilder().Design
+            .SetMenuTitle(player.Localizer["remove_freeday_submenu.title"]);
+
+        var prisoners = _players.GetPlayersByTeam(JBTeam.Prisoner).ToList();
+        foreach (var prisoner in prisoners)
+        {
+            if (!prisoner.IsFreeday)
+                continue;
+
+            var option = new ButtonMenuOption(prisoner.Player.Name);
+            option.Click += async (_, _) =>
+            {
+                _core.Scheduler.NextWorldUpdate(() =>
+                {
+                    prisoner.SetFreeday(false);
+                    _players.SendMessage(MessageType.Chat, "freeday_removed", true, 0, prisoner.Player.Name);
+                });
+            };
+
+            builder.AddOption(option);
+        } 
+
+        return builder.Build();
     }
 
     // ─── Cells ───────────────────────────────────────────────────────────────

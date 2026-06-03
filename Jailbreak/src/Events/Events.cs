@@ -146,6 +146,12 @@ public sealed class Events
         foreach (var p in _players.GetAllPlayers())
             p.WasUnmutedByWarden = false;
 
+        foreach (var p in _players.GetPlayersByRole(JBRole.Freeday))
+            p.SetFreeday(false);
+        
+        foreach (var p in _players.GetPlayersByRole(JBRole.Rebel))
+            p.SetRebel(false);
+
         if (_voiceConfig.KeepPrisonersMutedDuringRound)
         {
             foreach (var p in _players.GetPlayersByTeam(JBTeam.Prisoner).Where(p => !p.IsMuted))
@@ -256,6 +262,12 @@ public sealed class Events
     {
         foreach (var p in _players.GetAllPlayers())
             p.WasUnmutedByWarden = false;
+
+        foreach (var p in _players.GetPlayersByRole(JBRole.Freeday))
+            p.SetFreeday(false);
+        
+        foreach (var p in _players.GetPlayersByRole(JBRole.Rebel))
+            p.SetRebel(false);
 
         StopCheckPrisonerVoiceTimer();
 

@@ -26,10 +26,16 @@
     "box_submenu.title": "Toggle Box",
     "voice_submenu.title": "Toggle Voice",
     "manage_deputy_submenu.title": "Manage Deputy",
+    "freeday_submenu.title": "Manage Freeday",
+    "give_freeday_submenu.title": "Give Freeday",
+    "remove_freeday_submenu.title": "Remove Freeday",
     "warden_menu_option.toggle_cells": "Toggle Cells",
     "warden_menu_option.toggle_box": "Toggle Box",
     "warden_menu_option.toggle_voice": "Toggle Voice",
     "warden_menu_option.manage_deputy": "Manage Deputy",
+    "warden_menu_option.manage_freeday": "Manage Freeday",
+    "freeday_submenu_option.give_freeday": "Give Freeday",
+    "freeday_submenu_option.remove_freeday": "Remove Freeday",
     "box_submenu_option.start_box": "Start Box",
     "box_submenu_option.stop_box": "Stop Box",
     "cells_submenu_option.open_cells": "Open Cells",
@@ -65,6 +71,9 @@
     "became_rebel_alert": "{0} is now a rebel!",
     "became_rebel_chat": "{0} is now a [red]rebel[silver]!",
     "guard_death": "Guard [blue]{0}[silver] was killed by rebel [red]{1}[default].",
+
+    "freeday_given": "[blue]Warden[silver] gave freeday to [orange]{0}[silver].",
+    "freeday_removed": "[blue]Warden[silver] removed [orange]{0}'s[silver] freeday.",
 
     "none": "—",
     "team_ratio_full": "Guards are [red]full[silver]. The ratio is [lime]{0} prisoners[silver] per [lime]1 guard[silver]."
