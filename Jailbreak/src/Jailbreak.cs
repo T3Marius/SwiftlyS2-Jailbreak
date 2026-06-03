@@ -54,6 +54,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<Listeners>()
                   .AddSingleton<NetMessages>()
                   .AddSingleton<WardenCommands>()
+                  .AddSingleton<DeputyCommands>()
                   .AddSingleton<WardenMenu>()
                   .AddSingleton<BoxManager>();
 
@@ -80,6 +81,7 @@ public sealed class Main : BasePlugin
         }
 
         _provider.GetRequiredService<WardenCommands>().Register();
+        _provider.GetRequiredService<DeputyCommands>().Register();
         _provider.GetRequiredService<Events>().Register();
         _provider.GetRequiredService<Listeners>().Register();
         _provider.GetRequiredService<NetMessages>().Register();
@@ -96,6 +98,7 @@ public sealed class Main : BasePlugin
             return;
 
         _provider.GetRequiredService<WardenCommands>().Unregister();
+        _provider.GetRequiredService<DeputyCommands>().Unregister();
         _provider.GetRequiredService<Events>().Unregister();
         _provider.GetRequiredService<Listeners>().Unregister();
         _provider.GetRequiredService<NetMessages>().Unregister();
