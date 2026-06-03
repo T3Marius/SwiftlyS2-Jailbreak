@@ -18,8 +18,6 @@ public sealed class TeamManager
         _core        = core;
         _players     = players;
         _utilsConfig = utilsConfig.Value;
-        
-        _core.Registrator.Register(this);
     }
 
     [ClientCommandHookHandler]
@@ -44,7 +42,7 @@ public sealed class TeamManager
 
         if (currentGuards >= maxGuards)
         {
-            var player = _players.GetOrCreatePlayer(rawPlayer);
+            var player = _players.SyncPlayer(rawPlayer);
             player?.SendMessage(MessageType.Chat, "team_ratio_full", args: [_utilsConfig.PrisonerPerGuardRatio]);
             return HookResult.Stop;
         }

@@ -7,4 +7,5 @@ public sealed class UtilsConfig
     public string BoxStartSound { get; set; } = "tr.BellNormal";
     public float BoxStartSoundVolume { get; set; } = 0.7f;
     public int PrisonerPerGuardRatio { get; set; } = 2; // 2 prisoners per guard. 2 prisoners = 1 guard.
+    public bool AnnounceGuardsDeath { get; set; } = true;
 }

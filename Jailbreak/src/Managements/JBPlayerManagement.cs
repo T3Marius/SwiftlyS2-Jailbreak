@@ -22,11 +22,28 @@ public sealed class JBPlayerManagement : IJBPlayerManagement
 
     public IJBPlayer? GetOrCreatePlayer(IPlayer player)
     {
+        if (!player.IsValid)
+            return null;
+
         if (_players.TryGetValue(player.SteamID, out var jbPlayer))
+        {
+            jbPlayer.RefreshPlayer(player);
             return jbPlayer;
+        }
 
         jbPlayer = new JBPlayer(player, _core, _modelsConfig, _iconManager);
         _players[player.SteamID] = jbPlayer;
+        return jbPlayer;
+    }
+
+    public IJBPlayer? SyncPlayer(IPlayer player)
+    {
+        var jbPlayer = GetOrCreatePlayer(player);
+        if (jbPlayer == null)
+            return null;
+
+        jbPlayer.SyncTeam();
+        NormalizeTeamRole(jbPlayer);
         return jbPlayer;
     }
 
@@ -37,28 +54,69 @@ public sealed class JBPlayerManagement : IJBPlayerManagement
 
     public void SyncTeams()
     {
-        _players.Clear();
+        var liveSteamIds = new HashSet<ulong>();
 
         foreach (var rawPlayer in _core.PlayerManager.GetAllValidPlayers())
         {
-            var player = GetOrCreatePlayer(rawPlayer);
+            liveSteamIds.Add(rawPlayer.SteamID);
+
+            var player = SyncPlayer(rawPlayer);
             if (player == null)
                 continue;
-
-            player.SyncTeam();
         }
+
+        foreach (var steamId in _players.Keys.Where(steamId => !liveSteamIds.Contains(steamId)).ToList())
+            _players.Remove(steamId);
     }
 
-    public IEnumerable<IJBPlayer> GetAllPlayers()               => _players.Values;
-    public IEnumerable<IJBPlayer> GetPlayersByRole(JBRole role) => _players.Values.Where(p => p.Role == role);
-    public IEnumerable<IJBPlayer> GetPlayersByTeam(JBTeam team) => _players.Values.Where(p => p.Team == team);
+    public IEnumerable<IJBPlayer> GetAllPlayers()
+    {
+        SyncTeams();
+        return _players.Values.ToList();
+    }
 
-    public IJBPlayer? GetWarden()  => _players.Values.FirstOrDefault(p => p.IsWarden);
-    public IJBPlayer? GetDeputy()  => _players.Values.FirstOrDefault(p => p.IsDeputy);
+    public IEnumerable<IJBPlayer> GetPlayersByRole(JBRole role)
+    {
+        SyncTeams();
+        return _players.Values.Where(p => p.Role == role).ToList();
+    }
+
+    public IEnumerable<IJBPlayer> GetPlayersByTeam(JBTeam team)
+    {
+        SyncTeams();
+        return _players.Values.Where(p => p.Team == team).ToList();
+    }
+
+    public IJBPlayer? GetWarden()
+    {
+        SyncTeams();
+        return _players.Values.FirstOrDefault(p => p.IsWarden);
+    }
+
+    public IJBPlayer? GetDeputy()
+    {
+        SyncTeams();
+        return _players.Values.FirstOrDefault(p => p.IsDeputy);
+    }
 
     public void SendMessage(MessageType type, string key, bool prefix = true, int durationMs = 5000, params object[] args)
     {
-        foreach (var player in _players.Values)
+        SyncTeams();
+
+        foreach (var player in _players.Values.ToList())
             player.SendMessage(type, key, prefix, durationMs, args);
+    }
+
+    private static void NormalizeTeamRole(IJBPlayer player)
+    {
+        player.CanBecomeWarden = player.Team == JBTeam.Guard;
+
+        if (player.Team == JBTeam.Guard)
+            return;
+
+        if (player.IsWarden)
+            player.SetWarden(false);
+        else if (player.IsDeputy)
+            player.SetDeputy(false);
     }
 }

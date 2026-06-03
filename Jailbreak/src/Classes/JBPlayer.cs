@@ -9,133 +9,121 @@ namespace Jailbreak;
 
 public sealed class JBPlayer : IJBPlayer
 {
-    // ── Identity ─────────────────────────────────────────────────────────────
-    public IPlayer Player  { get; }
-    public ulong   SteamID { get; }
+    private IPlayer _player;
+    private readonly ISwiftlyCore _core;
+    private readonly ModelsConfig _modelsConfig;
+    private readonly IconManager _iconManager;
 
-    // ── Jailbreak state ───────────────────────────────────────────────────────
+    public IPlayer Player => GetLivePlayer() ?? _player;
+    public ulong SteamID { get; }
+
     public JBTeam Team { get; set; } = JBTeam.None;
     public JBRole Role { get; set; } = JBRole.None;
 
-    public bool IsFreeday       => Role == JBRole.Freeday;
-    public bool IsRebel         => Role == JBRole.Rebel;
-    public bool IsDeputy        => Role == JBRole.Deputy;
-    public bool IsWarden        => Role == JBRole.Warden;
+    public bool IsFreeday => Role == JBRole.Freeday;
+    public bool IsRebel => Role == JBRole.Rebel;
+    public bool IsDeputy => Role == JBRole.Deputy;
+    public bool IsWarden => Role == JBRole.Warden;
 
-    public bool IsCuffed           { get; set; } = false;
-    public bool CanBecomeWarden    { get; set; } = true;
-    public bool IsMuted            { get; set; } = false;
-    public bool WasUnmutedByWarden { get; set; } = false;
+    public bool IsCuffed { get; set; }
+    public bool CanBecomeWarden { get; set; } = true;
+    public bool IsMuted { get; set; }
+    public bool WasUnmutedByWarden { get; set; }
 
-    // ── Localizer (falls back to server locale when player is no longer valid) ─
-    public ILocalizer Localizer => Player.IsValid
-        ? _core.Translation.GetPlayerLocalizer(Player)
+    public ILocalizer Localizer => TryGetLivePlayer(out var livePlayer)
+        ? _core.Translation.GetPlayerLocalizer(livePlayer)
         : _core.Localizer;
-
-    // ── Private deps ──────────────────────────────────────────────────────────
-    private readonly ISwiftlyCore  _core;
-    private readonly ModelsConfig  _modelsConfig;
-    private readonly IconManager   _iconManager;
 
     public JBPlayer(IPlayer player, ISwiftlyCore core, IOptions<ModelsConfig> modelsConfig, IconManager iconManager)
     {
-        Player        = player;
-        SteamID       = player.SteamID;
-        _core         = core;
+        _player = player;
+        SteamID = player.SteamID;
+        _core = core;
         _modelsConfig = modelsConfig.Value;
-        _iconManager  = iconManager;
+        _iconManager = iconManager;
     }
 
-    // ── Role transitions ──────────────────────────────────────────────────────
+    internal void RefreshPlayer(IPlayer player)
+    {
+        _player = player;
+    }
 
     public void SetWarden(bool state, string? offReason = null, string? killerName = null, bool silent = false)
     {
         if (state)
         {
-            Role = JBRole.Warden;
-            _iconManager.SpawnCoin(Player);
-            if (!silent)
-                _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["new_warden_alert", Player.Name]);
+            if (!TryGetLivePlayer(out var livePlayer))
+                return;
 
-            if (!string.IsNullOrEmpty(_modelsConfig.WardenModel))
-                PlayerUtils.SetModel(Player, _modelsConfig.WardenModel, _core.Scheduler);
-            else
-            {
-                // color
-                PlayerUtils.Color(Player, new Color(0, 0, 255, 255), _core.Scheduler);
-            }
-        }
-        else
-        {
-            Role = JBRole.None;
-            _iconManager.DespawnCoin();
-
-            var key  = offReason != null ? $"warden_removed.{offReason}" : "warden_removed";
-            var args = killerName != null
-                ? (object[])[Player.Name, killerName]
-                : (object[])[Player.Name];
-             if (!silent)
-             {
-                _core.PlayerManager.SendMessage(MessageType.Chat, _core.Localizer["prefix"] + _core.Localizer[key, args]);
-                _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["no_warden_alert"]);
-            }
             SyncTeam();
-            if (Team == JBTeam.Guard)
-            {
-                CanBecomeWarden = true;
-                var guardModel = PlayerUtils.PickRandomModel(_modelsConfig.GuardModels);
-                if (!string.IsNullOrEmpty(guardModel))
-                    PlayerUtils.SetModel(Player, guardModel, _core.Scheduler);
-                else
-                {
-                    // color
-                    PlayerUtils.Color(Player, new Color(255, 255, 255, 255), _core.Scheduler);
-                }
-            }
-            else if (Team == JBTeam.Prisoner)
+            if (Team != JBTeam.Guard)
             {
                 CanBecomeWarden = false;
-                var prisonerModel = PlayerUtils.PickRandomModel(_modelsConfig.PrisonerModels);
-                if (!string.IsNullOrEmpty(prisonerModel))
-                    PlayerUtils.SetModel(Player, prisonerModel, _core.Scheduler);
-                else
-                {
-                    // color
-                    PlayerUtils.Color(Player, new Color(255, 255, 255, 255), _core.Scheduler);
-                }
+                return;
             }
+
+            Role = JBRole.Warden;
+            CanBecomeWarden = true;
+            _iconManager.SpawnCoin(livePlayer);
+
+            if (!silent)
+                _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["new_warden_alert", livePlayer.Name]);
+
+            if (!string.IsNullOrEmpty(_modelsConfig.WardenModel))
+                PlayerUtils.SetModel(livePlayer, _modelsConfig.WardenModel, _core.Scheduler);
+            else
+                PlayerUtils.Color(livePlayer, new Color(0, 0, 255, 255), _core.Scheduler);
+
+            return;
         }
+
+        Role = JBRole.None;
+        _iconManager.DespawnCoin();
+
+        var playerName = TryGetLivePlayer(out var demotedPlayer) ? demotedPlayer.Name : SteamID.ToString();
+        var key = offReason != null ? $"warden_removed.{offReason}" : "warden_removed";
+        var args = killerName != null
+            ? (object[])[playerName, killerName]
+            : (object[])[playerName];
+
+        if (!silent)
+        {
+            _core.PlayerManager.SendMessage(MessageType.Chat, _core.Localizer["prefix"] + _core.Localizer[key, args]);
+            _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["no_warden_alert"]);
+        }
+
+        SyncTeam();
+        ApplyTeamDefaults();
     }
 
     public void SetDeputy(bool state, string? offReason = null)
     {
         if (state)
         {
-            Role = JBRole.Deputy;
-
-            if (!string.IsNullOrEmpty(_modelsConfig.DeputyModel))
-                PlayerUtils.SetModel(Player, _modelsConfig.DeputyModel, _core.Scheduler);
-        }
-        else
-        {
-            if (Role == JBRole.Deputy) Role = JBRole.None;
+            if (!TryGetLivePlayer(out var livePlayer))
+                return;
 
             SyncTeam();
-            if (Team == JBTeam.Guard)
-            {
-                CanBecomeWarden = true;
-                var guardModel = PlayerUtils.PickRandomModel(_modelsConfig.GuardModels);
-                if (!string.IsNullOrEmpty(guardModel))
-                    PlayerUtils.SetModel(Player, guardModel, _core.Scheduler);
-            }
-            else if (Team == JBTeam.Prisoner)
+            if (Team != JBTeam.Guard)
             {
                 CanBecomeWarden = false;
-                var prisonerModel = PlayerUtils.PickRandomModel(_modelsConfig.PrisonerModels);
-                if (!string.IsNullOrEmpty(prisonerModel))
-                    PlayerUtils.SetModel(Player, prisonerModel, _core.Scheduler);
+                return;
             }
+
+            Role = JBRole.Deputy;
+            CanBecomeWarden = true;
+
+            if (!string.IsNullOrEmpty(_modelsConfig.DeputyModel))
+                PlayerUtils.SetModel(livePlayer, _modelsConfig.DeputyModel, _core.Scheduler);
+
+            return;
         }
+
+        if (Role == JBRole.Deputy)
+            Role = JBRole.None;
+
+        SyncTeam();
+        ApplyTeamDefaults();
     }
 
     public void SetRebel(bool state, string? offReason = null)
@@ -143,12 +131,14 @@ public sealed class JBPlayer : IJBPlayer
         if (state)
         {
             Role = JBRole.Rebel;
-            PlayerUtils.Color(Player, new Color(255, 0, 0, 255), _core.Scheduler);
+            ColorIfLive(new Color(255, 0, 0, 255));
         }
         else
         {
-            if (Role == JBRole.Rebel) Role = JBRole.None;
-            PlayerUtils.Color(Player, new Color(255, 255, 255, 255), _core.Scheduler);
+            if (Role == JBRole.Rebel)
+                Role = JBRole.None;
+
+            ColorIfLive(new Color(255, 255, 255, 255));
         }
     }
 
@@ -159,78 +149,126 @@ public sealed class JBPlayer : IJBPlayer
             Role = JBRole.Freeday;
 
             if (!string.IsNullOrEmpty(_modelsConfig.FreedayModel))
-                PlayerUtils.SetModel(Player, _modelsConfig.FreedayModel, _core.Scheduler);
+                SetModelIfLive(_modelsConfig.FreedayModel);
             else
-            {
-                // color
-                PlayerUtils.Color(Player, new Color(0, 255, 0, 255), _core.Scheduler);
-            }
-        }
-        else
-        {
-            if (Role == JBRole.Freeday) Role = JBRole.None;
+                ColorIfLive(new Color(0, 255, 0, 255));
 
-            if (_modelsConfig.PrisonerModels.Any())
-            {
-                var prisonerModel = PlayerUtils.PickRandomModel(_modelsConfig.PrisonerModels);
-                if (!string.IsNullOrEmpty(prisonerModel))
-                    PlayerUtils.SetModel(Player, prisonerModel, _core.Scheduler);
-                else
-                {
-                    // color
-                    PlayerUtils.Color(Player, new Color(255, 255, 255, 255), _core.Scheduler);
-                }
-            }
-            else
-            {
-                // color
-                PlayerUtils.Color(Player, new Color(255, 255, 255, 255), _core.Scheduler);
-            }
+            return;
         }
+
+        if (Role == JBRole.Freeday)
+            Role = JBRole.None;
+
+        var prisonerModel = PlayerUtils.PickRandomModel(_modelsConfig.PrisonerModels);
+        if (!string.IsNullOrEmpty(prisonerModel))
+            SetModelIfLive(prisonerModel);
+        else
+            ColorIfLive(new Color(255, 255, 255, 255));
     }
 
     public void Mute()
     {
-        Player.VoiceFlags = VoiceFlagValue.Muted;
+        if (!TryGetLivePlayer(out var livePlayer))
+            return;
+
+        livePlayer.VoiceFlags = VoiceFlagValue.Muted;
         IsMuted = true;
     }
+
     public void Unmute()
     {
-        Player.VoiceFlags = VoiceFlagValue.Normal;
+        if (!TryGetLivePlayer(out var livePlayer))
+            return;
+
+        livePlayer.VoiceFlags = VoiceFlagValue.Normal;
         IsMuted = false;
     }
 
-    // ── Team sync ─────────────────────────────────────────────────────────────
-
     public void SyncTeam()
     {
-        if (!Player.IsValid)
+        if (!TryGetLivePlayer(out var livePlayer))
         {
             Team = JBTeam.None;
             return;
         }
 
-        Team = Player.Controller.TeamNum switch
+        Team = livePlayer.Controller.TeamNum switch
         {
-            2 => JBTeam.Prisoner,
-            3 => JBTeam.Guard,
+            (byte)SwiftlyS2.Shared.Players.Team.T => JBTeam.Prisoner,
+            (byte)SwiftlyS2.Shared.Players.Team.CT => JBTeam.Guard,
             _ => JBTeam.None
         };
     }
 
-    // ── Messaging ─────────────────────────────────────────────────────────────
-
     public void SendMessage(MessageType type, string key, bool prefix = true, int durationMs = 5000, params object[] args)
     {
-        if (!Player.IsValid)
+        if (!TryGetLivePlayer(out var livePlayer))
             return;
 
         var localizer = Localizer;
-        var message   = args.Length > 0 ? localizer[key, args] : localizer[key];
+        var message = args.Length > 0 ? localizer[key, args] : localizer[key];
 
-        if (prefix)
-            Player.SendMessage(type, localizer["prefix"] + message, durationMs);
-        else
-            Player.SendMessage(type, message, durationMs);
+        livePlayer.SendMessage(type, prefix ? localizer["prefix"] + message : message, durationMs);
+    }
+
+    private void ApplyTeamDefaults()
+    {
+        CanBecomeWarden = Team == JBTeam.Guard;
+
+        var model = Team switch
+        {
+            JBTeam.Guard => PlayerUtils.PickRandomModel(_modelsConfig.GuardModels),
+            JBTeam.Prisoner => PlayerUtils.PickRandomModel(_modelsConfig.PrisonerModels),
+            _ => null
+        };
+
+        if (!string.IsNullOrEmpty(model))
+            SetModelIfLive(model);
+        else if (Team is JBTeam.Guard or JBTeam.Prisoner)
+            ColorIfLive(new Color(255, 255, 255, 255));
+    }
+
+    private IPlayer? GetLivePlayer()
+    {
+        try
+        {
+            if (_player.IsValid)
+                return _player;
+
+            var livePlayer = _core.PlayerManager.GetPlayerFromSteamId(SteamID);
+            if (livePlayer is not { IsValid: true })
+                return null;
+
+            _player = livePlayer;
+            return livePlayer;
+        }
+        catch (ObjectDisposedException)
+        {
+            return null;
+        }
+    }
+
+    private bool TryGetLivePlayer(out IPlayer livePlayer)
+    {
+        livePlayer = null!;
+
+        var player = GetLivePlayer();
+        if (player == null)
+            return false;
+
+        livePlayer = player;
+        return true;
+    }
+
+    private void SetModelIfLive(string model)
+    {
+        if (TryGetLivePlayer(out var livePlayer))
+            PlayerUtils.SetModel(livePlayer, model, _core.Scheduler);
+    }
+
+    private void ColorIfLive(Color color)
+    {
+        if (TryGetLivePlayer(out var livePlayer))
+            PlayerUtils.Color(livePlayer, color, _core.Scheduler);
     }
 }

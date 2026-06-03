@@ -1,4 +1,5 @@
 using Jailbreak.Contract;
+using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.GameEventDefinitions;
 using SwiftlyS2.Shared.GameEvents;
@@ -11,14 +12,14 @@ public sealed class RebelManager
 {
     private readonly ISwiftlyCore        _core;
     private readonly IJBPlayerManagement _players;
+    private readonly UtilsConfig         _utilsConfig;
 
 
-    public RebelManager(ISwiftlyCore core, IJBPlayerManagement players)
+    public RebelManager(ISwiftlyCore core, IJBPlayerManagement players, IOptions<UtilsConfig> utilsConfig)
     {
         _core = core;
         _players = players;
-
-        _core.Registrator.Register(this);
+        _utilsConfig = utilsConfig.Value;
     }
 
     private void MakeRebel(IJBPlayer player)
@@ -34,8 +35,14 @@ public sealed class RebelManager
         if (e.UserIdPlayer == null)
             return HookResult.Continue;
 
-        var player = _players.GetOrCreatePlayer(e.UserIdPlayer);
+        var player = _players.SyncPlayer(e.UserIdPlayer);
+
         if (player == null || player.IsRebel || player.Team != JBTeam.Prisoner)
+            return HookResult.Continue;
+        
+        var weapon = e.Weapon;
+
+        if (weapon.Contains("knife"))   // ignore knife fire
             return HookResult.Continue;
 
         MakeRebel(player);
@@ -48,13 +55,41 @@ public sealed class RebelManager
         if (e.UserIdPlayer == null || e.AttackerPlayer == null)
             return HookResult.Continue;
 
-        var victim = _players.GetOrCreatePlayer(e.UserIdPlayer);
-        var attacker = _players.GetOrCreatePlayer(e.AttackerPlayer);
+        var victim   = _players.SyncPlayer(e.UserIdPlayer);
+        var attacker = _players.SyncPlayer(e.AttackerPlayer);
+
         if (victim == null || attacker == null || attacker.IsRebel)
             return HookResult.Continue;
 
         if (attacker.Team == JBTeam.Prisoner && victim.Team == JBTeam.Guard)
             MakeRebel(attacker);
+
+        return HookResult.Continue;
+    }
+
+    [GameEventHandler(HookMode.Post)]
+    private HookResult EventPlayerDeath(EventPlayerDeath e)
+    {
+        if (e.UserIdPlayer == null || e.AttackerPlayer == null)
+            return HookResult.Continue;
+
+        var victim   = _players.SyncPlayer(e.UserIdPlayer);
+        var attacker = _players.SyncPlayer(e.AttackerPlayer);
+
+        if (victim == null || attacker == null || attacker == victim)
+            return HookResult.Continue;
+
+        if (_utilsConfig.AnnounceGuardsDeath)
+        {
+            _players.SendMessage(MessageType.Chat, "guard_death", true, 0, victim.Player.Name, attacker.Player.Name);
+        }
+
+        if (attacker.Team != JBTeam.Prisoner && victim.Team != JBTeam.Guard)
+            return HookResult.Continue;
+
+        if (!attacker.IsRebel)
+            MakeRebel(attacker);
+
 
         return HookResult.Continue;
     }

@@ -23,7 +23,6 @@ public sealed class BoxManager
     {
         _core = core;
         _utilsConfig = utilsConfig.Value;
-        _core.Registrator.Register(this);
 
         _teammatesAreEnemies = _core.ConVar.Find<bool>("mp_teammates_are_enemies");
     }

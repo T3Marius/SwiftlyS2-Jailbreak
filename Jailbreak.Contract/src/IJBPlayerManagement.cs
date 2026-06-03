@@ -5,6 +5,7 @@ namespace Jailbreak.Contract
     public interface IJBPlayerManagement
     {
         IJBPlayer? GetOrCreatePlayer(IPlayer player);
+        IJBPlayer? SyncPlayer(IPlayer player);
         void RemovePlayer(ulong steamId);
         IJBPlayer? GetWarden();
         IJBPlayer? GetDeputy();

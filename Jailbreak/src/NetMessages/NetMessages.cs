@@ -43,7 +43,7 @@ public sealed class NetMessages
         if (sender == null)
             return HookResult.Continue;
 
-        var player = _players.GetOrCreatePlayer(sender);
+        var player = _players.SyncPlayer(sender);
         if (player == null)
             return HookResult.Continue;
 

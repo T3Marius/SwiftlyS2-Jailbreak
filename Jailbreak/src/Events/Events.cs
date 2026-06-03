@@ -37,7 +37,7 @@ public sealed class Events
     private CancellationTokenSource? _wardenCheckCts;
     private CancellationTokenSource? _doorsCheckCts;
     private CancellationTokenSource? _checkPrisonersVoiceCts;
-    private Random _random = new();
+    private readonly Random _random = new();
 
     public Events(
         ISwiftlyCore core, 
@@ -70,41 +70,20 @@ public sealed class Events
     }
     public void Unregister()
     {
-        if (_playerSpawnHookId.HasValue)
-        {
-            _core.GameEvent.Unhook(_playerSpawnHookId.Value);
-            _playerSpawnHookId = null;
-        }
+        Unhook(ref _playerSpawnHookId);
+        Unhook(ref _playerTeamChangeHookId);
+        Unhook(ref _playerDisconnectHookId);
+        Unhook(ref _roundStartHookId);
+        Unhook(ref _roundEndHookId);
+        Unhook(ref _playerDeathHookId);
 
-        if (_playerTeamChangeHookId.HasValue)
-        {
-            _core.GameEvent.Unhook(_playerTeamChangeHookId.Value);
-            _playerTeamChangeHookId = null;
-        }
+        _wardenCheckCts?.Cancel();
+        _wardenCheckCts = null;
 
-        if (_playerDisconnectHookId.HasValue)
-        {
-            _core.GameEvent.Unhook(_playerDisconnectHookId.Value);
-            _playerDisconnectHookId = null;
-        }
+        _doorsCheckCts?.Cancel();
+        _doorsCheckCts = null;
 
-        if (_roundStartHookId.HasValue)
-        {
-            _core.GameEvent.Unhook(_roundStartHookId.Value);
-            _roundStartHookId = null;
-        }
-
-        if (_roundEndHookId.HasValue)
-        {
-            _core.GameEvent.Unhook(_roundEndHookId.Value);
-            _roundEndHookId = null;
-        }
-
-        if (_playerDeathHookId.HasValue)
-        {
-            _core.GameEvent.Unhook(_playerDeathHookId.Value);
-            _playerDeathHookId = null;
-        }
+        StopCheckPrisonerVoiceTimer();
 
         foreach (var cts in _centerTimers.Values)
             cts.Cancel();
@@ -115,27 +94,11 @@ public sealed class Events
         if (e.UserIdPlayer == null)
             return HookResult.Continue;
         
-        var player = _players.GetOrCreatePlayer(e.UserIdPlayer);
+        var player = _players.SyncPlayer(e.UserIdPlayer);
         if (player == null)
             return HookResult.Continue;
 
-        PlayerUtils.Color(player.Player, new Color(255, 255, 255, 255), _core.Scheduler);
-        player.SyncTeam();
-
-        if (player.Team == JBTeam.Guard)
-        {
-            player.CanBecomeWarden = true;
-            var guardModel = PlayerUtils.PickRandomModel(_modelsConfig.GuardModels);
-            if (!string.IsNullOrEmpty(guardModel))
-                PlayerUtils.SetModel(player.Player, guardModel, _core.Scheduler);
-        }
-        else if (player.Team == JBTeam.Prisoner)
-        {
-            player.CanBecomeWarden = false;
-            var prisonerModel = PlayerUtils.PickRandomModel(_modelsConfig.PrisonerModels);
-            if (!string.IsNullOrEmpty(prisonerModel))
-                PlayerUtils.SetModel(player.Player, prisonerModel, _core.Scheduler);
-        }
+        ApplyTeamLoadout(player);
 
         StartHudTimer(player);
         return HookResult.Continue;
@@ -143,22 +106,23 @@ public sealed class Events
 
     private HookResult OnPlayerTeamChange(EventPlayerTeam e)
     {
-        if (e.UserIdPlayer == null)
+        var rawPlayer = e.UserIdPlayer;
+        if (rawPlayer == null)
             return HookResult.Continue;
 
-        var player = _players.GetOrCreatePlayer(e.UserIdPlayer);
+        var player = _players.SyncPlayer(rawPlayer);
         if (player == null)
             return HookResult.Continue;
 
-        player.SyncTeam();
-        if (player.Team == JBTeam.Guard)
+        ApplyTeamLoadout(player);
+
+        _core.Scheduler.NextWorldUpdate(() =>
         {
-            player.CanBecomeWarden = true;
-        }
-        else if (player.Team == JBTeam.Prisoner)
-        {
-            player.CanBecomeWarden = false;
-        }
+            var syncedPlayer = _players.SyncPlayer(rawPlayer);
+            if (syncedPlayer != null)
+                ApplyTeamLoadout(syncedPlayer);
+        });
+
         return HookResult.Continue;
     }
 
@@ -230,7 +194,7 @@ public sealed class Events
 
         foreach (var player in _players.GetAllPlayers())
         {
-            player.CanBecomeWarden = true;
+            player.CanBecomeWarden = player.Team == JBTeam.Guard;
         }
 
         _wardenCheckCts = _core.Scheduler.DelayBySeconds(_wardenConfig.AutoGiveWardenWhenNone, () =>
@@ -252,7 +216,8 @@ public sealed class Events
 
             var selected = cts[_random.Next(cts.Count)];
             selected.SetWarden(true);
-            selected.SendMessage(MessageType.Chat, "you_are_new_warden", true);
+            if (selected.IsWarden)
+                selected.SendMessage(MessageType.Chat, "you_are_new_warden", true);
 
             _wardenCheckCts?.Cancel();
             _wardenCheckCts = null;
@@ -272,8 +237,8 @@ public sealed class Events
 
             _players.SendMessage(MessageType.Chat, "cells_opened_automatically", true);
 
-            _wardenCheckCts?.Cancel();
-            _wardenCheckCts = null;
+            _doorsCheckCts?.Cancel();
+            _doorsCheckCts = null;
         });
 
         return HookResult.Continue;
@@ -312,8 +277,8 @@ public sealed class Events
         if (e.AttackerPlayer == null || e.UserIdPlayer == null)
             return HookResult.Continue;
     
-        var attacker = _players.GetOrCreatePlayer(e.AttackerPlayer);
-        var victim = _players.GetOrCreatePlayer(e.UserIdPlayer);
+        var attacker = _players.SyncPlayer(e.AttackerPlayer);
+        var victim = _players.SyncPlayer(e.UserIdPlayer);
 
         if (attacker == null || victim == null)
             return HookResult.Continue;
@@ -346,6 +311,32 @@ public sealed class Events
             cts.Cancel();
             _centerTimers.Remove(steamId);
         }
+    }
+
+    private void ApplyTeamLoadout(IJBPlayer player)
+    {
+        PlayerUtils.Color(player.Player, new Color(255, 255, 255, 255), _core.Scheduler);
+
+        player.CanBecomeWarden = player.Team == JBTeam.Guard;
+
+        var model = player.Team switch
+        {
+            JBTeam.Guard => PlayerUtils.PickRandomModel(_modelsConfig.GuardModels),
+            JBTeam.Prisoner => PlayerUtils.PickRandomModel(_modelsConfig.PrisonerModels),
+            _ => null
+        };
+
+        if (!string.IsNullOrEmpty(model))
+            PlayerUtils.SetModel(player.Player, model, _core.Scheduler);
+    }
+
+    private void Unhook(ref Guid? hookId)
+    {
+        if (!hookId.HasValue)
+            return;
+
+        _core.GameEvent.Unhook(hookId.Value);
+        hookId = null;
     }
     private void StartCheckPrisonerVoiceTimer()
     {

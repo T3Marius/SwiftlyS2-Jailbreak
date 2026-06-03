@@ -42,6 +42,7 @@ public sealed class Main : BasePlugin
         collection.AddSwiftly(Core)
                   .AddSingleton<IconManager>()
                   .AddSingleton<CellManager>()
+                  .AddSingleton<JBPlayerManagement>()
                   .AddSingleton<IJBPlayerManagement, JBPlayerManagement>()
                   .AddSingleton<TeamManager>()
                   .AddSingleton<RebelManager>()
@@ -76,6 +77,10 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<Events>().Register();
         _provider.GetRequiredService<Listeners>().Register();
         _provider.GetRequiredService<NetMessages>().Register();
+  
+        Core.Registrator.Register(_provider.GetRequiredService<RebelManager>());
+        Core.Registrator.Register(_provider.GetRequiredService<TeamManager>());
+        Core.Registrator.Register(_provider.GetRequiredService<BoxManager>());
 
     }
     public override void Unload()
@@ -91,4 +96,5 @@ public sealed class Main : BasePlugin
         _provider.Dispose();
         _provider = null;
     }
+
 }

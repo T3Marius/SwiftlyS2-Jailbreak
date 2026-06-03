@@ -43,11 +43,7 @@ public sealed class WardenMenu
         var builder = _core.MenusAPI.CreateBuilder().Design
             .SetMenuTitle(player.Localizer["cells_submenu.title"]);
 
-        var openCells = new ButtonMenuOption(player.Localizer["cells_submenu_option.open_cells"])
-        {
-            // Only actionable when cells are currently closed
-            Enabled = !_cellManager.CellsOpen
-        };
+        var openCells = new ButtonMenuOption(player.Localizer["cells_submenu_option.open_cells"]);
         openCells.Click += (_, _) =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
@@ -59,11 +55,7 @@ public sealed class WardenMenu
             return ValueTask.CompletedTask;
         };
 
-        var closeCells = new ButtonMenuOption(player.Localizer["cells_submenu_option.close_cells"])
-        {
-            // Only actionable when cells are currently open
-            Enabled = _cellManager.CellsOpen
-        };
+        var closeCells = new ButtonMenuOption(player.Localizer["cells_submenu_option.close_cells"]);
         closeCells.Click += (_, _) =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
@@ -88,10 +80,7 @@ public sealed class WardenMenu
         var builder = _core.MenusAPI.CreateBuilder().Design
             .SetMenuTitle(player.Localizer["box_submenu.title"]);
 
-        var startBox = new ButtonMenuOption(player.Localizer["box_submenu_option.start_box"])
-        {
-            Enabled = !_boxManager.BoxEnabled
-        };
+        var startBox = new ButtonMenuOption(player.Localizer["box_submenu_option.start_box"]);
         startBox.Click += (_, _) =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
@@ -103,10 +92,7 @@ public sealed class WardenMenu
             return ValueTask.CompletedTask;
         };
 
-        var stopBox = new ButtonMenuOption(player.Localizer["box_submenu_option.stop_box"])
-        {
-            Enabled = _boxManager.BoxEnabled
-        };
+        var stopBox = new ButtonMenuOption(player.Localizer["box_submenu_option.stop_box"]);
         stopBox.Click += (_, _) =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
@@ -184,11 +170,7 @@ public sealed class WardenMenu
         var builder = _core.MenusAPI.CreateBuilder().Design
             .SetMenuTitle(prisoner.Player.Name);
 
-        var mute = new ButtonMenuOption(player.Localizer["voice_submenu_option.mute_prisoner"])
-        {
-            // Disable if already muted
-            Enabled = !prisoner.IsMuted
-        };
+        var mute = new ButtonMenuOption(player.Localizer["voice_submenu_option.mute_prisoner"]);
         mute.Click += (_, _) =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
@@ -200,11 +182,7 @@ public sealed class WardenMenu
             return ValueTask.CompletedTask;
         };
 
-        var unmute = new ButtonMenuOption(player.Localizer["voice_submenu_option.unmute_prisoner"])
-        {
-            // Disable if already unmuted
-            Enabled = prisoner.IsMuted
-        };
+        var unmute = new ButtonMenuOption(player.Localizer["voice_submenu_option.unmute_prisoner"]);
         unmute.Click += (_, _) =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
@@ -239,10 +217,7 @@ public sealed class WardenMenu
         builder.AddOption(new TextMenuOption(statusLabel));
 
         // Remove deputy — only actionable when one exists
-        var removeDeputy = new ButtonMenuOption(player.Localizer["manage_deputy_submenu_option.remove_deputy"])
-        {
-            Enabled = currentDeputy != null
-        };
+        var removeDeputy = new ButtonMenuOption(player.Localizer["manage_deputy_submenu_option.remove_deputy"]);
         removeDeputy.Click += (_, _) =>
         {
             _core.Scheduler.NextWorldUpdate(() =>

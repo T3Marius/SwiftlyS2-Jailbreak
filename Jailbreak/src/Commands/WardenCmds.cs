@@ -144,7 +144,7 @@ public sealed class WardenCommands
         if (ctx.Sender == null)
             return;
         
-        var player = _players.GetOrCreatePlayer(ctx.Sender);
+        var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
             return;
 
@@ -173,14 +173,15 @@ public sealed class WardenCommands
         }
 
         player.SetWarden(true);
-        player.SendMessage(MessageType.Chat, "you_are_new_warden", true);
+        if (player.IsWarden)
+            player.SendMessage(MessageType.Chat, "you_are_new_warden", true);
     }
     private void GiveUpWarden(ICommandContext ctx)
     {
         if (ctx.Sender == null)
             return;
         
-        var player = _players.GetOrCreatePlayer(ctx.Sender);
+        var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
             return;
 
@@ -197,7 +198,7 @@ public sealed class WardenCommands
         if (ctx.Sender == null)
             return;
         
-        var player = _players.GetOrCreatePlayer(ctx.Sender);
+        var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
             return;
 
@@ -219,7 +220,7 @@ public sealed class WardenCommands
         if (ctx.Sender == null)
             return;
         
-        var player = _players.GetOrCreatePlayer(ctx.Sender);
+        var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
             return;
 
@@ -236,7 +237,7 @@ public sealed class WardenCommands
         if (ctx.Sender == null)
             return;
         
-        var player = _players.GetOrCreatePlayer(ctx.Sender);
+        var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
             return;
 
@@ -264,7 +265,7 @@ public sealed class WardenCommands
         if (ctx.Sender == null)
             return;
         
-        var player = _players.GetOrCreatePlayer(ctx.Sender);
+        var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
             return;
 
