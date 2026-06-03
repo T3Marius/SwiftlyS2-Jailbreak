@@ -40,6 +40,7 @@ public sealed class Main : BasePlugin
              .Configure(b => b.AddTomlFile("voice.toml", false, true));
 
         collection.AddSwiftly(Core)
+                  .AddSingleton<CuffsManager>()
                   .AddSingleton<IconManager>()
                   .AddSingleton<CellManager>()
                   .AddSingleton<JBPlayerManagement>()
@@ -52,8 +53,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<NetMessages>()
                   .AddSingleton<WardenCommands>()
                   .AddSingleton<WardenMenu>()
-                  .AddSingleton<BoxManager>()
-                  .AddSingleton<CuffsManager>();
+                  .AddSingleton<BoxManager>();
 
         collection.AddOptionsWithValidateOnStart<WardenConfig>()
                   .BindConfiguration("Warden");
