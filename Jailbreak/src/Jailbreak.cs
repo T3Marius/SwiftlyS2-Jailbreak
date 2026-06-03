@@ -52,7 +52,8 @@ public sealed class Main : BasePlugin
                   .AddSingleton<NetMessages>()
                   .AddSingleton<WardenCommands>()
                   .AddSingleton<WardenMenu>()
-                  .AddSingleton<BoxManager>();
+                  .AddSingleton<BoxManager>()
+                  .AddSingleton<CuffsManager>();
 
         collection.AddOptionsWithValidateOnStart<WardenConfig>()
                   .BindConfiguration("Warden");
@@ -81,6 +82,7 @@ public sealed class Main : BasePlugin
         Core.Registrator.Register(_provider.GetRequiredService<RebelManager>());
         Core.Registrator.Register(_provider.GetRequiredService<TeamManager>());
         Core.Registrator.Register(_provider.GetRequiredService<BoxManager>());
+        Core.Registrator.Register(_provider.GetRequiredService<CuffsManager>());
 
     }
     public override void Unload()

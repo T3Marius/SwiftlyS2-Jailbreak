@@ -18,6 +18,7 @@ public sealed class WardenCommands
     private readonly WardenMenu              _wardenMenu;
     private readonly BoxManager              _boxManager;
     private readonly CellManager             _cellManager;
+    private readonly CuffsManager            _cuffsManager;
     private readonly ILogger<WardenCommands> _log;
 
     public WardenCommands(
@@ -27,6 +28,7 @@ public sealed class WardenCommands
         WardenMenu wardenMenu, 
         BoxManager boxManager,
         CellManager cellManager,
+        CuffsManager cuffsManager,
         ILogger<WardenCommands> log)
     {
         _core    = core;
@@ -35,6 +37,7 @@ public sealed class WardenCommands
         _wardenMenu = wardenMenu;
         _boxManager = boxManager;
         _cellManager = cellManager;
+        _cuffsManager = cuffsManager;
         _log     = log;
     }
 
@@ -174,7 +177,10 @@ public sealed class WardenCommands
 
         player.SetWarden(true);
         if (player.IsWarden)
+        {
+            _cuffsManager.OnWardenGive(player);
             player.SendMessage(MessageType.Chat, "you_are_new_warden", true);
+        }
     }
     private void GiveUpWarden(ICommandContext ctx)
     {
@@ -191,6 +197,7 @@ public sealed class WardenCommands
             return;
         }
 
+        _cuffsManager.OnWardenRemove(player);
         player.SetWarden(false, "giveup");
     }
     private void WardenHelp(ICommandContext ctx)

@@ -12,7 +12,7 @@ public sealed class JBPlayer : IJBPlayer
     private IPlayer _player;
     private readonly ISwiftlyCore _core;
     private readonly ModelsConfig _modelsConfig;
-    private readonly IconManager _iconManager;
+    private readonly IconManager  _iconManager;
 
     public IPlayer Player => GetLivePlayer() ?? _player;
     public ulong SteamID { get; }
@@ -77,6 +77,7 @@ public sealed class JBPlayer : IJBPlayer
             return;
         }
 
+        
         Role = JBRole.None;
         _iconManager.DespawnCoin();
 

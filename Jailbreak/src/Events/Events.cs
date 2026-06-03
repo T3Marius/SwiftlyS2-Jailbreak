@@ -15,6 +15,7 @@ public sealed class Events
     private readonly IJBPlayerManagement _players;
     private readonly CellManager         _cellManager;
     private readonly BoxManager          _boxManager;
+    private readonly CuffsManager        _cuffsManager;
 
     /* ------------------- Configs ------------------- */
     private readonly WardenConfig        _wardenConfig;
@@ -44,6 +45,7 @@ public sealed class Events
         IJBPlayerManagement playerManagement,
         CellManager cellManager,
         BoxManager boxManager,
+        CuffsManager cuffsManager,
         IOptions<WardenConfig> wardenConfig, 
         IOptions<ModelsConfig> modelsConfig, 
         IOptions<UtilsConfig> utilsConfig,
@@ -53,6 +55,7 @@ public sealed class Events
         _players = playerManagement;
         _cellManager = cellManager;
         _boxManager = boxManager;
+        _cuffsManager = cuffsManager;
         _wardenConfig = wardenConfig.Value;
         _modelsConfig = modelsConfig.Value;
         _utilsConfig = utilsConfig.Value;
@@ -133,6 +136,7 @@ public sealed class Events
 
         var steamId = e.UserIdPlayer.SteamID;
         StopHudTimer(steamId);
+        _cuffsManager.CleanupPlayer(steamId);
         _players.RemovePlayer(steamId);
         return HookResult.Continue;
     }
@@ -189,6 +193,7 @@ public sealed class Events
         var currentWarden = _players.GetWarden();
         if (currentWarden != null)
         {
+            _cuffsManager.OnWardenRemove(currentWarden);
             currentWarden.SetWarden(false, silent: true);
         }
 
@@ -217,7 +222,10 @@ public sealed class Events
             var selected = cts[_random.Next(cts.Count)];
             selected.SetWarden(true);
             if (selected.IsWarden)
+            {
+                _cuffsManager.OnWardenGive(selected);
                 selected.SendMessage(MessageType.Chat, "you_are_new_warden", true);
+            }
 
             _wardenCheckCts?.Cancel();
             _wardenCheckCts = null;
@@ -261,8 +269,11 @@ public sealed class Events
         var currentWarden = _players.GetWarden();
         if (currentWarden != null)
         {
+            _cuffsManager.OnWardenRemove(currentWarden);
             currentWarden.SetWarden(false);
         }
+
+        _cuffsManager.CleanupAll();
 
         foreach (var player in _players.GetAllPlayers())
         {
@@ -285,6 +296,7 @@ public sealed class Events
 
         if (victim.IsWarden && attacker.Team == JBTeam.Prisoner)
         {
+            _cuffsManager.OnWardenRemove(victim);
             victim.SetWarden(false, "killed", e.AttackerPlayer.Name);
         }
 

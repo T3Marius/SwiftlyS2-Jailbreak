@@ -94,5 +94,5 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak` to acc
 - [ ] Finish warden menu.
 - [X] Configure team ratio.
 - [X] Mute prisoners system (When Warden is speaking, first x seconds of round start, etc...).
-- [ ] Add cuffs to warden.
+- [X] Add cuffs to warden.
 - [ ] Add more TODO list. 😂

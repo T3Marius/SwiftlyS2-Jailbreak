@@ -1,3 +1,4 @@
+using Jailbreak.Contract;
 using SwiftlyS2.Shared.Natives;
 using SwiftlyS2.Shared.Players;
 using SwiftlyS2.Shared.Scheduler;
@@ -51,5 +52,52 @@ public static class PlayerUtils
             pawn.RenderUpdated();
             pawn.RenderUpdated();
         });
+    }
+
+    public static void GiveWeapon(IPlayer player, string weapon_name, ISchedulerService scheduler)
+    {
+        var pawn = player.Pawn;
+        if (pawn == null || !pawn.IsValid)
+            return;
+
+        scheduler.NextWorldUpdate(() =>
+        {
+            pawn.ItemServices?.GiveItem<CBaseEntity>(weapon_name);
+        });
+    }
+
+    public static void FreezeVelocity(IPlayer player, Color? color = null)
+    {
+        var playerPawn = player.PlayerPawn;
+        if (playerPawn == null)
+            return;
+
+        playerPawn.VelocityModifier = 0;
+        playerPawn.VelocityModifierUpdated();
+
+        if (color != null)
+        {
+            playerPawn.RenderMode = RenderMode_t.kRenderTransAlpha;
+            playerPawn.Render = color.Value;
+            playerPawn.RenderModeUpdated();
+            playerPawn.RenderUpdated();
+        }
+    }
+    public static void UnfreezeVelocity(IPlayer player, Color? color = null)
+    {
+        var playerPawn = player.PlayerPawn;
+        if (playerPawn == null)
+            return;
+
+        playerPawn.VelocityModifier = 1;
+        playerPawn.VelocityModifierUpdated();
+
+        if (color != null)
+        {
+            playerPawn.RenderMode = RenderMode_t.kRenderTransAlpha;
+            playerPawn.Render = color.Value;
+            playerPawn.RenderModeUpdated();
+            playerPawn.RenderUpdated();
+        }
     }
 }
