@@ -41,6 +41,8 @@ public sealed class Main : BasePlugin
              .Configure(b => b.AddTomlFile("voice.toml", false, true));
         Core.Configuration.InitializeTomlWithModel<DeputyConfig>("deputy.toml", "Deputy")
              .Configure(b => b.AddTomlFile("deputy.toml", false, true));
+        Core.Configuration.InitializeTomlWithModel<SpecialDayConfig>("specialday.toml", "SpecialDay")
+             .Configure(b => b.AddTomlFile("specialday.toml", false, true));
 
         collection.AddSwiftly(Core)
                   .AddSingleton<CuffsManager>()
@@ -52,6 +54,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<RebelManager>()
                   .AddSingleton<BeaconManager>()
                   .AddSingleton<LaserManager>()
+                  .AddSingleton<SpecialDayManager>()
                   .AddSingleton<GameConfig>()
                   .AddSingleton<WardenDatabase>()
                   .AddSingleton<Api>()
@@ -78,6 +81,9 @@ public sealed class Main : BasePlugin
         collection.AddOptionsWithValidateOnStart<DeputyConfig>()
                   .BindConfiguration("Deputy");
 
+        collection.AddOptionsWithValidateOnStart<SpecialDayConfig>()
+                  .BindConfiguration("SpecialDay");
+
         _provider = collection.BuildServiceProvider();
 
         _provider.GetRequiredService<WardenDatabase>().Initialize();
@@ -93,6 +99,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<Events>().Register();
         _provider.GetRequiredService<Listeners>().Register();
         _provider.GetRequiredService<NetMessages>().Register();
+        _provider.GetRequiredService<SpecialDayManager>().Register();
         _provider.GetRequiredService<BeaconManager>().Register();
         _provider.GetRequiredService<RebelManager>().Register();
         _provider.GetRequiredService<TeamManager>().Register();
@@ -111,6 +118,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<Events>().Unregister();
         _provider.GetRequiredService<Listeners>().Unregister();
         _provider.GetRequiredService<NetMessages>().Unregister();
+        _provider.GetRequiredService<SpecialDayManager>().Unregister();
         _provider.GetRequiredService<GameConfig>().Unregister();
         _provider.GetRequiredService<BeaconManager>().Unregister();
         _provider.GetRequiredService<RebelManager>().Unregister();

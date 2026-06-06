@@ -24,14 +24,16 @@ public sealed class LaserManager
     private readonly ISwiftlyCore _core;
     private readonly IJBPlayerManagement _players;
     private readonly WardenDatabase _wardenDatabase;
+    private readonly SpecialDayManager _specialDayManager;
     private readonly Dictionary<ulong, LaserState> _lasers = [];
     private readonly HashSet<ulong> _holdingUse = [];
 
-    public LaserManager(ISwiftlyCore core, IJBPlayerManagement players, WardenDatabase wardenDatabase)
+    public LaserManager(ISwiftlyCore core, IJBPlayerManagement players, WardenDatabase wardenDatabase, SpecialDayManager specialDayManager)
     {
         _core = core;
         _players = players;
         _wardenDatabase = wardenDatabase;
+        _specialDayManager = specialDayManager;
     }
 
     public void Register()
@@ -116,6 +118,7 @@ public sealed class LaserManager
     private bool CanUseLaser(IJBPlayer? player)
     {
         return player != null
+            && !_specialDayManager.IsSpecialDayActive
             && player.IsWarden
             && player.Player.IsValid
             && player.Player.IsAlive

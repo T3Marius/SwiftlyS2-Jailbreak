@@ -11,12 +11,14 @@ public sealed class Listeners
     private readonly IJBPlayerManagement    _players;
     private readonly ISwiftlyCore           _core;
     private readonly ModelsConfig          _modelsConfig;
+    private readonly SpecialDayManager     _specialDayManager;
 
-    public Listeners(ISwiftlyCore core, IJBPlayerManagement playerManagement, IOptions<ModelsConfig> modelsConfig)
+    public Listeners(ISwiftlyCore core, IJBPlayerManagement playerManagement, IOptions<ModelsConfig> modelsConfig, SpecialDayManager specialDayManager)
     {
         _core    = core;
         _modelsConfig = modelsConfig.Value;
-         _players = playerManagement;
+        _players = playerManagement;
+        _specialDayManager = specialDayManager;
     }
 
     public void Register()
@@ -49,6 +51,9 @@ public sealed class Listeners
 
     private void OnEntityTakeDamage(IOnEntityTakeDamageEvent e)
     {
+        if (_specialDayManager.IsSpecialDayActive)
+            return;
+
         if (!e.Entity.DesignerName.Contains("weapon"))
             return; // ignore everything else except weapons.
 

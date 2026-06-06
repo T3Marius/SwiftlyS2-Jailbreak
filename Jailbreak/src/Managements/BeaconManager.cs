@@ -27,6 +27,7 @@ public sealed class BeaconManager
     private readonly ISwiftlyCore _core;
     private readonly IJBPlayerManagement _players;
     private readonly WardenDatabase _wardenDatabase;
+    private readonly SpecialDayManager _specialDayManager;
     private readonly List<BeaconEffect> _effects = [];
     private readonly Dictionary<ulong, BeaconEffect> _playerEffects = [];
 
@@ -34,11 +35,12 @@ public sealed class BeaconManager
     private CancellationTokenSource? _updateCts;
     private BeaconEffect? _pingEffect;
 
-    public BeaconManager(ISwiftlyCore core, IJBPlayerManagement players, WardenDatabase wardenDatabase)
+    public BeaconManager(ISwiftlyCore core, IJBPlayerManagement players, WardenDatabase wardenDatabase, SpecialDayManager specialDayManager)
     {
         _core = core;
         _players = players;
         _wardenDatabase = wardenDatabase;
+        _specialDayManager = specialDayManager;
     }
 
     public void Register()
@@ -136,6 +138,9 @@ public sealed class BeaconManager
 
     private HookResult OnPlayerPing(EventPlayerPing e)
     {
+        if (_specialDayManager.IsSpecialDayActive)
+            return HookResult.Continue;
+
         var rawPlayer = e.UserIdPlayer;
         if (rawPlayer == null)
             return HookResult.Continue;

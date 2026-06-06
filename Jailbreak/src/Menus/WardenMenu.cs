@@ -14,6 +14,7 @@ public sealed class WardenMenu
     private readonly BoxManager _boxManager;
     private readonly IJBPlayerManagement _players;
     private readonly WardenDatabase _wardenDatabase;
+    private readonly SpecialDayManager _specialDayManager;
 
     private static readonly ColorChoice[] ColorChoices =
     [
@@ -31,19 +32,24 @@ public sealed class WardenMenu
         CellManager cellManager,
         BoxManager boxManager,
         IJBPlayerManagement players,
-        WardenDatabase wardenDatabase)
+        WardenDatabase wardenDatabase,
+        SpecialDayManager specialDayManager)
     {
         _core = core;
         _cellManager = cellManager;
         _boxManager = boxManager;
         _players = players;
         _wardenDatabase = wardenDatabase;
+        _specialDayManager = specialDayManager;
     }
 
     // ─── Root ────────────────────────────────────────────────────────────────
 
     public void Show(IJBPlayer player)
     {
+        if (BlockDuringSpecialDay(player))
+            return;
+
         var builder = CreateBuilder(player, "warden_menu.title");
 
         AddSubmenu(builder, player, "warden_menu_option.toggle_cells", () => CellsSubmenu(player));
@@ -51,9 +57,68 @@ public sealed class WardenMenu
         AddSubmenu(builder, player, "warden_menu_option.toggle_voice", () => VoiceSubmenu(player));
         AddSubmenu(builder, player, "warden_menu_option.manage_deputy", () => DeputySubmenu(player));
         AddSubmenu(builder, player, "warden_menu_option.manage_freeday", () => FreedaySubmenu(player));
+        AddSubmenu(builder, player, "warden_menu_option.special_days", () => SpecialDaysSubmenu(player));
         AddSubmenu(builder, player, "warden_menu_option.visual_management", () => VisualManagementSubmenu(player));
 
         _core.MenusAPI.OpenMenuForPlayer(player.Player, builder.Build());
+    }
+
+    public void ShowSpecialDays(IJBPlayer player)
+    {
+        if (BlockDuringSpecialDay(player))
+            return;
+
+        _core.MenusAPI.OpenMenuForPlayer(player.Player, SpecialDaysSubmenu(player));
+    }
+
+    private IMenuAPI SpecialDaysSubmenu(IJBPlayer player)
+    {
+        var builder = CreateBuilder(player, "special_days_submenu.title");
+
+        AddSubmenu(builder, player, "special_days_submenu_option.days", () => SpecialDaysListSubmenu(player));
+
+        return builder.Build();
+    }
+
+    private IMenuAPI SpecialDaysListSubmenu(IJBPlayer player)
+    {
+        var builder = CreateBuilder(player, "special_days_days_submenu.title");
+        var days = _specialDayManager.SpecialDays.OrderBy(day => day.Name).ToList();
+
+        if (days.Count == 0)
+        {
+            builder.AddOption(new TextMenuOption(player.Localizer["special_days_submenu_option.no_days"]));
+            return builder.Build();
+        }
+
+        foreach (var day in days)
+        {
+            AddButton(builder, day.Name, () =>
+            {
+                _core.Scheduler.NextWorldUpdate(() =>
+                {
+                    if (BlockDuringSpecialDay(player))
+                        return;
+
+                    if (_specialDayManager.QueuedSpecialDay != null)
+                    {
+                        player.SendMessage(MessageType.Chat, "special_day_already_queued", true, args: _specialDayManager.QueuedSpecialDay.Name);
+                        return;
+                    }
+
+                    if (_specialDayManager.CooldownRoundsRemaining > 0)
+                    {
+                        player.SendMessage(MessageType.Chat, "special_day_cooldown", true, args: _specialDayManager.CooldownRoundsRemaining);
+                        return;
+                    }
+
+                    if (!_specialDayManager.QueueSpecialDay(day.Id))
+                        player.SendMessage(MessageType.Chat, "special_day_cannot_queue", true, args: day.Name);
+                });
+            });
+        }
+
+        return builder.Build();
     }
 
     private IMenuAPI VisualManagementSubmenu(IJBPlayer player)
@@ -169,6 +234,9 @@ public sealed class WardenMenu
             {
                 _core.Scheduler.NextWorldUpdate(() =>
                 {
+                    if (BlockDuringSpecialDay(player))
+                        return;
+
                     if (prisoner.IsFreeday)
                         return;
 
@@ -196,6 +264,9 @@ public sealed class WardenMenu
             {
                 _core.Scheduler.NextWorldUpdate(() =>
                 {
+                    if (BlockDuringSpecialDay(player))
+                        return;
+
                     if (!prisoner.IsFreeday)
                         return;
 
@@ -222,6 +293,9 @@ public sealed class WardenMenu
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
+                if (BlockDuringSpecialDay(player))
+                    return;
+
                 if (_cellManager.CellsOpen)
                 {
                     _cellManager.CloseCells();
@@ -252,6 +326,9 @@ public sealed class WardenMenu
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
+                if (BlockDuringSpecialDay(player))
+                    return;
+
                 if (_boxManager.BoxEnabled)
                 {
                     _boxManager.StopBox();
@@ -292,6 +369,9 @@ public sealed class WardenMenu
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
+                if (BlockDuringSpecialDay(player))
+                    return;
+
                 foreach (var p in _players.GetPlayersByTeam(JBTeam.Prisoner))
                 {
                     p.Unmute();
@@ -305,6 +385,9 @@ public sealed class WardenMenu
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
+                if (BlockDuringSpecialDay(player))
+                    return;
+
                 foreach (var p in _players.GetPlayersByTeam(JBTeam.Prisoner))
                 {
                     p.Mute();
@@ -330,6 +413,9 @@ public sealed class WardenMenu
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
+                if (BlockDuringSpecialDay(player))
+                    return;
+
                 if (prisoner.IsMuted)
                 {
                     prisoner.Unmute();
@@ -368,6 +454,9 @@ public sealed class WardenMenu
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
+                if (BlockDuringSpecialDay(player))
+                    return;
+
                 var deputy = _players.GetDeputy();
                 if (deputy == null) return;
 
@@ -392,6 +481,9 @@ public sealed class WardenMenu
                 {
                     _core.Scheduler.NextWorldUpdate(() =>
                     {
+                        if (BlockDuringSpecialDay(player))
+                            return;
+
                         // Remove previous deputy first if one exists
                         var previousDeputy = _players.GetDeputy();
                         if (previousDeputy != null)
@@ -414,6 +506,15 @@ public sealed class WardenMenu
     {
         return _core.MenusAPI.CreateBuilder().Design
             .SetMenuTitle(player.Localizer[titleKey]);
+    }
+
+    private bool BlockDuringSpecialDay(IJBPlayer player)
+    {
+        if (!_specialDayManager.IsSpecialDayActive)
+            return false;
+
+        player.SendMessage(MessageType.Chat, "special_day_active_blocked", true);
+        return true;
     }
 
     private static void AddSubmenu(IMenuBuilderAPI builder, IJBPlayer player, string labelKey, Func<IMenuAPI> submenu)

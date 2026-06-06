@@ -13,16 +13,18 @@ public sealed class RebelManager
     private readonly ISwiftlyCore        _core;
     private readonly IJBPlayerManagement _players;
     private readonly UtilsConfig         _utilsConfig;
+    private readonly SpecialDayManager   _specialDayManager;
 
     private Guid? _weaponFireHookId;
     private Guid? _playerHurtHookId;
     private Guid? _playerDeathHookId;
 
-    public RebelManager(ISwiftlyCore core, IJBPlayerManagement players, IOptions<UtilsConfig> utilsConfig)
+    public RebelManager(ISwiftlyCore core, IJBPlayerManagement players, IOptions<UtilsConfig> utilsConfig, SpecialDayManager specialDayManager)
     {
         _core = core;
         _players = players;
         _utilsConfig = utilsConfig.Value;
+        _specialDayManager = specialDayManager;
     }
 
     public void Register()
@@ -48,6 +50,9 @@ public sealed class RebelManager
 
     private HookResult EventWeaponFire(EventWeaponFire e)
     {
+        if (_specialDayManager.IsSpecialDayActive)
+            return HookResult.Continue;
+
         if (e.UserIdPlayer == null)
             return HookResult.Continue;
 
@@ -67,6 +72,9 @@ public sealed class RebelManager
 
     private HookResult EventPlayerHurt(EventPlayerHurt e)
     {
+        if (_specialDayManager.IsSpecialDayActive)
+            return HookResult.Continue;
+
         if (e.UserIdPlayer == null || e.AttackerPlayer == null)
             return HookResult.Continue;
 
@@ -84,6 +92,9 @@ public sealed class RebelManager
 
     private HookResult EventPlayerDeath(EventPlayerDeath e)
     {
+        if (_specialDayManager.IsSpecialDayActive)
+            return HookResult.Continue;
+
         if (e.UserIdPlayer == null || e.AttackerPlayer == null)
             return HookResult.Continue;
 

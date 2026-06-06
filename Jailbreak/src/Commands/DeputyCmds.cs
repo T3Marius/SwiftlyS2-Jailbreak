@@ -12,11 +12,13 @@ public sealed class DeputyCommands
     private readonly ISwiftlyCore        _core;
     private readonly DeputyConfig        _config;
     private readonly IJBPlayerManagement _players;
+    private readonly SpecialDayManager   _specialDayManager;
 
-    public DeputyCommands(ISwiftlyCore core, IOptions<DeputyConfig> config, IJBPlayerManagement players)
+    public DeputyCommands(ISwiftlyCore core, IOptions<DeputyConfig> config, IJBPlayerManagement players, SpecialDayManager specialDayManager)
     {
         _core = core;
         _players = players;
+        _specialDayManager = specialDayManager;
         _config = config.Value;
     }
 
@@ -67,6 +69,9 @@ public sealed class DeputyCommands
         if (player == null)
             return;
 
+        if (BlockDuringSpecialDay(player))
+            return;
+
         if (player.Team != JBTeam.Guard)
         {
             player.SendMessage(MessageType.Chat, "deputy_not_guard");
@@ -103,6 +108,9 @@ public sealed class DeputyCommands
         if (player == null)
             return; 
 
+        if (BlockDuringSpecialDay(player))
+            return;
+
         if (!player.IsDeputy)
         {
             player.SendMessage(MessageType.Chat, "you_are_not_deputy");
@@ -111,5 +119,14 @@ public sealed class DeputyCommands
 
         player.SetDeputy(false);
         _players.SendMessage(MessageType.Chat, "deputy_removed.giveup", args: player.Player.Name);
+    }
+
+    private bool BlockDuringSpecialDay(IJBPlayer player)
+    {
+        if (!_specialDayManager.IsSpecialDayActive)
+            return false;
+
+        player.SendMessage(MessageType.Chat, "special_day_active_blocked", true);
+        return true;
     }
 }

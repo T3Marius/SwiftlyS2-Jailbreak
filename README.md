@@ -45,6 +45,26 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 - Warden can give and remove freeday from the menu.
 - Freeday state is shown beside each prisoner and updates instantly.
 
+### Special Days
+
+- `Jailbreak.Contract` exposes `ISpecialDay`, `SpecialDayBase`, and shared weapon helpers for external modules.
+- Special days can be registered from other plugins through `IJailbreak`.
+- Warden can queue a Special Day with `!sd` or from the Warden Menu.
+- Queued days start next round and respect the configurable round cooldown.
+- Countdown support can freeze all players, prisoners, guards, or nobody depending on the day.
+- Countdown HTML shows the day name, remaining time, and day description.
+- Special Day weapon restrictions are enforced through acquire checks.
+- Optional `!sguns` menu supports selecting a primary first, then a secondary, then gives both weapons.
+- Special days can enable friendly fire with `AllowFriendlyFire`.
+- Normal Jailbreak systems are blocked during active Special Days, including warden actions, rebels, freedays, cuffs, laser, ping, and warden voice handling.
+- End announcements show the Special Day name and surviving players, with names colored by team.
+
+### Current Special Days
+
+| Day | Module | Settings |
+| --- | --- | --- |
+| Knife Fight | `Modules/SpecialDays` | Knives only, no guns menu, no countdown freeze, friendly fire enabled. |
+
 ### Visuals
 
 - Warden ping creates a CBeam circle at the ping location.
@@ -65,8 +85,10 @@ All warden command aliases are configurable in `warden.toml`.
 | GiveUpWarden | `!uw`, `!unwarden` | Give up the warden role. |
 | WardenHelp | `!whelp`, `!wh` | Print warden help. |
 | WardenMenu | `!wmenu`, `!wm` | Open the warden menu. |
+| SpecialDays | `!sd` | Open the Special Days selection menu. |
 | ToggleBox | `!box` | Toggle box mode. |
 | ToggleCells | `!cells`, `!c` | Open or close cells. |
+| SpecialGuns | `!sguns` | Open the active Special Day guns menu when enabled. |
 
 ## Warden Menu
 
@@ -77,6 +99,7 @@ Opened with `!wmenu`.
 - Toggle Voice
 - Manage Deputy
 - Manage Freeday
+- Special Days
 - Visual Management
   - Laser Color
   - Ping Color
@@ -87,6 +110,7 @@ Opened with `!wmenu`.
 | --- | --- | --- |
 | `warden.toml` | Warden | Warden command aliases and auto-assign delay. |
 | `deputy.toml` | Deputy | Deputy command aliases. |
+| `specialday.toml` | SpecialDay | Special Day round cooldown. |
 | `models.toml` | Models | Warden, deputy, rebel, freeday, guard, and prisoner models. |
 | `utils.toml` | Utils | Database connection, cell timing, box sound/name settings, and other shared settings. |
 | `voice.toml` | Voice | Prisoner mute behavior. |
@@ -108,13 +132,16 @@ Stored and cached per warden:
 Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak`.
 
 - `IJBPlayerManagement Players` gives access to player tracking, warden/deputy lookup, role state, and team state.
+- `RegisterSpecialDay(ISpecialDay specialDay)` registers a Special Day module.
+- `UnregisterSpecialDay(string id)` unregisters a Special Day module.
 
 ## TODO List
 
 - [ ] Build the LastRequest interface system and wire it into core.
-- [ ] Build the SpecialDays interface system and wire it into core.
+- [x] Build the SpecialDays interface system and wire it into core.
 - [ ] Create LastRequest modules.
-- [ ] Create SpecialDays modules.
+- [x] Create first SpecialDays module.
+- [ ] Add more SpecialDays modules.
 - [x] Finish deputy commands.
 - [x] Configure deputy and warden roles.
 - [x] Configure rebel system.

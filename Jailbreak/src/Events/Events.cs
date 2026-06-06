@@ -16,6 +16,7 @@ public sealed class Events
     private readonly CellManager         _cellManager;
     private readonly BoxManager          _boxManager;
     private readonly CuffsManager        _cuffsManager;
+    private readonly SpecialDayManager   _specialDayManager;
 
     /* ------------------- Configs ------------------- */
     private readonly WardenConfig        _wardenConfig;
@@ -46,6 +47,7 @@ public sealed class Events
         CellManager cellManager,
         BoxManager boxManager,
         CuffsManager cuffsManager,
+        SpecialDayManager specialDayManager,
         IOptions<WardenConfig> wardenConfig, 
         IOptions<ModelsConfig> modelsConfig, 
         IOptions<UtilsConfig> utilsConfig,
@@ -56,6 +58,7 @@ public sealed class Events
         _cellManager = cellManager;
         _boxManager = boxManager;
         _cuffsManager = cuffsManager;
+        _specialDayManager = specialDayManager;
         _wardenConfig = wardenConfig.Value;
         _modelsConfig = modelsConfig.Value;
         _utilsConfig = utilsConfig.Value;
@@ -203,10 +206,13 @@ public sealed class Events
             currentWarden.SetWarden(false, silent: true);
         }
 
+        var specialDayRound = _specialDayManager.HasQueuedOrActiveSpecialDay;
+
         foreach (var player in _players.GetAllPlayers())
-        {
-            player.CanBecomeWarden = player.Team == JBTeam.Guard;
-        }
+            player.CanBecomeWarden = !specialDayRound && player.Team == JBTeam.Guard;
+
+        if (specialDayRound)
+            return HookResult.Continue;
 
         _wardenCheckCts = _core.Scheduler.DelayBySeconds(_wardenConfig.AutoGiveWardenWhenNone, () =>
         {
@@ -306,6 +312,9 @@ public sealed class Events
         if (attacker == null || victim == null)
             return HookResult.Continue;
 
+        if (_specialDayManager.IsSpecialDayActive)
+            return HookResult.Continue;
+
         if (victim.IsWarden && attacker.Team == JBTeam.Prisoner)
         {
             _cuffsManager.OnWardenRemove(victim);
@@ -341,7 +350,7 @@ public sealed class Events
     {
         PlayerUtils.Color(player.Player, new Color(255, 255, 255, 255), _core.Scheduler);
 
-        player.CanBecomeWarden = player.Team == JBTeam.Guard;
+        player.CanBecomeWarden = !_specialDayManager.HasQueuedOrActiveSpecialDay && player.Team == JBTeam.Guard;
 
         var model = player.Team switch
         {

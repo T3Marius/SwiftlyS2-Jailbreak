@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/Modules/">
+    <Project Path="Modules/SpecialDays/SpecialDays.csproj" />
+  </Folder>
   <Project Path="Jailbreak.Contract/Jailbreak.Contract.csproj" />
   <Project Path="Jailbreak/Jailbreak.csproj" />
 </Solution>

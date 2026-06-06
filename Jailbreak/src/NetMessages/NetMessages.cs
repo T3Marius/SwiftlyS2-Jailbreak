@@ -11,15 +11,17 @@ public sealed class NetMessages
     private readonly ISwiftlyCore        _core;
     private readonly IJBPlayerManagement _players;
     private readonly VoiceConfig         _voiceConfig;
+    private readonly SpecialDayManager   _specialDayManager;
 
     private Guid? _voiceDataMsg;
     private CancellationTokenSource? _unmuteCts;
 
-    public NetMessages(ISwiftlyCore core, IJBPlayerManagement players, IOptions<VoiceConfig> voiceConfig)
+    public NetMessages(ISwiftlyCore core, IJBPlayerManagement players, IOptions<VoiceConfig> voiceConfig, SpecialDayManager specialDayManager)
     {
         _core = core;
         _players = players;
         _voiceConfig = voiceConfig.Value;
+        _specialDayManager = specialDayManager;
     }
 
     public void Register()
@@ -45,6 +47,9 @@ public sealed class NetMessages
 
         var player = _players.SyncPlayer(sender);
         if (player == null)
+            return HookResult.Continue;
+
+        if (_specialDayManager.IsSpecialDayActive)
             return HookResult.Continue;
 
         if (player.IsWarden)

@@ -16,6 +16,7 @@ public sealed class CuffsManager
 {
     private readonly ISwiftlyCore        _core;
     private readonly IJBPlayerManagement _players;
+    private readonly SpecialDayManager   _specialDayManager;
 
     private const string CuffWeapon   = "weapon_taser";
     private const float GrabDistance  = 110.0f;
@@ -28,10 +29,11 @@ public sealed class CuffsManager
     private Guid? _weaponFireHookId;
     private Guid? _playerDeathHookId;
     
-    public CuffsManager(ISwiftlyCore core, IJBPlayerManagement players)
+    public CuffsManager(ISwiftlyCore core, IJBPlayerManagement players, SpecialDayManager specialDayManager)
     {
         _core = core;
         _players = players;
+        _specialDayManager = specialDayManager;
     }
 
     public void Register()
@@ -55,6 +57,9 @@ public sealed class CuffsManager
 
     public void OnWardenGive(IJBPlayer warden)
     {
+        if (_specialDayManager.IsSpecialDayActive)
+            return;
+
         if (!warden.IsWarden || !warden.Player.IsValid)
             return;
 
@@ -117,6 +122,9 @@ public sealed class CuffsManager
 
     private void OnClientKeyStateChanged(IOnClientKeyStateChangedEvent e)
     {
+        if (_specialDayManager.IsSpecialDayActive)
+            return;
+
         if (e.Key != KeyKind.Mouse2)
             return;
 
@@ -141,6 +149,14 @@ public sealed class CuffsManager
 
     private void OnTick()
     {
+        if (_specialDayManager.IsSpecialDayActive)
+        {
+            if (_cuffedByWarden.Count > 0 || _grabbedByWarden.Count > 0 || _wardenTaserOwners.Count > 0 || _mouse2HeldWardens.Count > 0)
+                CleanupAll();
+
+            return;
+        }
+
         foreach (var prisoner in _players.GetAllPlayers().Where(p => p.IsCuffed))
             PlayerUtils.FreezeVelocity(prisoner.Player, new Color(0, 255, 0, 255));
 
@@ -183,6 +199,9 @@ public sealed class CuffsManager
 
     private HookResult EventWeaponFire(EventWeaponFire e)
     {
+        if (_specialDayManager.IsSpecialDayActive)
+            return HookResult.Continue;
+
         if (e.UserIdPlayer == null)
             return HookResult.Continue;
 
@@ -214,6 +233,9 @@ public sealed class CuffsManager
 
     private void OnEntityTakeDamage(IOnEntityTakeDamageEvent e)
     {
+        if (_specialDayManager.IsSpecialDayActive)
+            return;
+
         if (!e.Entity.DesignerName.StartsWith("player", StringComparison.OrdinalIgnoreCase))
             return;
 

@@ -19,6 +19,7 @@ public sealed class WardenCommands
     private readonly BoxManager              _boxManager;
     private readonly CellManager             _cellManager;
     private readonly CuffsManager            _cuffsManager;
+    private readonly SpecialDayManager       _specialDayManager;
     private readonly ILogger<WardenCommands> _log;
 
     public WardenCommands(
@@ -29,6 +30,7 @@ public sealed class WardenCommands
         BoxManager boxManager,
         CellManager cellManager,
         CuffsManager cuffsManager,
+        SpecialDayManager specialDayManager,
         ILogger<WardenCommands> log)
     {
         _core    = core;
@@ -38,6 +40,7 @@ public sealed class WardenCommands
         _boxManager = boxManager;
         _cellManager = cellManager;
         _cuffsManager = cuffsManager;
+        _specialDayManager = specialDayManager;
         _log     = log;
     }
 
@@ -73,6 +76,14 @@ public sealed class WardenCommands
                 continue;
 
             _core.Command.RegisterCommand(cmd, WardenMenu);
+        }
+
+        foreach (var cmd in _config.Commands.SpecialDays)
+        {
+            if (_core.Command.IsCommandRegistered(cmd))
+                continue;
+
+            _core.Command.RegisterCommand(cmd, SpecialDays);
         }
 
         foreach (var cmd in _config.Commands.ToggleBox)
@@ -126,6 +137,14 @@ public sealed class WardenCommands
             _core.Command.UnregisterCommand(cmd);
         }
 
+        foreach (var cmd in _config.Commands.SpecialDays)
+        {
+            if (!_core.Command.IsCommandRegistered(cmd))
+                continue;
+
+            _core.Command.UnregisterCommand(cmd);
+        }
+
         foreach (var cmd in _config.Commands.ToggleBox)
         {
             if (!_core.Command.IsCommandRegistered(cmd))
@@ -151,6 +170,9 @@ public sealed class WardenCommands
         
         var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
+            return;
+
+        if (BlockDuringSpecialDay(player))
             return;
 
         if (player.Team != JBTeam.Guard)
@@ -193,6 +215,9 @@ public sealed class WardenCommands
         if (player == null)
             return;
 
+        if (BlockDuringSpecialDay(player))
+            return;
+
         if (!player.IsWarden)
         {
             player.SendMessage(MessageType.Chat, "you_are_not_warden", true);
@@ -209,6 +234,9 @@ public sealed class WardenCommands
         
         var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
+            return;
+
+        if (BlockDuringSpecialDay(player))
             return;
 
         if (!player.IsWarden)
@@ -233,6 +261,9 @@ public sealed class WardenCommands
         if (player == null)
             return;
 
+        if (BlockDuringSpecialDay(player))
+            return;
+
         if (!player.IsWarden)
         {
             player.SendMessage(MessageType.Chat, "you_are_not_warden", true);
@@ -241,6 +272,26 @@ public sealed class WardenCommands
 
         _wardenMenu.Show(player);
     }
+    private void SpecialDays(ICommandContext ctx)
+    {
+        if (ctx.Sender == null)
+            return;
+
+        var player = _players.SyncPlayer(ctx.Sender);
+        if (player == null)
+            return;
+
+        if (BlockDuringSpecialDay(player))
+            return;
+
+        if (!player.IsWarden)
+        {
+            player.SendMessage(MessageType.Chat, "you_are_not_warden", true);
+            return;
+        }
+
+        _wardenMenu.ShowSpecialDays(player);
+    }
     private void ToggleBox(ICommandContext ctx)
     {
         if (ctx.Sender == null)
@@ -248,6 +299,9 @@ public sealed class WardenCommands
         
         var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
+            return;
+
+        if (BlockDuringSpecialDay(player))
             return;
 
         if (!player.IsWarden)
@@ -278,6 +332,9 @@ public sealed class WardenCommands
         if (player == null)
             return;
 
+        if (BlockDuringSpecialDay(player))
+            return;
+
         if (!player.IsWarden && !player.IsDeputy)
         {
             player.SendMessage(MessageType.Chat, "you_are_not_warden&deputy", true);
@@ -300,6 +357,15 @@ public sealed class WardenCommands
             _cellManager.CloseCells();
             _players.SendMessage(MessageType.Chat, "cells_closed_sender", true, args: sender);
         }
+    }
+
+    private bool BlockDuringSpecialDay(IJBPlayer player)
+    {
+        if (!_specialDayManager.IsSpecialDayActive)
+            return false;
+
+        player.SendMessage(MessageType.Chat, "special_day_active_blocked", true);
+        return true;
     }
 
 }
