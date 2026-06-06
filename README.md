@@ -149,6 +149,7 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak`.
 - [x] Create first SpecialDays module.
 - [ ] Add more SpecialDays modules.
 - [ ] Add more LastRequests modules
+- [ ] Save LastRequests Wins and Loses in database
 - [x] Finish deputy commands.
 - [x] Configure deputy and warden roles.
 - [x] Configure rebel system.
@@ -166,4 +167,5 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak`.
 - [x] Add ability to remove weapons when shooting them as warden.
 - [x] Add a `jailbreak.cfg` file in the plugin directory.
 - [ ] Revisit drawing mode later.
+- [ ] Add speaking icon to whomever is speaking
 - [ ] Add more TODO items.
