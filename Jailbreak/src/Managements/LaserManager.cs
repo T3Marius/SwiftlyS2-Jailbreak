@@ -25,6 +25,7 @@ public sealed class LaserManager
     private readonly IJBPlayerManagement _players;
     private readonly WardenDatabase _wardenDatabase;
     private readonly SpecialDayManager _specialDayManager;
+    private readonly TraceParams _laserTraceParams;
     private readonly Dictionary<ulong, LaserState> _lasers = [];
     private readonly HashSet<ulong> _holdingUse = [];
 
@@ -34,6 +35,7 @@ public sealed class LaserManager
         _players = players;
         _wardenDatabase = wardenDatabase;
         _specialDayManager = specialDayManager;
+        _laserTraceParams = CreateLaserTraceParams();
     }
 
     public void Register()
@@ -139,7 +141,7 @@ public sealed class LaserManager
         if (beam == null)
             return;
 
-        var targetEnd = TraceLaserEnd(pawn, start, forward, state.Beam);
+        var targetEnd = TraceLaserEnd(start, forward);
         var elapsed = (float)(DateTime.UtcNow - state.StartedAt).TotalSeconds;
         var grow = EaseOut(Math.Clamp(elapsed / LaserGrowSeconds, 0f, 1f));
         var targetVisibleEnd = start + ((targetEnd - start) * grow);
@@ -178,35 +180,25 @@ public sealed class LaserManager
             - (up * WeaponDownOffset);
     }
 
-    private Vector TraceLaserEnd(CCSPlayerPawn pawn, Vector start, Vector forward, CBeam? laser)
+    private Vector TraceLaserEnd(Vector start, Vector forward)
     {
         var end = start + (forward * MaxDistance);
 
-        var builder = TraceParams.Builder()
+        var trace = _core.Trace.TraceShapeLine(start, end, _laserTraceParams);
+        return trace.DidHit ? trace.HitPoint : end;
+    }
+
+    private static TraceParams CreateLaserTraceParams()
+    {
+        return TraceParams.Builder()
             .WithLineRay()
             .WithObjectQuery(RnQueryObjectSet.AllGameEntities)
             .WithInteraction(MaskTrace.Solid | MaskTrace.Player | MaskTrace.Hitbox, MaskTrace.Empty, MaskTrace.Solid)
             .WithCollisionGroup(CollisionGroup.PlayerMovement)
             .WithIterateEntities(true)
             .HitSolid()
-            .IgnoreEntity(pawn)
-            .WithShouldHitEntity(entity =>
-            {
-                if (entity.Address == pawn.Address)
-                    return false;
-
-                if (laser != null && entity.Address == laser.Address)
-                    return false;
-
-                return !entity.DesignerName.Equals("beam", StringComparison.OrdinalIgnoreCase);
-            });
-
-        var activeWeapon = pawn.WeaponServices?.ActiveWeapon.Value;
-        if (activeWeapon != null && activeWeapon.IsValid)
-            builder.IgnoreEntity(activeWeapon);
-
-        var trace = _core.Trace.TraceShapeLine(start, end, builder.Build());
-        return trace.DidHit ? trace.HitPoint : end;
+            .WithShouldHitEntity(entity => entity is not CBeam)
+            .Build();
     }
 
     private LaserState GetOrCreateLaser(ulong steamId)

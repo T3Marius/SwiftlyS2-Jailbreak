@@ -14,17 +14,24 @@ public sealed class RebelManager
     private readonly IJBPlayerManagement _players;
     private readonly UtilsConfig         _utilsConfig;
     private readonly SpecialDayManager   _specialDayManager;
+    private readonly LastRequestManager  _lastRequestManager;
 
     private Guid? _weaponFireHookId;
     private Guid? _playerHurtHookId;
     private Guid? _playerDeathHookId;
 
-    public RebelManager(ISwiftlyCore core, IJBPlayerManagement players, IOptions<UtilsConfig> utilsConfig, SpecialDayManager specialDayManager)
+    public RebelManager(
+        ISwiftlyCore core,
+        IJBPlayerManagement players,
+        IOptions<UtilsConfig> utilsConfig,
+        SpecialDayManager specialDayManager,
+        LastRequestManager lastRequestManager)
     {
         _core = core;
         _players = players;
         _utilsConfig = utilsConfig.Value;
         _specialDayManager = specialDayManager;
+        _lastRequestManager = lastRequestManager;
     }
 
     public void Register()
@@ -50,7 +57,7 @@ public sealed class RebelManager
 
     private HookResult EventWeaponFire(EventWeaponFire e)
     {
-        if (_specialDayManager.IsSpecialDayActive)
+        if (_specialDayManager.IsSpecialDayActive || _lastRequestManager.IsLastRequestActive)
             return HookResult.Continue;
 
         if (e.UserIdPlayer == null)
@@ -72,7 +79,7 @@ public sealed class RebelManager
 
     private HookResult EventPlayerHurt(EventPlayerHurt e)
     {
-        if (_specialDayManager.IsSpecialDayActive)
+        if (_specialDayManager.IsSpecialDayActive || _lastRequestManager.IsLastRequestActive)
             return HookResult.Continue;
 
         if (e.UserIdPlayer == null || e.AttackerPlayer == null)
@@ -92,7 +99,7 @@ public sealed class RebelManager
 
     private HookResult EventPlayerDeath(EventPlayerDeath e)
     {
-        if (_specialDayManager.IsSpecialDayActive)
+        if (_specialDayManager.IsSpecialDayActive || _lastRequestManager.IsLastRequestActive)
             return HookResult.Continue;
 
         if (e.UserIdPlayer == null || e.AttackerPlayer == null)

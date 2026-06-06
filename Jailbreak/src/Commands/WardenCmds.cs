@@ -20,6 +20,7 @@ public sealed class WardenCommands
     private readonly CellManager             _cellManager;
     private readonly CuffsManager            _cuffsManager;
     private readonly SpecialDayManager       _specialDayManager;
+    private readonly LastRequestManager      _lastRequestManager;
     private readonly ILogger<WardenCommands> _log;
 
     public WardenCommands(
@@ -31,6 +32,7 @@ public sealed class WardenCommands
         CellManager cellManager,
         CuffsManager cuffsManager,
         SpecialDayManager specialDayManager,
+        LastRequestManager lastRequestManager,
         ILogger<WardenCommands> log)
     {
         _core    = core;
@@ -41,6 +43,7 @@ public sealed class WardenCommands
         _cellManager = cellManager;
         _cuffsManager = cuffsManager;
         _specialDayManager = specialDayManager;
+        _lastRequestManager = lastRequestManager;
         _log     = log;
     }
 
@@ -361,11 +364,19 @@ public sealed class WardenCommands
 
     private bool BlockDuringSpecialDay(IJBPlayer player)
     {
-        if (!_specialDayManager.IsSpecialDayActive)
-            return false;
+        if (_specialDayManager.IsSpecialDayActive)
+        {
+            player.SendMessage(MessageType.Chat, "special_day_active_blocked", true);
+            return true;
+        }
 
-        player.SendMessage(MessageType.Chat, "special_day_active_blocked", true);
-        return true;
+        if (_lastRequestManager.IsLastRequestActive)
+        {
+            player.SendMessage(MessageType.Chat, "last_request_already_active", true);
+            return true;
+        }
+
+        return false;
     }
 
 }

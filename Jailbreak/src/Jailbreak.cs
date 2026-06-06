@@ -43,6 +43,8 @@ public sealed class Main : BasePlugin
              .Configure(b => b.AddTomlFile("deputy.toml", false, true));
         Core.Configuration.InitializeTomlWithModel<SpecialDayConfig>("specialday.toml", "SpecialDay")
              .Configure(b => b.AddTomlFile("specialday.toml", false, true));
+        Core.Configuration.InitializeTomlWithModel<PrisonerConfig>("prisoner.toml", "Prisoner")
+             .Configure(b => b.AddTomlFile("prisoner.toml", false, true));
 
         collection.AddSwiftly(Core)
                   .AddSingleton<CuffsManager>()
@@ -55,6 +57,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<BeaconManager>()
                   .AddSingleton<LaserManager>()
                   .AddSingleton<SpecialDayManager>()
+                  .AddSingleton<LastRequestManager>()
                   .AddSingleton<GameConfig>()
                   .AddSingleton<WardenDatabase>()
                   .AddSingleton<Api>()
@@ -63,6 +66,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<NetMessages>()
                   .AddSingleton<WardenCommands>()
                   .AddSingleton<DeputyCommands>()
+                  .AddSingleton<PrisonerCommands>()
                   .AddSingleton<WardenMenu>()
                   .AddSingleton<BoxManager>();
 
@@ -84,6 +88,9 @@ public sealed class Main : BasePlugin
         collection.AddOptionsWithValidateOnStart<SpecialDayConfig>()
                   .BindConfiguration("SpecialDay");
 
+        collection.AddOptionsWithValidateOnStart<PrisonerConfig>()
+                  .BindConfiguration("Prisoner");
+
         _provider = collection.BuildServiceProvider();
 
         _provider.GetRequiredService<WardenDatabase>().Initialize();
@@ -96,10 +103,12 @@ public sealed class Main : BasePlugin
 
         _provider.GetRequiredService<WardenCommands>().Register();
         _provider.GetRequiredService<DeputyCommands>().Register();
+        _provider.GetRequiredService<PrisonerCommands>().Register();
         _provider.GetRequiredService<Events>().Register();
         _provider.GetRequiredService<Listeners>().Register();
         _provider.GetRequiredService<NetMessages>().Register();
         _provider.GetRequiredService<SpecialDayManager>().Register();
+        _provider.GetRequiredService<LastRequestManager>().Register();
         _provider.GetRequiredService<BeaconManager>().Register();
         _provider.GetRequiredService<RebelManager>().Register();
         _provider.GetRequiredService<TeamManager>().Register();
@@ -115,10 +124,12 @@ public sealed class Main : BasePlugin
 
         _provider.GetRequiredService<WardenCommands>().Unregister();
         _provider.GetRequiredService<DeputyCommands>().Unregister();
+        _provider.GetRequiredService<PrisonerCommands>().Unregister();
         _provider.GetRequiredService<Events>().Unregister();
         _provider.GetRequiredService<Listeners>().Unregister();
         _provider.GetRequiredService<NetMessages>().Unregister();
         _provider.GetRequiredService<SpecialDayManager>().Unregister();
+        _provider.GetRequiredService<LastRequestManager>().Unregister();
         _provider.GetRequiredService<GameConfig>().Unregister();
         _provider.GetRequiredService<BeaconManager>().Unregister();
         _provider.GetRequiredService<RebelManager>().Unregister();

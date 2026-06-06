@@ -9,13 +9,17 @@ public sealed class Api : IJailbreak
     public ISpecialDay? CurrentSpecialDay => _specialDayManager.CurrentSpecialDay;
     public ISpecialDay? QueuedSpecialDay => _specialDayManager.QueuedSpecialDay;
     public int SpecialDayCooldownRoundsRemaining => _specialDayManager.CooldownRoundsRemaining;
+    public IReadOnlyCollection<ILastRequest> LastRequests => _lastRequestManager.LastRequests;
+    public ILastRequest? CurrentLastRequest => _lastRequestManager.CurrentLastRequest;
 
     private readonly SpecialDayManager _specialDayManager;
+    private readonly LastRequestManager _lastRequestManager;
 
-    public Api(IJBPlayerManagement playerManagement, SpecialDayManager specialDayManager)
+    public Api(IJBPlayerManagement playerManagement, SpecialDayManager specialDayManager, LastRequestManager lastRequestManager)
     {
         Players = playerManagement;
         _specialDayManager = specialDayManager;
+        _lastRequestManager = lastRequestManager;
     }
 
     public bool RegisterSpecialDay(ISpecialDay specialDay)
@@ -41,5 +45,15 @@ public sealed class Api : IJailbreak
     public void EndSpecialDay()
     {
         _specialDayManager.EndSpecialDay();
+    }
+
+    public bool RegisterLastRequest(ILastRequest lastRequest)
+    {
+        return _lastRequestManager.RegisterLastRequest(lastRequest);
+    }
+
+    public bool UnregisterLastRequest(string id)
+    {
+        return _lastRequestManager.UnregisterLastRequest(id);
     }
 }

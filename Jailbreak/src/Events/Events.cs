@@ -17,6 +17,7 @@ public sealed class Events
     private readonly BoxManager          _boxManager;
     private readonly CuffsManager        _cuffsManager;
     private readonly SpecialDayManager   _specialDayManager;
+    private readonly LastRequestManager  _lastRequestManager;
 
     /* ------------------- Configs ------------------- */
     private readonly WardenConfig        _wardenConfig;
@@ -48,6 +49,7 @@ public sealed class Events
         BoxManager boxManager,
         CuffsManager cuffsManager,
         SpecialDayManager specialDayManager,
+        LastRequestManager lastRequestManager,
         IOptions<WardenConfig> wardenConfig, 
         IOptions<ModelsConfig> modelsConfig, 
         IOptions<UtilsConfig> utilsConfig,
@@ -59,6 +61,7 @@ public sealed class Events
         _boxManager = boxManager;
         _cuffsManager = cuffsManager;
         _specialDayManager = specialDayManager;
+        _lastRequestManager = lastRequestManager;
         _wardenConfig = wardenConfig.Value;
         _modelsConfig = modelsConfig.Value;
         _utilsConfig = utilsConfig.Value;
@@ -207,11 +210,12 @@ public sealed class Events
         }
 
         var specialDayRound = _specialDayManager.HasQueuedOrActiveSpecialDay;
+        var normalWardenBlocked = specialDayRound || _lastRequestManager.IsLastRequestActive;
 
         foreach (var player in _players.GetAllPlayers())
-            player.CanBecomeWarden = !specialDayRound && player.Team == JBTeam.Guard;
+            player.CanBecomeWarden = !normalWardenBlocked && player.Team == JBTeam.Guard;
 
-        if (specialDayRound)
+        if (normalWardenBlocked)
             return HookResult.Continue;
 
         _wardenCheckCts = _core.Scheduler.DelayBySeconds(_wardenConfig.AutoGiveWardenWhenNone, () =>
@@ -312,7 +316,7 @@ public sealed class Events
         if (attacker == null || victim == null)
             return HookResult.Continue;
 
-        if (_specialDayManager.IsSpecialDayActive)
+        if (_specialDayManager.IsSpecialDayActive || _lastRequestManager.IsLastRequestActive)
             return HookResult.Continue;
 
         if (victim.IsWarden && attacker.Team == JBTeam.Prisoner)
@@ -350,7 +354,9 @@ public sealed class Events
     {
         PlayerUtils.Color(player.Player, new Color(255, 255, 255, 255), _core.Scheduler);
 
-        player.CanBecomeWarden = !_specialDayManager.HasQueuedOrActiveSpecialDay && player.Team == JBTeam.Guard;
+        player.CanBecomeWarden = !_specialDayManager.HasQueuedOrActiveSpecialDay
+            && !_lastRequestManager.IsLastRequestActive
+            && player.Team == JBTeam.Guard;
 
         var model = player.Team switch
         {

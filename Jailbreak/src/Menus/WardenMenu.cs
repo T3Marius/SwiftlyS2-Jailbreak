@@ -15,6 +15,7 @@ public sealed class WardenMenu
     private readonly IJBPlayerManagement _players;
     private readonly WardenDatabase _wardenDatabase;
     private readonly SpecialDayManager _specialDayManager;
+    private readonly LastRequestManager _lastRequestManager;
 
     private static readonly ColorChoice[] ColorChoices =
     [
@@ -33,7 +34,8 @@ public sealed class WardenMenu
         BoxManager boxManager,
         IJBPlayerManagement players,
         WardenDatabase wardenDatabase,
-        SpecialDayManager specialDayManager)
+        SpecialDayManager specialDayManager,
+        LastRequestManager lastRequestManager)
     {
         _core = core;
         _cellManager = cellManager;
@@ -41,6 +43,7 @@ public sealed class WardenMenu
         _players = players;
         _wardenDatabase = wardenDatabase;
         _specialDayManager = specialDayManager;
+        _lastRequestManager = lastRequestManager;
     }
 
     // ─── Root ────────────────────────────────────────────────────────────────
@@ -510,11 +513,19 @@ public sealed class WardenMenu
 
     private bool BlockDuringSpecialDay(IJBPlayer player)
     {
-        if (!_specialDayManager.IsSpecialDayActive)
-            return false;
+        if (_specialDayManager.IsSpecialDayActive)
+        {
+            player.SendMessage(MessageType.Chat, "special_day_active_blocked", true);
+            return true;
+        }
 
-        player.SendMessage(MessageType.Chat, "special_day_active_blocked", true);
-        return true;
+        if (_lastRequestManager.IsLastRequestActive)
+        {
+            player.SendMessage(MessageType.Chat, "last_request_already_active", true);
+            return true;
+        }
+
+        return false;
     }
 
     private static void AddSubmenu(IMenuBuilderAPI builder, IJBPlayer player, string labelKey, Func<IMenuAPI> submenu)
