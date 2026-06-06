@@ -65,6 +65,12 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 | --- | --- | --- |
 | Knife Fight | `Modules/SpecialDays` | Knives only, no guns menu, no countdown freeze, friendly fire enabled. |
 
+### Current Last Requests
+
+| LR | Module | Settings |
+| --- | --- | --- |
+| Knife Fight | `Modules/LastRequests` | Knives only, differnet knife type |
+
 ### Visuals
 
 - Warden ping creates a CBeam circle at the ping location.
@@ -137,11 +143,12 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak`.
 
 ## TODO List
 
-- [ ] Build the LastRequest interface system and wire it into core.
+- [X] Build the LastRequest interface system and wire it into core.
 - [x] Build the SpecialDays interface system and wire it into core.
-- [ ] Create LastRequest modules.
+- [X] Create LastRequest modules.
 - [x] Create first SpecialDays module.
 - [ ] Add more SpecialDays modules.
+- [ ] Add more LastRequests modules
 - [x] Finish deputy commands.
 - [x] Configure deputy and warden roles.
 - [x] Configure rebel system.
