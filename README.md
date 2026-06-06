@@ -169,4 +169,5 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak`.
 - [ ] Revisit drawing mode later.
 - [ ] Add speaking icon to whomever is speaking
 - [ ] Add gameplay sounds (Warden set, Rebel set, etc)
+- [X] Go to sleep
 - [ ] Add more TODO items.
