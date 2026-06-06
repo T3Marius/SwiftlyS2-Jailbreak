@@ -17,7 +17,7 @@ public sealed class ModelsConfig
         "agents/models/sunucukur/prisoner/p_variant_b/p_variant_b.vmdl",
         "agents/models/sunucukur/prisoner/p_variant_c/p_variant_c.vmdl",
         "agents/models/sunucukur/prisoner/p_variant_d/p_variant_d.vmdl",
-        "agents/models/sunucukur/prisoner/p_variant_e/p_variant_e.vmdl",
+        "agents/models/sunucukur/prisoner/p_variantd_e/p_variant_e.vmdl",
         "agents/models/sunucukur/prisoner/p_variant_f/p_variant_f.vmdl",
     ];
 }

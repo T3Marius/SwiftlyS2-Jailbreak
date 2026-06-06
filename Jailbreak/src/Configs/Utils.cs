@@ -2,6 +2,7 @@ namespace Jailbreak;
 
 public sealed class UtilsConfig
 {
+    public string DatabaseConnection { get; set; } = "default";
     public int OpenCellsAfterSeconds { get; set; } = 20;
     public bool HideTeammatesName { get; set; } = true;
     public string BoxStartSound { get; set; } = "tr.BellNormal";

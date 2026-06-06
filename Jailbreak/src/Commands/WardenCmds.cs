@@ -90,6 +90,7 @@ public sealed class WardenCommands
 
             _core.Command.RegisterCommand(cmd, ToggleCells);
         }
+
     }
     public void Unregister()
     {
@@ -140,6 +141,7 @@ public sealed class WardenCommands
 
             _core.Command.UnregisterCommand(cmd);
         }
+
     }
 
     private void BecomeWarden(ICommandContext ctx)
@@ -276,7 +278,7 @@ public sealed class WardenCommands
         if (player == null)
             return;
 
-        if (!player.IsWarden || !player.IsDeputy)
+        if (!player.IsWarden && !player.IsDeputy)
         {
             player.SendMessage(MessageType.Chat, "you_are_not_warden&deputy", true);
             return;
@@ -291,12 +293,13 @@ public sealed class WardenCommands
         if (_cellManager.CellsOpen)
         {
             _cellManager.OpenCells();
-            _players.SendMessage(MessageType.Chat, "cells_opened_warden", true, args: sender);
+            _players.SendMessage(MessageType.Chat, "cells_opened_sender", true, args: sender);
         }
         else
         {
             _cellManager.CloseCells();
-            _players.SendMessage(MessageType.Chat, "cells_closed_warden", true, args: sender);
+            _players.SendMessage(MessageType.Chat, "cells_closed_sender", true, args: sender);
         }
     }
+
 }

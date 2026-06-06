@@ -14,12 +14,29 @@ public sealed class RebelManager
     private readonly IJBPlayerManagement _players;
     private readonly UtilsConfig         _utilsConfig;
 
+    private Guid? _weaponFireHookId;
+    private Guid? _playerHurtHookId;
+    private Guid? _playerDeathHookId;
 
     public RebelManager(ISwiftlyCore core, IJBPlayerManagement players, IOptions<UtilsConfig> utilsConfig)
     {
         _core = core;
         _players = players;
         _utilsConfig = utilsConfig.Value;
+    }
+
+    public void Register()
+    {
+        _weaponFireHookId = _core.GameEvent.HookPost<EventWeaponFire>(EventWeaponFire);
+        _playerHurtHookId = _core.GameEvent.HookPost<EventPlayerHurt>(EventPlayerHurt);
+        _playerDeathHookId = _core.GameEvent.HookPost<EventPlayerDeath>(EventPlayerDeath);
+    }
+
+    public void Unregister()
+    {
+        Unhook(ref _weaponFireHookId);
+        Unhook(ref _playerHurtHookId);
+        Unhook(ref _playerDeathHookId);
     }
 
     private void MakeRebel(IJBPlayer player)
@@ -29,7 +46,6 @@ public sealed class RebelManager
         _players.SendMessage(MessageType.Chat, "became_rebel_chat", true, args: player.Player.Name);
     }
 
-    [GameEventHandler(HookMode.Post)]
     private HookResult EventWeaponFire(EventWeaponFire e)
     {
         if (e.UserIdPlayer == null)
@@ -49,7 +65,6 @@ public sealed class RebelManager
         return HookResult.Continue;
     }
 
-    [GameEventHandler(HookMode.Post)]
     private HookResult EventPlayerHurt(EventPlayerHurt e)
     {
         if (e.UserIdPlayer == null || e.AttackerPlayer == null)
@@ -67,7 +82,6 @@ public sealed class RebelManager
         return HookResult.Continue;
     }
 
-    [GameEventHandler(HookMode.Post)]
     private HookResult EventPlayerDeath(EventPlayerDeath e)
     {
         if (e.UserIdPlayer == null || e.AttackerPlayer == null)
@@ -79,13 +93,13 @@ public sealed class RebelManager
         if (victim == null || attacker == null || attacker == victim)
             return HookResult.Continue;
 
+        if (attacker.Team != JBTeam.Prisoner || victim.Team != JBTeam.Guard)
+            return HookResult.Continue;
+
         if (_utilsConfig.AnnounceGuardsDeath)
         {
             _players.SendMessage(MessageType.Chat, "guard_death", true, 0, victim.Player.Name, attacker.Player.Name);
         }
-
-        if (attacker.Team != JBTeam.Prisoner && victim.Team != JBTeam.Guard)
-            return HookResult.Continue;
 
         if (!attacker.IsRebel)
             MakeRebel(attacker);
@@ -94,4 +108,12 @@ public sealed class RebelManager
         return HookResult.Continue;
     }
 
+    private void Unhook(ref Guid? hookId)
+    {
+        if (!hookId.HasValue)
+            return;
+
+        _core.GameEvent.Unhook(hookId.Value);
+        hookId = null;
+    }
 }

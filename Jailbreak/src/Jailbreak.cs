@@ -3,6 +3,7 @@ using SwiftlyS2.Shared.Plugins;
 using Microsoft.Extensions.DependencyInjection;
 using Jailbreak.Contract;
 using Tomlyn.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Jailbreak;
 
@@ -49,6 +50,9 @@ public sealed class Main : BasePlugin
                   .AddSingleton<IJBPlayerManagement, JBPlayerManagement>()
                   .AddSingleton<TeamManager>()
                   .AddSingleton<RebelManager>()
+                  .AddSingleton<BeaconManager>()
+                  .AddSingleton<LaserManager>()
+                  .AddSingleton<WardenDatabase>()
                   .AddSingleton<Api>()
                   .AddSingleton<Events>()
                   .AddSingleton<Listeners>()
@@ -75,6 +79,8 @@ public sealed class Main : BasePlugin
 
         _provider = collection.BuildServiceProvider();
 
+        _provider.GetRequiredService<WardenDatabase>().Initialize();
+
         if (hotReload)
         {
             _provider.GetRequiredService<JBPlayerManagement>().SyncTeams();
@@ -85,11 +91,12 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<Events>().Register();
         _provider.GetRequiredService<Listeners>().Register();
         _provider.GetRequiredService<NetMessages>().Register();
-  
-        Core.Registrator.Register(_provider.GetRequiredService<RebelManager>());
-        Core.Registrator.Register(_provider.GetRequiredService<TeamManager>());
-        Core.Registrator.Register(_provider.GetRequiredService<BoxManager>());
-        Core.Registrator.Register(_provider.GetRequiredService<CuffsManager>());
+        _provider.GetRequiredService<BeaconManager>().Register();
+        _provider.GetRequiredService<RebelManager>().Register();
+        _provider.GetRequiredService<TeamManager>().Register();
+        _provider.GetRequiredService<BoxManager>().Register();
+        _provider.GetRequiredService<CuffsManager>().Register();
+        _provider.GetRequiredService<LaserManager>().Register();
 
     }
     public override void Unload()
@@ -102,6 +109,12 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<Events>().Unregister();
         _provider.GetRequiredService<Listeners>().Unregister();
         _provider.GetRequiredService<NetMessages>().Unregister();
+        _provider.GetRequiredService<BeaconManager>().Unregister();
+        _provider.GetRequiredService<RebelManager>().Unregister();
+        _provider.GetRequiredService<TeamManager>().Unregister();
+        _provider.GetRequiredService<BoxManager>().Unregister();
+        _provider.GetRequiredService<CuffsManager>().Unregister();
+        _provider.GetRequiredService<LaserManager>().Unregister();
         _provider.GetRequiredService<IconManager>().CleanupAll();
         _provider.Dispose();
         _provider = null;

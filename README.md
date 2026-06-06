@@ -2,98 +2,133 @@
 
 A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys2/swiftlys2).
 
----
-
 ## Features
 
-### Player Roles & Teams
+### Player Roles And Teams
 
-- **Teams**: Guard (CT), Prisoner (T)
-- **Roles**: Warden, Deputy, Rebel, Freeday
-- Per-role particle icon above the player's head (configurable via `icons.toml`)
-- Per-role model assignment with fallback color tinting:
-  - Warden → blue, Deputy → white, Rebel → red, Freeday → green
-- Guard and prisoner model pools with random selection each spawn (`models.toml`)
-- Cuffed state tracking per player
+- Guard and prisoner team tracking through `JBPlayerManagement`.
+- Warden, Deputy, Rebel, Freeday, and cuffed player state.
+- Hot reload team sync so role/team state is rebuilt when the plugin reloads.
+- CT team ratio enforcement on CT joins only: 1 guard per 2 prisoners, with bots included in the count.
+- Per-role particle icon support.
+- Per-role and team model assignment through `models.toml`, with fallback tint colors.
 
 ### Warden System
 
-- Any guard can claim warden with `!w`; only one warden at a time
-- Warden auto-assigned from eligible guards after a configurable delay each round
-- Warden is removed on death (killed by a prisoner) or round end
-- Deputy tracking (one at a time)
-- HUD center message updated every 3 seconds showing current warden and deputy
+- Guards can claim warden with `!w`; only one warden can exist at a time.
+- Warden can give up with `!uw`.
+- Warden auto-assignment from eligible guards after the configured delay.
+- Warden cleanup on death, round end, and plugin unload.
+- Cuffs are given to the warden and cleaned up when warden is removed.
+- Warden can remove weapons by shooting them.
+- HUD center message shows the current warden and deputy.
 
-### Cell Door System
+### Deputy System
 
-- Opens / closes `func_door`, `func_door_rotating`, `func_movelinear`, `prop_door_rotating`, and `func_breakable` entities
-- Cells auto-open after a configurable number of seconds each round (`utils.toml → OpenCellsAfterSeconds`)
-- State tracking prevents duplicate open/close calls
+- One deputy can exist at a time.
+- Deputy can open and close cells.
+- Warden menu supports assigning and removing deputy.
 
-### Box Mode
+### Cells And Box
 
-- Enables `mp_teammates_are_enemies` so prisoners can damage each other
-- Guards (CT) are protected — damage between CTs is blocked while box is active
-- Plays a configurable sound on activation (`BoxStartSound`, `BoxStartSoundVolume`)
-- Optionally hides overhead teammate names during box (`HideTeammatesName`)
-- Box stops automatically on round end
+- Cell manager opens and closes common cell door entities.
+- Cells can auto-open after `OpenCellsAfterSeconds` from `utils.toml`.
+- Box mode toggles prisoner friendly fire with CT protection.
+- Box mode can play a configurable start sound and hide teammate names.
+- Box, cells, and menu labels update live when state changes.
 
----
+### Voice And Freeday
+
+- Warden can mute or unmute all prisoners.
+- Warden can mute or unmute individual prisoners.
+- Prisoner voice state is shown directly in the menu and updates after changes.
+- Warden can give and remove freeday from the menu.
+- Freeday state is shown beside each prisoner and updates instantly.
+
+### Visuals
+
+- Warden ping creates a CBeam circle at the ping location.
+- Ping beacon grows into place, then stays until the next ping or timeout.
+- Player beacon support exists for effects such as duels.
+- Warden laser appears while holding `E`, starts from the weapon position, traces against map geometry, and stops at walls/structures.
+- Laser has a smooth grow/lerp animation.
+- Laser and ping colors support normal colors and rainbow mode.
+- Visual color preferences are saved per warden in the database and cached for performance.
 
 ## Commands
 
-All commands are configurable in `warden.toml`.
+All warden command aliases are configurable in `warden.toml`.
 
 | Command | Default aliases | Description |
-|---------|----------------|-------------|
-| BecomeWarden | `!w`, `!warden` | Claim the warden role (guards only) |
-| GiveUpWarden | `!uw`, `!unwarden` | Voluntarily step down as warden |
-| WardenHelp | `!whelp`, `!wh` | Print warden command list |
-| WardenMenu | `!wmenu`, `!wm` | Open the interactive warden menu |
-| ToggleBox | `!box` | Enable / disable box mode |
-| ToggleCells | `!cells`, `!c` | Open / close cell doors |
-
----
+| --- | --- | --- |
+| BecomeWarden | `!w`, `!warden` | Claim the warden role. |
+| GiveUpWarden | `!uw`, `!unwarden` | Give up the warden role. |
+| WardenHelp | `!whelp`, `!wh` | Print warden help. |
+| WardenMenu | `!wmenu`, `!wm` | Open the warden menu. |
+| ToggleBox | `!box` | Toggle box mode. |
+| ToggleCells | `!cells`, `!c` | Open or close cells. |
 
 ## Warden Menu
 
-Opened with `!wmenu`. Provides two submenus:
+Opened with `!wmenu`.
 
-- **Toggle Cells** — Open Cells / Close Cells
-- **Toggle Box** — Start Box / Stop Box
-
----
+- Toggle Cells
+- Toggle Box
+- Toggle Voice
+- Manage Deputy
+- Manage Freeday
+- Visual Management
+  - Laser Color
+  - Ping Color
 
 ## Configuration
 
 | File | Section | Key settings |
-|------|---------|--------------|
-| `warden.toml` | Warden | Command aliases, auto-assign delay |
-| `icons.toml` | Icons | Particle icon paths per role |
-| `models.toml` | Models | Model paths for each role and team pools |
-| `utils.toml` | Utils | `OpenCellsAfterSeconds`, `HideTeammatesName`, `BoxStartSound`, `BoxStartSoundVolume` |
+| --- | --- | --- |
+| `warden.toml` | Warden | Warden command aliases and auto-assign delay. |
+| `deputy.toml` | Deputy | Deputy command aliases. |
+| `models.toml` | Models | Warden, deputy, rebel, freeday, guard, and prisoner models. |
+| `utils.toml` | Utils | Database connection, cell timing, box sound/name settings, and other shared settings. |
+| `voice.toml` | Voice | Prisoner mute behavior. |
 
----
+## Database
+
+`WardenDatabase` uses `Utils.DatabaseConnection` and creates `jb_warden_settings`.
+
+Stored and cached per warden:
+
+- Laser color
+- Laser rainbow mode
+- Ping/beam color
+- Ping/beam rainbow mode
 
 ## Public API
 
-Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak` to access:
+Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak`.
 
-- `IJBPlayerManagement Players` — full player tracking (get warden, get by role/team, etc.)
+- `IJBPlayerManagement Players` gives access to player tracking, warden/deputy lookup, role state, and team state.
 
-# TODO List
-- [ ] Make LastRequest interface system + configure it in core.
-- [ ] Make SpecialDays interface systen + configure it in core.
-- [ ] Create some LastRequest modules.
-- [ ] Create some SpecialDays modules.
-- [ ] Finish warden commands.
-- [X] Finish deputy commands.
-- [X] Finish configuring deputy and warden roles.
-- [X] Finish configuring rebel system.
-- [X] Finish configuring freeday system.
-- [ ] Finish warden menu.
-- [X] Configure team ratio.
-- [X] Mute prisoners system (When Warden is speaking, first x seconds of round start, etc...).
-- [X] Add cuffs to warden.
-- [X] Add ability to remove weapons when shooting at them as warden.
-- [ ] Add more TODO list. 😂
+## TODO List
+
+- [ ] Build the LastRequest interface system and wire it into core.
+- [ ] Build the SpecialDays interface system and wire it into core.
+- [ ] Create LastRequest modules.
+- [ ] Create SpecialDays modules.
+- [x] Finish deputy commands.
+- [x] Configure deputy and warden roles.
+- [x] Configure rebel system.
+- [x] Configure freeday system.
+- [x] Finish the current warden menu structure.
+- [x] Add live state labels to warden menu options.
+- [x] Add visual management for laser and ping colors.
+- [x] Persist warden visual settings in the database.
+- [x] Add warden ping beacon.
+- [x] Add player beacon support.
+- [x] Add animated warden laser.
+- [x] Configure team ratio.
+- [x] Add prisoner mute system.
+- [x] Add cuffs to warden.
+- [x] Add ability to remove weapons when shooting them as warden.
+- [ ] Add a `jailbreak.cfg` file in the plugin directory.
+- [ ] Revisit drawing mode later.
+- [ ] Add more TODO items.

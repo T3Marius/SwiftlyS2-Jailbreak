@@ -17,7 +17,7 @@ public sealed class BoxManager
     /// <summary>
     /// Whether the box is enabled or not.
     /// </summary>
-    public bool BoxEnabled { get; set; } = true;
+    public bool BoxEnabled { get; set; }
 
     public BoxManager(ISwiftlyCore core, IOptions<UtilsConfig> utilsConfig)
     {
@@ -25,6 +25,17 @@ public sealed class BoxManager
         _utilsConfig = utilsConfig.Value;
 
         _teammatesAreEnemies = _core.ConVar.Find<bool>("mp_teammates_are_enemies");
+    }
+
+    public void Register()
+    {
+        _core.Event.OnEntityTakeDamage += OnEntityTakeDamage;
+    }
+
+    public void Unregister()
+    {
+        _core.Event.OnEntityTakeDamage -= OnEntityTakeDamage;
+        StopBox();
     }
 
     public void StartBox()
@@ -62,7 +73,6 @@ public sealed class BoxManager
         }
     }
 
-    [EventListener<EventDelegates.OnEntityTakeDamage>]
     private void OnEntityTakeDamage(IOnEntityTakeDamageEvent e)
     {
         if (!BoxEnabled) // completly skip the check if the box is not enabled to save performance, since this event is called very often.

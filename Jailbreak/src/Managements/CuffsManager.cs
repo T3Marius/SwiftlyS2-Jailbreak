@@ -25,11 +25,32 @@ public sealed class CuffsManager
     private readonly Dictionary<ulong, ulong> _grabbedByWarden   = [];
     private readonly HashSet<ulong>           _wardenTaserOwners = [];
     private readonly HashSet<ulong>           _mouse2HeldWardens = [];
+    private Guid? _weaponFireHookId;
+    private Guid? _playerDeathHookId;
     
     public CuffsManager(ISwiftlyCore core, IJBPlayerManagement players)
     {
         _core = core;
         _players = players;
+    }
+
+    public void Register()
+    {
+        _core.Event.OnClientKeyStateChanged += OnClientKeyStateChanged;
+        _core.Event.OnTick += OnTick;
+        _core.Event.OnEntityTakeDamage += OnEntityTakeDamage;
+        _weaponFireHookId = _core.GameEvent.HookPost<EventWeaponFire>(EventWeaponFire);
+        _playerDeathHookId = _core.GameEvent.HookPost<EventPlayerDeath>(EventPlayerDeath);
+    }
+
+    public void Unregister()
+    {
+        _core.Event.OnClientKeyStateChanged -= OnClientKeyStateChanged;
+        _core.Event.OnTick -= OnTick;
+        _core.Event.OnEntityTakeDamage -= OnEntityTakeDamage;
+        Unhook(ref _weaponFireHookId);
+        Unhook(ref _playerDeathHookId);
+        CleanupAll();
     }
 
     public void OnWardenGive(IJBPlayer warden)
@@ -94,7 +115,6 @@ public sealed class CuffsManager
         _mouse2HeldWardens.Clear();
     }
 
-    [EventListener<EventDelegates.OnClientKeyStateChanged>]
     private void OnClientKeyStateChanged(IOnClientKeyStateChangedEvent e)
     {
         if (e.Key != KeyKind.Mouse2)
@@ -119,7 +139,6 @@ public sealed class CuffsManager
             _mouse2HeldWardens.Add(player.SteamID);
     }
 
-    [EventListener<EventDelegates.OnTick>]
     private void OnTick()
     {
         foreach (var prisoner in _players.GetAllPlayers().Where(p => p.IsCuffed))
@@ -162,7 +181,6 @@ public sealed class CuffsManager
         }
     }
 
-    [GameEventHandler(HookMode.Post)]
     private HookResult EventWeaponFire(EventWeaponFire e)
     {
         if (e.UserIdPlayer == null)
@@ -180,7 +198,6 @@ public sealed class CuffsManager
         return HookResult.Continue;
     }
 
-    [GameEventHandler(HookMode.Post)]
     private HookResult EventPlayerDeath(EventPlayerDeath e)
     {
         if (e.UserIdPlayer == null)
@@ -195,7 +212,6 @@ public sealed class CuffsManager
         return HookResult.Continue;
     }
 
-    [EventListener<EventDelegates.OnEntityTakeDamage>]
     private void OnEntityTakeDamage(IOnEntityTakeDamageEvent e)
     {
         if (!e.Entity.DesignerName.StartsWith("player", StringComparison.OrdinalIgnoreCase))
@@ -405,5 +421,14 @@ public sealed class CuffsManager
         }
 
         return null;
+    }
+
+    private void Unhook(ref Guid? hookId)
+    {
+        if (!hookId.HasValue)
+            return;
+
+        _core.GameEvent.Unhook(hookId.Value);
+        hookId = null;
     }
 }
