@@ -42,7 +42,13 @@ public sealed class BunnyhoopManager
         _bhopCountdownCts = null;
 
         _core.ConVar.Find<bool>("sv_autobunnyhopping")?.SetInternal(false);
-        _core.ConVar.Find<bool>("sv_enablebunnyhopping")?.SetInternal(false);        
+        _core.ConVar.Find<bool>("sv_enablebunnyhopping")?.SetInternal(false);  
+
+        foreach (var player in _players.GetAllPlayers())
+        {
+            _core.ConVar.Find<bool>("sv_autobunnyhopping")?.ReplicateToClient(player.Player.PlayerID, false);
+            _core.ConVar.Find<bool>("sv_enablebunnyhopping")?.ReplicateToClient(player.Player.PlayerID, false);
+        }   
 
         if (_utils.Bunnyhoop.RoundStartCountdown > 0)
         {
@@ -51,6 +57,12 @@ public sealed class BunnyhoopManager
             {
                 _core.ConVar.Find<bool>("sv_autobunnyhopping")?.SetInternal(true);
                 _core.ConVar.Find<bool>("sv_enablebunnyhopping")?.SetInternal(true);   
+                
+                foreach (var player in _players.GetAllPlayers())
+                {
+                    _core.ConVar.Find<bool>("sv_autobunnyhopping")?.ReplicateToClient(player.Player.PlayerID, true);
+                    _core.ConVar.Find<bool>("sv_enablebunnyhopping")?.ReplicateToClient(player.Player.PlayerID, true);
+                }  
 
                 _players.SendMessage(MessageType.Chat, "bunnyhoop_enabled", true);
                 _bhopCountdownCts?.Cancel();
@@ -61,7 +73,13 @@ public sealed class BunnyhoopManager
         else
         {
             _core.ConVar.Find<bool>("sv_autobunnyhopping")?.SetInternal(true);
-            _core.ConVar.Find<bool>("sv_enablebunnyhopping")?.SetInternal(true);        
+            _core.ConVar.Find<bool>("sv_enablebunnyhopping")?.SetInternal(true);    
+
+            foreach (var player in _players.GetAllPlayers())
+            {
+                _core.ConVar.Find<bool>("sv_autobunnyhopping")?.ReplicateToClient(player.Player.PlayerID, true);
+                _core.ConVar.Find<bool>("sv_enablebunnyhopping")?.ReplicateToClient(player.Player.PlayerID, true);
+            }       
         }
         return HookResult.Continue;
     }
