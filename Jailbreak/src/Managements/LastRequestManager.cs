@@ -14,6 +14,8 @@ namespace Jailbreak;
 
 public sealed class LastRequestManager
 {
+    public bool WasLastRequestActiveThisFrame { get; private set; }
+
     private const float DuelBeamWidth = 2.4f;
     private const float DuelBeamHeight = 48f;
 
@@ -308,6 +310,7 @@ public sealed class LastRequestManager
 
     private void OnTick()
     {
+        WasLastRequestActiveThisFrame = IsLastRequestActive;
         UpdateDuelBeam();
     }
 

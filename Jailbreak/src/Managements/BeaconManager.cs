@@ -18,7 +18,7 @@ public sealed class BeaconManager
     private const float PingAnimationSeconds = 1.35f;
     private const float PingLifetimeSeconds = 60f;
     private const float PingHeight = 8f;
-    private const float PlayerBaseRadius = 48f;
+    private const float PlayerBaseRadius = 68f;
     private const float PlayerRadiusPulse = 14f;
     private const float PlayerHeight = 10f;
     private const float SegmentOverlap = 0.22f;

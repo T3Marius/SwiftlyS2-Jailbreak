@@ -99,7 +99,9 @@ public sealed class RebelManager
 
     private HookResult EventPlayerDeath(EventPlayerDeath e)
     {
-        if (_specialDayManager.IsSpecialDayActive || _lastRequestManager.IsLastRequestActive)
+        if (_specialDayManager.IsSpecialDayActive 
+            || _lastRequestManager.IsLastRequestActive 
+            || _lastRequestManager.WasLastRequestActiveThisFrame)
             return HookResult.Continue;
 
         if (e.UserIdPlayer == null || e.AttackerPlayer == null)

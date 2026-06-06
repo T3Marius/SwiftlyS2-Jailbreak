@@ -220,6 +220,12 @@ public sealed class Events
 
         _wardenCheckCts = _core.Scheduler.DelayBySeconds(_wardenConfig.AutoGiveWardenWhenNone, () =>
         {
+            if (_lastRequestManager.IsLastRequestActive)
+            {
+                _wardenCheckCts?.Cancel();
+                _wardenCheckCts = null;
+                return;
+            }
             if (_players.GetWarden() != null)
             {
                 _wardenCheckCts?.Cancel();

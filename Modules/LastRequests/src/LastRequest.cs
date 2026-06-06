@@ -36,7 +36,7 @@ public sealed class Main : BasePlugin
             Core.Logger.LogWarning("Jailbreak api is null, last requests will not be registered");
             return;
         }
-        
+
         if (GlobalConfig.KnifeFight.Enabled)
             _jail.RegisterLastRequest(new KnifeFightLastRequest(Core, _jail));
     }
@@ -82,7 +82,7 @@ public sealed class KnifeFightLastRequest : LastRequestBase
     public override string Id => "lr_knife_fight";
     public override string Name => "Knife Fight";
     public override string Description => "Fight a guard using knives.";
-    public override int StartCountdown => 5;
+    public override int StartCountdown => Config.Countdown;
     public override LastRequestOpponentMode OpponentMode => LastRequestOpponentMode.Duel;
     public override LastRequestWeaponSelection WeaponSelection => LastRequestWeaponSelection.None;
     public override bool AllowAllWeapons => false;
