@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.Extensions.Logging;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Events;
 
@@ -7,6 +8,8 @@ namespace Jailbreak;
 public sealed class GameConfig
 {
     private const string FileName = "jailbreak.cfg";
+
+    private static readonly GameConfigEntry CheatsCommand = new("sv_cheats", "1");
 
     private static readonly GameConfigEntry[] ServerCommands =
     [
@@ -38,40 +41,60 @@ public sealed class GameConfig
     ];
 
     private readonly ISwiftlyCore _core;
+    private readonly ILogger<GameConfig> _log;
 
-    public GameConfig(ISwiftlyCore core)
+    public GameConfig(ISwiftlyCore core, ILogger<GameConfig> log)
     {
         _core = core;
+        _log = log;
     }
 
     public void Register(bool hotReload)
     {
         EnsureConfigFile();
         _core.Event.OnMapLoad += OnMapLoad;
+        _core.Event.OnClientConnected += OnClientConnected;
+
+        _log.LogInformation("Game config registered. HotReload={HotReload}", hotReload);
 
         if (hotReload)
-            Apply();
+            Apply("hot reload");
     }
 
     public void Unregister()
     {
         _core.Event.OnMapLoad -= OnMapLoad;
+        _core.Event.OnClientConnected -= OnClientConnected;
+        _log.LogInformation("Game config unregistered.");
     }
 
-    public void Apply()
+    public void Apply(string reason = "manual")
     {
-        _core.Engine.ExecuteCommand("sv_cheats 1");
+        _log.LogInformation("Applying jailbreak game config. Reason={Reason}", reason);
+
+        Execute(CheatsCommand);
+
         foreach (var command in ServerCommands)
             Execute(command);
 
         foreach (var command in MovementCommands)
             Execute(command);
-        _core.Engine.ExecuteCommand("sv_cheats 1");
+
+        Execute(CheatsCommand);
+
+        _log.LogInformation("Applied jailbreak game config. Reason={Reason}, Commands={CommandCount}", reason, ServerCommands.Length + MovementCommands.Length + 2);
     }
 
     private void OnMapLoad(IOnMapLoadEvent @event)
     {
-        Apply();
+        _log.LogInformation("Map load detected. Map={MapName}", @event.MapName);
+        Apply($"map load {@event.MapName}");
+    }
+
+    private void OnClientConnected(IOnClientConnectedEvent @event)
+    {
+        _log.LogInformation("Client connected. PlayerId={PlayerId}. Re-applying jailbreak game config.", @event.PlayerId);
+        Apply($"client connect {@event.PlayerId}");
     }
 
     private void EnsureConfigFile()
@@ -79,15 +102,30 @@ public sealed class GameConfig
         Directory.CreateDirectory(_core.PluginPath);
 
         var path = Path.Combine(_core.PluginPath, FileName);
+        var configText = BuildConfigText();
         if (File.Exists(path))
-            return;
+        {
+            if (File.ReadAllText(path) == configText)
+            {
+                _log.LogInformation("Game config file already exists. Path={Path}", path);
+                return;
+            }
 
-        File.WriteAllText(path, BuildConfigText());
+            File.WriteAllText(path, configText);
+            _log.LogInformation("Updated game config file. Path={Path}", path);
+            return;
+        }
+
+        File.WriteAllText(path, configText);
+        _log.LogInformation("Created game config file. Path={Path}", path);
     }
 
     private static string BuildConfigText()
     {
         var builder = new StringBuilder();
+
+        builder.AppendLine(CheatsCommand.ToString());
+        builder.AppendLine();
 
         foreach (var command in ServerCommands)
             builder.AppendLine(command.ToString());
@@ -98,12 +136,16 @@ public sealed class GameConfig
         foreach (var command in MovementCommands)
             builder.AppendLine(command.ToString());
 
+        builder.AppendLine(CheatsCommand.ToString());
+
         return builder.ToString();
     }
 
     private void Execute(GameConfigEntry command)
     {
-        _core.Engine.ExecuteCommand(command.ToString());
+        var commandText = command.ToString();
+        _log.LogInformation("Executing game config command: {Command}", commandText);
+        _core.Engine.ExecuteCommand(commandText);
     }
 
     private sealed record GameConfigEntry(string Key, string Value)
