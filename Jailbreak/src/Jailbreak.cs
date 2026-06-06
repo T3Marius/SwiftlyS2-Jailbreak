@@ -68,7 +68,8 @@ public sealed class Main : BasePlugin
                   .AddSingleton<DeputyCommands>()
                   .AddSingleton<PrisonerCommands>()
                   .AddSingleton<WardenMenu>()
-                  .AddSingleton<BoxManager>();
+                  .AddSingleton<BoxManager>()
+                  .AddSingleton<BunnyhoopManager>();
 
         collection.AddOptionsWithValidateOnStart<WardenConfig>()
                   .BindConfiguration("Warden");
@@ -116,6 +117,9 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<CuffsManager>().Register();
         _provider.GetRequiredService<LaserManager>().Register();
 
+        if (_provider.GetRequiredService<IOptions<UtilsConfig>>().Value.Bunnyhoop.Enable)
+            _provider.GetRequiredService<BunnyhoopManager>().Register();
+
     }
     public override void Unload()
     {
@@ -137,6 +141,8 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<BoxManager>().Unregister();
         _provider.GetRequiredService<CuffsManager>().Unregister();
         _provider.GetRequiredService<LaserManager>().Unregister();
+        if (_provider.GetRequiredService<IOptions<UtilsConfig>>().Value.Bunnyhoop.Enable)
+            _provider.GetRequiredService<BunnyhoopManager>().Unregister();
         _provider.GetRequiredService<IconManager>().CleanupAll();
         _provider.Dispose();
         _provider = null;

@@ -144,5 +144,7 @@
     "you_are_new_warden": "You are the new [blue]Warden[silver]. Use [lime]!whelp[silver] to see your commands.",
     "you_are_not_deputy": "You are not the [gold]Deputy[silver].",
     "you_are_not_warden": "You are not the [blue]Warden[silver].",
-    "you_are_not_warden&deputy": "You need to be [blue]Warden[silver] or [gold]Deputy[silver] in order to use this command!"
+    "you_are_not_warden&deputy": "You need to be [blue]Warden[silver] or [gold]Deputy[silver] in order to use this command!",
+    "bunnyhoop_disabled": "Bunnyhoop is [red]disabled[silver]. Enableing it in [gold]{0}[silver] seconds!",
+    "bunnyhoop_enabled": "Bunnyhoop is now [green]enabled[silver] for everyone!"
 }
