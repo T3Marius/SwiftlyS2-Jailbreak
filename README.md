@@ -168,4 +168,5 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak`.
 - [x] Add a `jailbreak.cfg` file in the plugin directory.
 - [ ] Revisit drawing mode later.
 - [ ] Add speaking icon to whomever is speaking
+- [ ] Add gameplay sounds (Warden set, Rebel set, etc)
 - [ ] Add more TODO items.
