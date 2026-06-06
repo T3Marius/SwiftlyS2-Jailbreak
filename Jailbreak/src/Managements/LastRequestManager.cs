@@ -9,6 +9,7 @@ using SwiftlyS2.Shared.Misc;
 using SwiftlyS2.Shared.Natives;
 using SwiftlyS2.Shared.Players;
 using SwiftlyS2.Shared.SchemaDefinitions;
+using SwiftlyS2.Shared.Sounds;
 
 namespace Jailbreak;
 
@@ -34,6 +35,7 @@ public sealed class LastRequestManager
     private Guid? _playerDisconnectHookId;
     private Guid? _roundEndHookId;
     private CancellationTokenSource? _countdownCts;
+    private CancellationTokenSource? _blipSoundCts;
     private LastRequestStartContext? _currentContext;
     private CHandle<CBeam>? _duelBeamHandle;
     private bool _currentStarted;
@@ -123,6 +125,9 @@ public sealed class LastRequestManager
         _currentContext = context;
         _currentStarted = false;
 
+        _blipSoundCts?.Cancel();
+        _blipSoundCts = null;
+
         DisableCurrentWarden();
         ApplyVisuals(context);
         AnnounceLastRequestSelected(lastRequest, context);
@@ -134,6 +139,20 @@ public sealed class LastRequestManager
         }
 
         StartCountdown(lastRequest, context);
+
+        _blipSoundCts = _core.Scheduler.RepeatBySeconds(1.0f, () =>
+        {
+            foreach (var player in _players.GetAllPlayers())
+                player.Player.ExecuteCommand("play sounds/buttons/blip1.vsnd_c");
+
+            if (!IsLastRequestActive)
+            {
+                _blipSoundCts?.Cancel();
+                _blipSoundCts = null;
+                return;
+            }
+        });
+
         return true;
     }
 
