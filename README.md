@@ -90,6 +90,7 @@ Opened with `!wmenu`.
 | `models.toml` | Models | Warden, deputy, rebel, freeday, guard, and prisoner models. |
 | `utils.toml` | Utils | Database connection, cell timing, box sound/name settings, and other shared settings. |
 | `voice.toml` | Voice | Prisoner mute behavior. |
+| `jailbreak.cfg` | Game cvars | Generated in the plugin directory and applied on map start or hot reload. |
 
 ## Database
 
@@ -129,6 +130,6 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak`.
 - [x] Add prisoner mute system.
 - [x] Add cuffs to warden.
 - [x] Add ability to remove weapons when shooting them as warden.
-- [ ] Add a `jailbreak.cfg` file in the plugin directory.
+- [x] Add a `jailbreak.cfg` file in the plugin directory.
 - [ ] Revisit drawing mode later.
 - [ ] Add more TODO items.

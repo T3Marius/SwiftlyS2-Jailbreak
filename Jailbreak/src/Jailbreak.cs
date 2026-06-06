@@ -52,6 +52,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<RebelManager>()
                   .AddSingleton<BeaconManager>()
                   .AddSingleton<LaserManager>()
+                  .AddSingleton<GameConfig>()
                   .AddSingleton<WardenDatabase>()
                   .AddSingleton<Api>()
                   .AddSingleton<Events>()
@@ -80,6 +81,7 @@ public sealed class Main : BasePlugin
         _provider = collection.BuildServiceProvider();
 
         _provider.GetRequiredService<WardenDatabase>().Initialize();
+        _provider.GetRequiredService<GameConfig>().Register(hotReload);
 
         if (hotReload)
         {
@@ -109,6 +111,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<Events>().Unregister();
         _provider.GetRequiredService<Listeners>().Unregister();
         _provider.GetRequiredService<NetMessages>().Unregister();
+        _provider.GetRequiredService<GameConfig>().Unregister();
         _provider.GetRequiredService<BeaconManager>().Unregister();
         _provider.GetRequiredService<RebelManager>().Unregister();
         _provider.GetRequiredService<TeamManager>().Unregister();
