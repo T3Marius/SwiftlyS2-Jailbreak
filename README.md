@@ -45,6 +45,15 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 - Warden can give and remove freeday from the menu.
 - Freeday state is shown beside each prisoner and updates instantly.
 
+### Prisoners And Guards
+
+- Rebels can request surrender with `!s` or `!surrender`.
+- The surrender request opens an accept/refuse menu for the current warden.
+- Accepted surrenders remove rebel state and strip all prisoner weapons, including knife.
+- Guards can use `!guns` to select a primary and secondary weapon.
+- Guard gun preferences are saved in the database and restored on spawn outside Special Days.
+- Prisoners are stripped on round start outside Special Days and only receive a knife.
+
 ### Special Days
 
 - `Jailbreak.Contract` exposes `ISpecialDay`, `SpecialDayBase`, and shared weapon helpers for external modules.
@@ -57,6 +66,8 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 - Optional `!sguns` menu supports selecting a primary first, then a secondary, then gives both weapons.
 - Special days can enable friendly fire with `AllowFriendlyFire`.
 - Normal Jailbreak systems are blocked during active Special Days, including warden actions, rebels, freedays, cuffs, laser, ping, and warden voice handling.
+- Active Special Days keep showing their name and description in center HTML.
+- Bunnyhop is enabled instantly during Special Day countdowns and active Special Days when enabled in config.
 - End announcements show the Special Day name and surviving players, with names colored by team.
 
 ### Current Special Days
@@ -99,7 +110,9 @@ All warden command aliases are configurable in `warden.toml`.
 | ToggleDraw | `!draw` | Toggle warden drawing mode. |
 | DrawColor | `!drawcolor` | Open the drawing color menu. |
 | DrawClear | `!drawclear` | Clear your own drawings. |
+| GuardGuns | `!guns` | Open the guard guns menu. |
 | SpecialGuns | `!sguns` | Open the active Special Day guns menu when enabled. |
+| Surrender | `!s`, `!surrender` | Request rebel surrender from the warden. |
 | JailbreakStats | `!jbstats`, `!jstats`, `!stats` | Open Last Request and Special Day stats. |
 
 ## Warden Menu
@@ -149,6 +162,13 @@ Stored and cached per player:
 - Last Request wins and losses
 - Special Day wins and losses
 
+`GuardGunsDatabase` uses `Utils.DatabaseConnection` and creates `jb_guard_guns`.
+
+Stored and cached per guard:
+
+- Preferred primary weapon
+- Preferred secondary weapon
+
 ## Public API
 
 Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak`.
@@ -178,6 +198,10 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [x] Add Jailbreak stats command and menu.
 - [x] Show LR winner win count in end announcements.
 - [x] Show Special Day winner/winners with win counts in end announcements.
+- [x] Constantly keep SpecialDay description in CenterHTML when active.
+- [x] Add rebel surrender requests.
+- [x] Add guard guns menu and saved guard loadouts.
+- [x] Strip prisoner weapons on round start.
 - [x] Finish deputy commands.
 - [x] Configure deputy and warden roles.
 - [x] Configure rebel system.
@@ -202,7 +226,6 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [ ] Add broader drawing cleanup/management options.
 - [ ] Add speaking icon to whomever is speaking
 - [ ] Add gameplay sounds (Warden set, Rebel set, etc)
-- [ ] Constantly keep SpecialDay description in CenterHTML when active.
 - [ ] Add more TODO items.
 
 ## ☕ If you'd like to support me! Any donation is deeply appreciated.

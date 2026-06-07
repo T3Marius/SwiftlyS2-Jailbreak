@@ -8,4 +8,5 @@ public sealed class PrisonerConfig
 public sealed class PrisonerCommandsConfig
 {
     public List<string> LastRequest { get; set; } = ["lr"];
+    public List<string> Surrender { get; set; } = ["s", "surrender"];
 }

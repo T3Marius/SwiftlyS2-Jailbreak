@@ -6,6 +6,7 @@ using SwiftlyS2.Shared.GameEvents;
 using SwiftlyS2.Shared.Misc;
 using SwiftlyS2.Shared.Natives;
 using SwiftlyS2.Shared.Players;
+using SwiftlyS2.Shared.SchemaDefinitions;
 
 namespace Jailbreak;
 
@@ -19,6 +20,7 @@ public sealed class Events
     private readonly DrawManager         _drawManager;
     private readonly SpecialDayManager   _specialDayManager;
     private readonly LastRequestManager  _lastRequestManager;
+    private readonly GuardGunsManager    _guardGunsManager;
 
     /* ------------------- Configs ------------------- */
     private readonly WardenConfig        _wardenConfig;
@@ -53,6 +55,7 @@ public sealed class Events
         DrawManager drawManager,
         SpecialDayManager specialDayManager,
         LastRequestManager lastRequestManager,
+        GuardGunsManager guardGunsManager,
         IOptions<WardenConfig> wardenConfig, 
         IOptions<ModelsConfig> modelsConfig, 
         IOptions<UtilsConfig> utilsConfig,
@@ -66,6 +69,7 @@ public sealed class Events
         _drawManager = drawManager;
         _specialDayManager = specialDayManager;
         _lastRequestManager = lastRequestManager;
+        _guardGunsManager = guardGunsManager;
         _wardenConfig = wardenConfig.Value;
         _modelsConfig = modelsConfig.Value;
         _utilsConfig = utilsConfig.Value;
@@ -164,6 +168,12 @@ public sealed class Events
         
         foreach (var p in _players.GetPlayersByRole(JBRole.Rebel))
             p.SetRebel(false);
+
+        if (!_specialDayManager.HasQueuedOrActiveSpecialDay)
+        {
+            foreach (var prisoner in _players.GetPlayersByTeam(JBTeam.Prisoner))
+                StripPrisonerWeapons(prisoner);
+        }
 
         if (_voiceConfig.KeepPrisonersMutedDuringRound)
         {
@@ -392,6 +402,48 @@ public sealed class Events
 
         if (!string.IsNullOrEmpty(model))
             PlayerUtils.SetModel(player.Player, model, _core.Scheduler);
+
+        if (_specialDayManager.HasQueuedOrActiveSpecialDay)
+            return;
+
+        if (player.Team == JBTeam.Prisoner)
+            StripPrisonerWeapons(player);
+        else if (player.Team == JBTeam.Guard)
+            _guardGunsManager.GiveSavedLoadout(player);
+    }
+
+    private void StripPrisonerWeapons(IJBPlayer prisoner)
+    {
+        _core.Scheduler.NextWorldUpdate(() =>
+        {
+            if (!prisoner.Player.IsValid || !prisoner.Player.IsAlive || prisoner.Team != JBTeam.Prisoner)
+                return;
+
+            StripWeapons(prisoner.Player);
+            GiveWeapon(prisoner.Player, "weapon_knife");
+        });
+    }
+
+    private static void StripWeapons(IPlayer player)
+    {
+        var weaponServices = player.PlayerPawn?.WeaponServices;
+        if (weaponServices == null)
+            return;
+
+        foreach (var weapon in weaponServices.MyValidWeapons.ToList())
+        {
+            if (weapon?.IsValid == true)
+                weaponServices.RemoveWeapon(weapon);
+        }
+    }
+
+    private static void GiveWeapon(IPlayer player, string weaponName)
+    {
+        var pawn = player.Pawn;
+        if (pawn == null || !pawn.IsValid)
+            return;
+
+        pawn.ItemServices?.GiveItem<CBaseEntity>(weaponName);
     }
 
     private void Unhook(ref Guid? hookId)

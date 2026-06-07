@@ -1,3 +1,4 @@
+using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.EntitySystem;
 using SwiftlyS2.Shared.Scheduler;
 using SwiftlyS2.Shared.SchemaDefinitions;
@@ -27,5 +28,15 @@ public static class Utils
                 ent.AcceptInput<string>(input, null);
             }
         });
+    }
+
+    public static void ExtendRound(ISwiftlyCore core, int minutes)
+    {
+        var gameRules = core.EntitySystem.GetGameRules();
+        if (gameRules == null)
+            return;
+        
+        gameRules.RoundTime += minutes * 60;
+        gameRules.RoundTimeUpdated();
     }
 }

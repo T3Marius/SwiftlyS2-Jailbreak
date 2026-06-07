@@ -63,10 +63,40 @@ public sealed class WardenMenu
         AddSubmenu(builder, player, "warden_menu_option.color_prisoners", () => ColorPrisonersSubmenu(player));
         AddSubmenu(builder, player, "warden_menu_option.special_days", () => SpecialDaysSubmenu(player));
         AddSubmenu(builder, player, "warden_menu_option.visual_management", () => VisualManagementSubmenu(player));
+        AddSubmenu(builder, player, "warden_menu_option.extend_round", () => ExtendRoundSubmenu(player));
 
         _core.MenusAPI.OpenMenuForPlayer(player.Player, builder.Build());
     }
+    private IMenuAPI ExtendRoundSubmenu(IJBPlayer player)
+    {
+        var builder = CreateBuilder(player, "extend_round_submenu.title");
 
+        var customOption = new InputMenuOption(
+            player.Localizer["extend_round_submenu_option.custom_value"],
+            maxLength: 2,
+            validator: IsValidRoundExtension,
+            defaultValue: "1",
+            hintMessage: player.Localizer["extend_round_custom_hint"]);
+        customOption.ValueChanged += (_, args) =>
+        {
+            if (!int.TryParse(args.NewValue, out var minutes))
+                return;
+
+            var menuPlayer = _players.SyncPlayer(args.Player) ?? player;
+            ExtendRound(menuPlayer, minutes);
+        };
+        builder.AddOption(customOption);
+
+        foreach (var minutes in new[] { 1, 2, 3, 5 })
+        {
+            AddButton(builder, player.Localizer["extend_round_submenu_option.minutes", minutes], () =>
+            {
+                ExtendRound(player, minutes);
+            });
+        }
+
+        return builder.Build();
+    }
     public void ShowSpecialDays(IJBPlayer player)
     {
         if (BlockDuringSpecialDay(player))
@@ -605,6 +635,23 @@ public sealed class WardenMenu
         }
 
         return builder.Build();
+    }
+
+    private void ExtendRound(IJBPlayer player, int minutes)
+    {
+        _core.Scheduler.NextWorldUpdate(() =>
+        {
+            if (BlockDuringSpecialDay(player))
+                return;
+
+            Utils.ExtendRound(_core, minutes);
+            _players.SendMessage(MessageType.Chat, "round_extended", true, args: [player.Player.Name, minutes]);
+        });
+    }
+
+    private static bool IsValidRoundExtension(string value)
+    {
+        return int.TryParse(value, out var minutes) && minutes is >= 1 and <= 60;
     }
 
     private IMenuBuilderAPI CreateBuilder(IJBPlayer player, string titleKey)
