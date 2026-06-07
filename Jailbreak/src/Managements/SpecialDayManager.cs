@@ -31,6 +31,7 @@ public sealed class SpecialDayManager
     private Guid? _roundStartHookId;
     private Guid? _roundEndHookId;
     private CancellationTokenSource? _countdownCts;
+    private CancellationTokenSource? _activeHudCts;
     private bool _currentDayStarted;
     private bool _countdownFreezeActive;
     private bool _friendlyFireEnabledBySpecialDay;
@@ -86,7 +87,7 @@ public sealed class SpecialDayManager
                 _core.Command.UnregisterCommand(command);
         }
 
-        EndSpecialDay();
+        CancelSpecialDay("manager unregister");
         QueuedSpecialDay = null;
         _specialDays.Clear();
     }
@@ -153,7 +154,18 @@ public sealed class SpecialDayManager
 
     public void EndSpecialDay()
     {
+        FinishSpecialDay(announceAndRecord: true, reason: "round end");
+    }
+
+    private void CancelSpecialDay(string reason)
+    {
+        FinishSpecialDay(announceAndRecord: false, reason: reason);
+    }
+
+    private void FinishSpecialDay(bool announceAndRecord, string reason)
+    {
         StopCountdown();
+        StopActiveHud();
         UnfreezePlayers();
 
         var specialDay = CurrentSpecialDay;
@@ -164,14 +176,22 @@ public sealed class SpecialDayManager
         if (_currentDayStarted)
         {
             specialDay.End();
-            var winners = RecordSpecialDayStats();
-            AnnounceSpecialDayEnded(specialDay, winners);
+            if (announceAndRecord)
+            {
+                var winners = RecordSpecialDayStats();
+                AnnounceSpecialDayEnded(specialDay, winners);
+            }
         }
 
         RestoreSpecialDayConvars();
         _participants.Clear();
         _currentDayStarted = false;
-        _log.LogInformation("Ended special day. Id={Id}, Name={Name}", specialDay.Id, specialDay.Name);
+        _log.LogInformation(
+            "{Action} special day. Id={Id}, Name={Name}, Reason={Reason}",
+            announceAndRecord ? "Ended" : "Cancelled",
+            specialDay.Id,
+            specialDay.Name,
+            reason);
     }
 
     private void OnItemServicesCanAcquire(IOnItemServicesCanAcquireHookEvent e)
@@ -226,6 +246,9 @@ public sealed class SpecialDayManager
         var queuedDay = QueuedSpecialDay;
         QueuedSpecialDay = null;
 
+        if (CurrentSpecialDay != null)
+            CancelSpecialDay("new round started while special day was active");
+
         if (queuedDay != null)
         {
             CooldownRoundsRemaining = Math.Max(0, _config.CooldownRounds);
@@ -247,7 +270,7 @@ public sealed class SpecialDayManager
 
     private void OnMapUnload(IOnMapUnloadEvent @event)
     {
-        EndSpecialDay();
+        CancelSpecialDay("map unload");
         QueuedSpecialDay = null;
         CooldownRoundsRemaining = 0;
     }
@@ -298,6 +321,7 @@ public sealed class SpecialDayManager
         ApplyStartLoadout(specialDay);
         specialDay.Start();
         _currentDayStarted = true;
+        StartActiveHud(specialDay);
         _log.LogInformation("Started special day. Id={Id}, Name={Name}", specialDay.Id, specialDay.Name);
     }
 
@@ -342,7 +366,7 @@ public sealed class SpecialDayManager
             if (!player.Player.IsValid || !player.Player.IsAlive)
                 continue;
 
-            _participants[player.SteamID] = player.Player.Name;
+            _participants[PlayerIdentity.GetKey(player.Player)] = player.Player.Name;
         }
     }
 
@@ -351,21 +375,28 @@ public sealed class SpecialDayManager
         if (_participants.Count == 0)
             return [];
 
-        var aliveParticipants = _players.GetAllPlayers()
-            .Where(player => player.Player.IsValid && player.Player.IsAlive && _participants.ContainsKey(player.SteamID))
-            .ToDictionary(player => player.SteamID);
+        var aliveParticipants = new Dictionary<ulong, IJBPlayer>();
+        foreach (var player in _players.GetAllPlayers())
+        {
+            if (!player.Player.IsValid || !player.Player.IsAlive)
+                continue;
+
+            var playerKey = PlayerIdentity.GetKey(player.Player);
+            if (_participants.ContainsKey(playerKey))
+                aliveParticipants[playerKey] = player;
+        }
         var winners = new List<string>();
 
-        foreach (var (steamId, playerName) in _participants)
+        foreach (var (playerKey, playerName) in _participants)
         {
-            if (aliveParticipants.TryGetValue(steamId, out var player))
+            if (aliveParticipants.TryGetValue(playerKey, out var player))
             {
-                var stats = _statsDB.AddSpecialDayWin(steamId, player.Player.Name);
+                var stats = _statsDB.AddSpecialDayWin(playerKey, player.Player.Name);
                 winners.Add(FormatWinnerName(player, stats.SpecialDayWins));
             }
             else
             {
-                _statsDB.AddSpecialDayLoss(steamId, playerName);
+                _statsDB.AddSpecialDayLoss(playerKey, playerName);
             }
         }
 
@@ -392,6 +423,35 @@ public sealed class SpecialDayManager
                 continue;
 
             var message = player.Localizer["special_day_countdown_html", specialDay.Name, remaining, specialDay.Description];
+            player.Player.SendCenterHTML(message, 1100);
+        }
+    }
+
+    private void StartActiveHud(ISpecialDay specialDay)
+    {
+        StopActiveHud();
+        SendActiveHudMessage(specialDay);
+
+        _activeHudCts = _core.Scheduler.RepeatBySeconds(1f, () =>
+        {
+            if (CurrentSpecialDay != specialDay || !_currentDayStarted)
+            {
+                StopActiveHud();
+                return;
+            }
+
+            SendActiveHudMessage(specialDay);
+        });
+    }
+
+    private void SendActiveHudMessage(ISpecialDay specialDay)
+    {
+        foreach (var player in _players.GetAllPlayers())
+        {
+            if (!player.Player.IsValid)
+                continue;
+
+            var message = player.Localizer["special_day_active_html", specialDay.Name, specialDay.Description];
             player.Player.SendCenterHTML(message, 1100);
         }
     }
@@ -456,6 +516,12 @@ public sealed class SpecialDayManager
     {
         _countdownCts?.Cancel();
         _countdownCts = null;
+    }
+
+    private void StopActiveHud()
+    {
+        _activeHudCts?.Cancel();
+        _activeHudCts = null;
     }
 
     private void OnTick()
