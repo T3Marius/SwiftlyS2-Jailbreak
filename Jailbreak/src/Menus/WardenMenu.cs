@@ -74,6 +74,14 @@ public sealed class WardenMenu
         _core.MenusAPI.OpenMenuForPlayer(player.Player, SpecialDaysSubmenu(player));
     }
 
+    public void ShowDrawColor(IJBPlayer player)
+    {
+        if (BlockDuringSpecialDay(player))
+            return;
+
+        _core.MenusAPI.OpenMenuForPlayer(player.Player, DrawColorSubmenu(player));
+    }
+
     private IMenuAPI SpecialDaysSubmenu(IJBPlayer player)
     {
         var builder = CreateBuilder(player, "special_days_submenu.title");
@@ -138,6 +146,11 @@ public sealed class WardenMenu
             () => player.Localizer["visual_management_submenu_option.ping_color_current", GetSelectedPingColorName(player)],
             () => PingColorSubmenu(player));
 
+        AddDynamicSubmenu(
+            builder,
+            () => player.Localizer["visual_management_submenu_option.draw_color_current", GetSelectedDrawColorName(player)],
+            () => DrawColorSubmenu(player));
+
         return builder.Build();
     }
 
@@ -167,6 +180,21 @@ public sealed class WardenMenu
             settings => settings.BeamColor,
             saveRainbow: () => _wardenDatabase.SaveWardenBeamRainbow(player.SteamID),
             saveColor: color => _wardenDatabase.SaveWardenBeamColor(player.SteamID, color));
+
+        return builder.Build();
+    }
+
+    private IMenuAPI DrawColorSubmenu(IJBPlayer player)
+    {
+        var builder = CreateBuilder(player, "draw_color_submenu.title");
+
+        AddColorOptions(
+            builder,
+            player,
+            settings => settings.DrawRainbow,
+            settings => settings.DrawColor,
+            saveRainbow: () => _wardenDatabase.SaveWardenDrawRainbow(player.SteamID),
+            saveColor: color => _wardenDatabase.SaveWardenDrawColor(player.SteamID, color));
 
         return builder.Build();
     }
@@ -555,7 +583,7 @@ public sealed class WardenMenu
 
     private static void AddDynamicButton(IMenuBuilderAPI builder, Func<string> label, Action action)
     {
-        var option = new ButtonMenuOption(label(), 120, 0)
+        var option = new ButtonMenuOption(label(), 120, 250)
         {
             BindingText = label
         };
@@ -579,6 +607,12 @@ public sealed class WardenMenu
         return GetSelectedColorName(player, settings.BeamRainbow, settings.BeamColor);
     }
 
+    private string GetSelectedDrawColorName(IJBPlayer player)
+    {
+        var settings = _wardenDatabase.GetWardenSettings(player.SteamID);
+        return GetSelectedColorName(player, settings.DrawRainbow, settings.DrawColor);
+    }
+
     private static string GetSelectedColorName(IJBPlayer player, bool rainbow, Color color)
     {
         if (rainbow)
@@ -592,7 +626,7 @@ public sealed class WardenMenu
 
     private static string SelectedLabel(string label, bool selected)
     {
-        return selected ? $"[lime]Selected[silver] - {label}" : label;
+        return selected ? $"Selected - {label}" : label;
     }
 
     private static bool ColorsEqual(Color left, Color right)

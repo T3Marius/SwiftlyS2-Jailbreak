@@ -14,4 +14,7 @@ public sealed class WardenCommandsCfg
     public List<string> SpecialDays { get; set; } = ["sd"];
     public List<string> ToggleBox { get; set; } = ["box"];
     public List<string> ToggleCells { get; set; } = ["cells", "c"];
+    public List<string> ToggleDraw { get; set; } = ["draw"];
+    public List<string> DrawColor { get; set; } = ["drawcolor"];
+    public List<string> DrawClear { get; set; } = ["drawclear"];
 }

@@ -11,6 +11,7 @@ public sealed class WardenDatabase
 
     private static readonly Color DefaultLaserColor = new(255, 40, 40, 230);
     private static readonly Color DefaultBeamColor = new(80, 170, 255, 220);
+    private static readonly Color DefaultDrawColor = new(255, 70, 255, 230);
 
     private readonly ISwiftlyCore _core;
     private readonly UtilsConfig _utilsConfig;
@@ -40,7 +41,12 @@ public sealed class WardenDatabase
                 beam_g SMALLINT NOT NULL DEFAULT 170,
                 beam_b SMALLINT NOT NULL DEFAULT 255,
                 beam_a SMALLINT NOT NULL DEFAULT 220,
-                beam_rainbow SMALLINT NOT NULL DEFAULT 0
+                beam_rainbow SMALLINT NOT NULL DEFAULT 0,
+                draw_r SMALLINT NOT NULL DEFAULT 255,
+                draw_g SMALLINT NOT NULL DEFAULT 70,
+                draw_b SMALLINT NOT NULL DEFAULT 255,
+                draw_a SMALLINT NOT NULL DEFAULT 230,
+                draw_rainbow SMALLINT NOT NULL DEFAULT 1
             )
             """;
 
@@ -48,6 +54,11 @@ public sealed class WardenDatabase
 
         EnsureColumn(connection, "laser_rainbow", "SMALLINT NOT NULL DEFAULT 0");
         EnsureColumn(connection, "beam_rainbow", "SMALLINT NOT NULL DEFAULT 0");
+        EnsureColumn(connection, "draw_r", "SMALLINT NOT NULL DEFAULT 255");
+        EnsureColumn(connection, "draw_g", "SMALLINT NOT NULL DEFAULT 70");
+        EnsureColumn(connection, "draw_b", "SMALLINT NOT NULL DEFAULT 255");
+        EnsureColumn(connection, "draw_a", "SMALLINT NOT NULL DEFAULT 230");
+        EnsureColumn(connection, "draw_rainbow", "SMALLINT NOT NULL DEFAULT 1");
     }
 
     public WardenVisualSettings GetWardenSettings(ulong steamId)
@@ -78,6 +89,11 @@ public sealed class WardenDatabase
         return GetWardenSettings(steamId).BeamColor;
     }
 
+    public Color GetWardenDrawColor(ulong steamId)
+    {
+        return GetWardenSettings(steamId).DrawColor;
+    }
+
     public bool IsWardenLaserRainbow(ulong steamId)
     {
         return GetWardenSettings(steamId).LaserRainbow;
@@ -86,6 +102,11 @@ public sealed class WardenDatabase
     public bool IsWardenBeamRainbow(ulong steamId)
     {
         return GetWardenSettings(steamId).BeamRainbow;
+    }
+
+    public bool IsWardenDrawRainbow(ulong steamId)
+    {
+        return GetWardenSettings(steamId).DrawRainbow;
     }
 
     public void SaveWardenLaserColor(ulong steamId, Color color)
@@ -100,6 +121,12 @@ public sealed class WardenDatabase
         SaveWardenSettings(steamId, current with { BeamColor = color, BeamRainbow = false });
     }
 
+    public void SaveWardenDrawColor(ulong steamId, Color color)
+    {
+        var current = GetWardenSettings(steamId);
+        SaveWardenSettings(steamId, current with { DrawColor = color, DrawRainbow = false });
+    }
+
     public void SaveWardenLaserRainbow(ulong steamId)
     {
         var current = GetWardenSettings(steamId);
@@ -110,6 +137,12 @@ public sealed class WardenDatabase
     {
         var current = GetWardenSettings(steamId);
         SaveWardenSettings(steamId, current with { BeamRainbow = true });
+    }
+
+    public void SaveWardenDrawRainbow(ulong steamId)
+    {
+        var current = GetWardenSettings(steamId);
+        SaveWardenSettings(steamId, current with { DrawRainbow = true });
     }
 
     public void SaveWardenSettings(ulong steamId, WardenVisualSettings settings)
@@ -128,7 +161,12 @@ public sealed class WardenDatabase
                 beam_g = @beam_g,
                 beam_b = @beam_b,
                 beam_a = @beam_a,
-                beam_rainbow = @beam_rainbow
+                beam_rainbow = @beam_rainbow,
+                draw_r = @draw_r,
+                draw_g = @draw_g,
+                draw_b = @draw_b,
+                draw_a = @draw_a,
+                draw_rainbow = @draw_rainbow
             WHERE steam_id = @steam_id
             """;
 
@@ -150,7 +188,12 @@ public sealed class WardenDatabase
                     beam_g,
                     beam_b,
                     beam_a,
-                    beam_rainbow
+                    beam_rainbow,
+                    draw_r,
+                    draw_g,
+                    draw_b,
+                    draw_a,
+                    draw_rainbow
                 ) VALUES (
                     @steam_id,
                     @laser_r,
@@ -162,7 +205,12 @@ public sealed class WardenDatabase
                     @beam_g,
                     @beam_b,
                     @beam_a,
-                    @beam_rainbow
+                    @beam_rainbow,
+                    @draw_r,
+                    @draw_g,
+                    @draw_b,
+                    @draw_a,
+                    @draw_rainbow
                 )
                 """;
 
@@ -207,7 +255,12 @@ public sealed class WardenDatabase
                    beam_g,
                    beam_b,
                    beam_a,
-                   beam_rainbow
+                   beam_rainbow,
+                   draw_r,
+                   draw_g,
+                   draw_b,
+                   draw_a,
+                   draw_rainbow
             FROM {TableName}
             WHERE steam_id = @steam_id
             """;
@@ -230,7 +283,13 @@ public sealed class WardenDatabase
                 ToByte(reader["beam_g"]),
                 ToByte(reader["beam_b"]),
                 ToByte(reader["beam_a"])),
-            ToBool(reader["beam_rainbow"]));
+            ToBool(reader["beam_rainbow"]),
+            new Color(
+                ToByte(reader["draw_r"]),
+                ToByte(reader["draw_g"]),
+                ToByte(reader["draw_b"]),
+                ToByte(reader["draw_a"])),
+            ToBool(reader["draw_rainbow"]));
     }
 
     private IDbConnection OpenConnection()
@@ -247,6 +306,8 @@ public sealed class WardenDatabase
         AddParameter(command, "@laser_rainbow", settings.LaserRainbow ? 1 : 0);
         AddColorParameters(command, "beam", settings.BeamColor);
         AddParameter(command, "@beam_rainbow", settings.BeamRainbow ? 1 : 0);
+        AddColorParameters(command, "draw", settings.DrawColor);
+        AddParameter(command, "@draw_rainbow", settings.DrawRainbow ? 1 : 0);
     }
 
     private static void AddColorParameters(IDbCommand command, string prefix, Color color)
@@ -289,8 +350,14 @@ public sealed class WardenDatabase
         return Convert.ToInt32(value) != 0;
     }
 
-    public sealed record WardenVisualSettings(Color LaserColor, bool LaserRainbow, Color BeamColor, bool BeamRainbow)
+    public sealed record WardenVisualSettings(
+        Color LaserColor,
+        bool LaserRainbow,
+        Color BeamColor,
+        bool BeamRainbow,
+        Color DrawColor,
+        bool DrawRainbow)
     {
-        public static WardenVisualSettings Default { get; } = new(DefaultLaserColor, false, DefaultBeamColor, false);
+        public static WardenVisualSettings Default { get; } = new(DefaultLaserColor, false, DefaultBeamColor, false, DefaultDrawColor, true);
     }
 }

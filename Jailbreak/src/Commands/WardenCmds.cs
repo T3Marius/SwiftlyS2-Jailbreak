@@ -19,6 +19,7 @@ public sealed class WardenCommands
     private readonly BoxManager              _boxManager;
     private readonly CellManager             _cellManager;
     private readonly CuffsManager            _cuffsManager;
+    private readonly DrawManager             _drawManager;
     private readonly SpecialDayManager       _specialDayManager;
     private readonly LastRequestManager      _lastRequestManager;
     private readonly ILogger<WardenCommands> _log;
@@ -31,6 +32,7 @@ public sealed class WardenCommands
         BoxManager boxManager,
         CellManager cellManager,
         CuffsManager cuffsManager,
+        DrawManager drawManager,
         SpecialDayManager specialDayManager,
         LastRequestManager lastRequestManager,
         ILogger<WardenCommands> log)
@@ -42,6 +44,7 @@ public sealed class WardenCommands
         _boxManager = boxManager;
         _cellManager = cellManager;
         _cuffsManager = cuffsManager;
+        _drawManager = drawManager;
         _specialDayManager = specialDayManager;
         _lastRequestManager = lastRequestManager;
         _log     = log;
@@ -105,6 +108,30 @@ public sealed class WardenCommands
             _core.Command.RegisterCommand(cmd, ToggleCells);
         }
 
+        foreach (var cmd in _config.Commands.ToggleDraw)
+        {
+            if (_core.Command.IsCommandRegistered(cmd))
+                continue;
+
+            _core.Command.RegisterCommand(cmd, ToggleDraw);
+        }
+
+        foreach (var cmd in _config.Commands.DrawColor)
+        {
+            if (_core.Command.IsCommandRegistered(cmd))
+                continue;
+
+            _core.Command.RegisterCommand(cmd, DrawColor);
+        }
+
+        foreach (var cmd in _config.Commands.DrawClear)
+        {
+            if (_core.Command.IsCommandRegistered(cmd))
+                continue;
+
+            _core.Command.RegisterCommand(cmd, DrawClear);
+        }
+
     }
     public void Unregister()
     {
@@ -157,6 +184,30 @@ public sealed class WardenCommands
         }
 
         foreach (var cmd in _config.Commands.ToggleCells)
+        {
+            if (!_core.Command.IsCommandRegistered(cmd))
+                continue;
+
+            _core.Command.UnregisterCommand(cmd);
+        }
+
+        foreach (var cmd in _config.Commands.ToggleDraw)
+        {
+            if (!_core.Command.IsCommandRegistered(cmd))
+                continue;
+
+            _core.Command.UnregisterCommand(cmd);
+        }
+
+        foreach (var cmd in _config.Commands.DrawColor)
+        {
+            if (!_core.Command.IsCommandRegistered(cmd))
+                continue;
+
+            _core.Command.UnregisterCommand(cmd);
+        }
+
+        foreach (var cmd in _config.Commands.DrawClear)
         {
             if (!_core.Command.IsCommandRegistered(cmd))
                 continue;
@@ -360,6 +411,71 @@ public sealed class WardenCommands
             _cellManager.CloseCells();
             _players.SendMessage(MessageType.Chat, "cells_closed_sender", true, args: sender);
         }
+    }
+
+    private void ToggleDraw(ICommandContext ctx)
+    {
+        if (ctx.Sender == null)
+            return;
+
+        var player = _players.SyncPlayer(ctx.Sender);
+        if (player == null)
+            return;
+
+        if (BlockDuringSpecialDay(player))
+            return;
+
+        if (!player.IsWarden)
+        {
+            player.SendMessage(MessageType.Chat, "you_are_not_warden", true);
+            return;
+        }
+
+        var enabled = _drawManager.ToggleDrawing(player);
+        player.SendMessage(MessageType.Chat, enabled ? "draw_enabled" : "draw_disabled", true);
+    }
+
+    private void DrawColor(ICommandContext ctx)
+    {
+        if (ctx.Sender == null)
+            return;
+
+        var player = _players.SyncPlayer(ctx.Sender);
+        if (player == null)
+            return;
+
+        if (BlockDuringSpecialDay(player))
+            return;
+
+        if (!player.IsWarden)
+        {
+            player.SendMessage(MessageType.Chat, "you_are_not_warden", true);
+            return;
+        }
+
+        _wardenMenu.ShowDrawColor(player);
+    }
+
+    private void DrawClear(ICommandContext ctx)
+    {
+        if (ctx.Sender == null)
+            return;
+
+        var player = _players.SyncPlayer(ctx.Sender);
+        if (player == null)
+            return;
+
+        if (BlockDuringSpecialDay(player))
+            return;
+
+        if (!player.IsWarden)
+        {
+            player.SendMessage(MessageType.Chat, "you_are_not_warden", true);
+            return;
+        }
+
+        _drawManager.ClearDrawing(player);
+        player.SendMessage(MessageType.Chat, "draw_cleared", true);
     }
 
     private bool BlockDuringSpecialDay(IJBPlayer player)

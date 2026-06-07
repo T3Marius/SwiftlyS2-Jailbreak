@@ -17,6 +17,7 @@ public sealed class CuffsManager
     private readonly ISwiftlyCore        _core;
     private readonly IJBPlayerManagement _players;
     private readonly SpecialDayManager   _specialDayManager;
+    private readonly DrawManager         _drawManager;
 
     private const string CuffWeapon   = "weapon_taser";
     private const float GrabDistance  = 110.0f;
@@ -29,11 +30,12 @@ public sealed class CuffsManager
     private Guid? _weaponFireHookId;
     private Guid? _playerDeathHookId;
     
-    public CuffsManager(ISwiftlyCore core, IJBPlayerManagement players, SpecialDayManager specialDayManager)
+    public CuffsManager(ISwiftlyCore core, IJBPlayerManagement players, SpecialDayManager specialDayManager, DrawManager drawManager)
     {
         _core = core;
         _players = players;
         _specialDayManager = specialDayManager;
+        _drawManager = drawManager;
     }
 
     public void Register()
@@ -171,6 +173,12 @@ public sealed class CuffsManager
             return;
         }
 
+        if (_drawManager.IsDrawingEnabled(player))
+        {
+            ReleaseGrab(GetPlayerKey(player));
+            return;
+        }
+
         if (player.IsWarden)
             _mouse2HeldWardens.Add(GetPlayerKey(player));
     }
@@ -191,7 +199,7 @@ public sealed class CuffsManager
         foreach (var wardenKey in _mouse2HeldWardens.ToList())
         {
             var warden = FindPlayerByKey(wardenKey);
-            if (warden == null || !warden.IsWarden || !warden.Player.IsValid || !warden.Player.IsAlive)
+            if (warden == null || _drawManager.IsDrawingEnabled(warden) || !warden.IsWarden || !warden.Player.IsValid || !warden.Player.IsAlive)
             {
                 ReleaseGrab(wardenKey);
                 continue;

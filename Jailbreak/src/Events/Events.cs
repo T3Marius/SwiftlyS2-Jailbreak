@@ -16,6 +16,7 @@ public sealed class Events
     private readonly CellManager         _cellManager;
     private readonly BoxManager          _boxManager;
     private readonly CuffsManager        _cuffsManager;
+    private readonly DrawManager         _drawManager;
     private readonly SpecialDayManager   _specialDayManager;
     private readonly LastRequestManager  _lastRequestManager;
 
@@ -49,6 +50,7 @@ public sealed class Events
         CellManager cellManager,
         BoxManager boxManager,
         CuffsManager cuffsManager,
+        DrawManager drawManager,
         SpecialDayManager specialDayManager,
         LastRequestManager lastRequestManager,
         IOptions<WardenConfig> wardenConfig, 
@@ -61,6 +63,7 @@ public sealed class Events
         _cellManager = cellManager;
         _boxManager = boxManager;
         _cuffsManager = cuffsManager;
+        _drawManager = drawManager;
         _specialDayManager = specialDayManager;
         _lastRequestManager = lastRequestManager;
         _wardenConfig = wardenConfig.Value;
@@ -143,6 +146,7 @@ public sealed class Events
 
         var steamId = e.UserIdPlayer.SteamID;
         StopHudTimer(steamId);
+        _drawManager.CleanupPlayer(e.UserIdPlayer);
         _cuffsManager.CleanupPlayer(e.UserIdPlayer);
         _players.RemovePlayer(e.UserIdPlayer);
         return HookResult.Continue;

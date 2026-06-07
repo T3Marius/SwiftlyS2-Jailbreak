@@ -69,7 +69,7 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 
 | LR | Module | Settings |
 | --- | --- | --- |
-| Knife Fight | `Modules/LastRequests` | Knives only, differnet knife type |
+| Knife Fight | `Modules/LastRequests` | Knives only, different knife types. |
 
 ### Visuals
 
@@ -80,6 +80,7 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 - Laser has a smooth grow/lerp animation.
 - Laser and ping colors support normal colors and rainbow mode.
 - Visual color preferences are saved per warden in the database and cached for performance.
+- Warden drawing mode can be toggled with `!draw` and draws smoothed persistent CBeam strokes while holding Mouse2.
 
 ## Commands
 
@@ -94,7 +95,11 @@ All warden command aliases are configurable in `warden.toml`.
 | SpecialDays | `!sd` | Open the Special Days selection menu. |
 | ToggleBox | `!box` | Toggle box mode. |
 | ToggleCells | `!cells`, `!c` | Open or close cells. |
+| ToggleDraw | `!draw` | Toggle warden drawing mode. |
+| DrawColor | `!drawcolor` | Open the drawing color menu. |
+| DrawClear | `!drawclear` | Clear your own drawings. |
 | SpecialGuns | `!sguns` | Open the active Special Day guns menu when enabled. |
+| JailbreakStats | `!jbstats`, `!jstats`, `!stats` | Open Last Request and Special Day stats. |
 
 ## Warden Menu
 
@@ -109,6 +114,7 @@ Opened with `!wmenu`.
 - Visual Management
   - Laser Color
   - Ping Color
+  - Draw Color
 
 ## Configuration
 
@@ -132,6 +138,15 @@ Stored and cached per warden:
 - Laser rainbow mode
 - Ping/beam color
 - Ping/beam rainbow mode
+- Draw color
+- Draw rainbow mode
+
+`JBStatsDB` uses `Utils.DatabaseConnection` and creates `jb_player_stats`.
+
+Stored and cached per player:
+
+- Last Request wins and losses
+- Special Day wins and losses
 
 ## Public API
 
@@ -148,8 +163,12 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak`.
 - [X] Create LastRequest modules.
 - [x] Create first SpecialDays module.
 - [ ] Add more SpecialDays modules.
-- [ ] Add more LastRequests modules
-- [ ] Save LastRequests Wins and Loses in database
+- [ ] Add more LastRequests modules.
+- [x] Save Last Request wins and losses in database.
+- [x] Save Special Day wins and losses in database.
+- [x] Add Jailbreak stats command and menu.
+- [x] Show LR winner win count in end announcements.
+- [x] Show Special Day winner/winners with win counts in end announcements.
 - [x] Finish deputy commands.
 - [x] Configure deputy and warden roles.
 - [x] Configure rebel system.
@@ -164,9 +183,14 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak`.
 - [x] Configure team ratio.
 - [x] Add prisoner mute system.
 - [x] Add cuffs to warden.
+- [x] Fix bot identity handling for cuffs and player cache.
 - [x] Add ability to remove weapons when shooting them as warden.
+- [x] Block becoming warden during round end.
 - [x] Add a `jailbreak.cfg` file in the plugin directory.
-- [ ] Revisit drawing mode later.
+- [x] Add warden drawing mode.
+- [x] Add drawing color selection.
+- [x] Add drawing cleanup command.
+- [ ] Add broader drawing cleanup/management options.
 - [ ] Add speaking icon to whomever is speaking
 - [ ] Add gameplay sounds (Warden set, Rebel set, etc)
 - [ ] Add more TODO items.

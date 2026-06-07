@@ -70,19 +70,18 @@ public sealed class GameConfig
 
     public void Apply(string reason = "manual")
     {
-        _log.LogInformation("Applying jailbreak game config. Reason={Reason}", reason);
+        var commands = BuildCommands();
+        _log.LogInformation("Scheduling jailbreak game config apply. Reason={Reason}, Commands={CommandCount}", reason, commands.Count);
 
-        Execute(CheatsCommand);
+        _core.Scheduler.NextWorldUpdate(() =>
+        {
+            _log.LogInformation("Applying jailbreak game config. Reason={Reason}", reason);
 
-        foreach (var command in ServerCommands)
-            Execute(command);
+            foreach (var command in commands)
+                Execute(command);
 
-        foreach (var command in MovementCommands)
-            Execute(command);
-
-        Execute(CheatsCommand);
-
-        _log.LogInformation("Applied jailbreak game config. Reason={Reason}, Commands={CommandCount}", reason, ServerCommands.Length + MovementCommands.Length + 2);
+            _log.LogInformation("Applied jailbreak game config. Reason={Reason}, Commands={CommandCount}", reason, commands.Count);
+        });
     }
 
     private void OnMapLoad(IOnMapLoadEvent @event)
@@ -139,6 +138,20 @@ public sealed class GameConfig
         builder.AppendLine(CheatsCommand.ToString());
 
         return builder.ToString();
+    }
+
+    private static IReadOnlyList<GameConfigEntry> BuildCommands()
+    {
+        var commands = new List<GameConfigEntry>
+        {
+            CheatsCommand
+        };
+
+        commands.AddRange(ServerCommands);
+        commands.AddRange(MovementCommands);
+        commands.Add(CheatsCommand);
+
+        return commands;
     }
 
     private void Execute(GameConfigEntry command)

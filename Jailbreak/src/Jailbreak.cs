@@ -58,6 +58,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<RebelManager>()
                   .AddSingleton<BeaconManager>()
                   .AddSingleton<LaserManager>()
+                  .AddSingleton<DrawManager>()
                   .AddSingleton<SpecialDayManager>()
                   .AddSingleton<LastRequestManager>()
                   .AddSingleton<GameConfig>()
@@ -126,6 +127,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<BoxManager>().Register();
         _provider.GetRequiredService<CuffsManager>().Register();
         _provider.GetRequiredService<LaserManager>().Register();
+        _provider.GetRequiredService<DrawManager>().Register();
 
         if (_provider.GetRequiredService<IOptions<UtilsConfig>>().Value.Bunnyhoop.Enable)
             _provider.GetRequiredService<BunnyhoopManager>().Register();
@@ -152,6 +154,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<BoxManager>().Unregister();
         _provider.GetRequiredService<CuffsManager>().Unregister();
         _provider.GetRequiredService<LaserManager>().Unregister();
+        _provider.GetRequiredService<DrawManager>().Unregister();
         if (_provider.GetRequiredService<IOptions<UtilsConfig>>().Value.Bunnyhoop.Enable)
             _provider.GetRequiredService<BunnyhoopManager>().Unregister();
         _provider.GetRequiredService<IconManager>().CleanupAll();
