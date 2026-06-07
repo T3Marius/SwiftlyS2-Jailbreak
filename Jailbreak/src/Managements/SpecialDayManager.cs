@@ -197,7 +197,7 @@ public sealed class SpecialDayManager
             return;
 
         var specialDay = CurrentSpecialDay;
-        if (specialDay == null || !_currentDayStarted)
+        if (specialDay == null || (!_currentDayStarted && !_countdownFreezeActive))
         {
             player.SendMessage(MessageType.Chat, "special_guns_no_active_day", true);
             return;
@@ -514,6 +514,9 @@ public sealed class SpecialDayManager
 
         if (!string.IsNullOrEmpty(secondaryClassname))
             GiveWeapon(player, secondaryClassname);
+
+        string knife = player.Controller.Team == Team.T ? "weapon_knife_t" : "weapon_knife";
+        GiveWeapon(player, knife);
     }
 
     private IEnumerable<ItemDefinitionIndex> GetMenuWeapons(ISpecialDay specialDay, IReadOnlySet<ItemDefinitionIndex> group)
