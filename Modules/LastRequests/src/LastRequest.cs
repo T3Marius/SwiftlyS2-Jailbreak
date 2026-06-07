@@ -80,8 +80,8 @@ public sealed class KnifeFightLastRequest : LastRequestBase
     }
 
     public override string Id => "lr_knife_fight";
-    public override string Name => "Knife Fight";
-    public override string Description => "Fight a guard using knives.";
+    public override string Name => Core.Localizer["knife_fight.name"];
+    public override string Description => Core.Localizer["knife_fight.description"];
     public override int StartCountdown => Config.Countdown;
     public override LastRequestOpponentMode OpponentMode => LastRequestOpponentMode.Duel;
     public override LastRequestWeaponSelection WeaponSelection => LastRequestWeaponSelection.None;
