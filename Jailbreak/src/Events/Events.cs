@@ -354,6 +354,9 @@ public sealed class Events
 
         var cts = _core.Scheduler.RepeatBySeconds(3f, () =>
         {
+            if (_specialDayManager.HasQueuedOrActiveSpecialDay || _lastRequestManager.IsLastRequestActive)
+                return;
+
             var warden = _players.GetWarden()?.Player.Name ?? _core.Localizer["none"];
             var deputy = _players.GetDeputy()?.Player.Name ?? _core.Localizer["none"];
             player.SendMessage(MessageType.Center, "current_ct_roles.center", false, args: [warden, deputy]);

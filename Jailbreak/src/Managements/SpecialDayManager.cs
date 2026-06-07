@@ -423,7 +423,7 @@ public sealed class SpecialDayManager
                 continue;
 
             var message = player.Localizer["special_day_countdown_html", specialDay.Name, remaining, specialDay.Description];
-            player.Player.SendCenterHTML(message, 1100);
+            player.Player.SendCenterHTML(message, 1500);
         }
     }
 
@@ -451,8 +451,8 @@ public sealed class SpecialDayManager
             if (!player.Player.IsValid)
                 continue;
 
-            var message = player.Localizer["special_day_active_html", specialDay.Name, specialDay.Description];
-            player.Player.SendCenterHTML(message, 1100);
+            var message = player.Localizer["special_day_active_html", specialDay.Name, string.Empty, specialDay.Description];
+            player.Player.SendCenterHTML(message, 1500);
         }
     }
 

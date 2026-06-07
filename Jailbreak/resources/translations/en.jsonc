@@ -115,7 +115,7 @@
     "remove_freeday_submenu.title": "Remove Freeday",
     "special_day_already_queued": "[blue]{0}[silver] is already queued for next round.",
     "special_day_active_blocked": "This action is disabled during an active [blue]Special Day[silver].",
-    "special_day_active_html": "<font class='fontSize-l' color='#66d9ff'>{0}</font><br><font class='fontSize-s' color='#d8e6ff'>{1}</font>",
+    "special_day_active_html": "<font class='fontSize-l' color='#66d9ff'>{0}</font><br><font class='fontSize-s' color='#ffffff'>Info:</font> <font class='fontSize-s' color='#d8e6ff'>{2}</font>",
     "special_day_cannot_queue": "[red]{0}[silver] cannot be queued right now.",
     "special_day_cooldown": "Special Days are on cooldown for [lime]{0} round(s)[silver].",
     "special_day_countdown_html": "<font class='fontSize-l' color='#66d9ff'>{0}</font><br><font class='fontSize-s' color='#d8e6ff'>{2}</font><br><font class='fontSize-m' color='#ffffff'>SD Starts in</font> <font class='fontSize-xl' color='#ffdf5d'>{1}</font> <font class='fontSize-m' color='#ffffff'>seconds</font>",
