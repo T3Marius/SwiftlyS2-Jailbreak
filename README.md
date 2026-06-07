@@ -202,3 +202,9 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [ ] Add speaking icon to whomever is speaking
 - [ ] Add gameplay sounds (Warden set, Rebel set, etc)
 - [ ] Add more TODO items.
+
+## ☕ If you'd like to support me! Any donation is deeply appreciated.
+
+<a href="https://buymeacoffee.com/t3marius" target="_blank">
+  <img
+    src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png"
