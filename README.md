@@ -156,6 +156,14 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak`.
 - `RegisterSpecialDay(ISpecialDay specialDay)` registers a Special Day module.
 - `UnregisterSpecialDay(string id)` unregisters a Special Day module.
 
+## Releases
+
+Releases are created from tags through `.github/workflows/release.yml`.
+
+- Beta prereleases use tags like `v0.1.0-beta.1`.
+- Stable releases use tags like `v0.1.0`.
+- Release notes are generated from commits since the previous matching release tag and include clickable commit hashes.
+
 ## TODO List
 
 - [X] Build the LastRequest interface system and wire it into core.
