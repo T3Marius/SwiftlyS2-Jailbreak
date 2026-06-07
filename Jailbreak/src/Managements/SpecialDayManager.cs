@@ -23,7 +23,9 @@ public sealed class SpecialDayManager
     private readonly IJBPlayerManagement _players;
     private readonly ILogger<SpecialDayManager> _log;
     private readonly SpecialDayConfig _config;
+    private readonly JBStatsDB _statsDB;
     private readonly Dictionary<string, ISpecialDay> _specialDays = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<ulong, string> _participants = [];
     private readonly IConVar<bool>? _teammatesAreEnemies;
 
     private Guid? _roundStartHookId;
@@ -37,11 +39,13 @@ public sealed class SpecialDayManager
         ISwiftlyCore core,
         IJBPlayerManagement players,
         IOptions<SpecialDayConfig> config,
+        JBStatsDB statsDB,
         ILogger<SpecialDayManager> log)
     {
         _core = core;
         _players = players;
         _config = config.Value;
+        _statsDB = statsDB;
         _log = log;
         _teammatesAreEnemies = _core.ConVar.Find<bool>("mp_teammates_are_enemies");
     }
@@ -160,10 +164,12 @@ public sealed class SpecialDayManager
         if (_currentDayStarted)
         {
             specialDay.End();
-            AnnounceSpecialDayEnded(specialDay);
+            var winners = RecordSpecialDayStats();
+            AnnounceSpecialDayEnded(specialDay, winners);
         }
 
         RestoreSpecialDayConvars();
+        _participants.Clear();
         _currentDayStarted = false;
         _log.LogInformation("Ended special day. Id={Id}, Name={Name}", specialDay.Id, specialDay.Name);
     }
@@ -287,6 +293,7 @@ public sealed class SpecialDayManager
     private void StartCurrentSpecialDay(ISpecialDay specialDay)
     {
         _countdownFreezeActive = false;
+        CaptureParticipants();
         ApplySpecialDayConvars(specialDay);
         ApplyStartLoadout(specialDay);
         specialDay.Start();
@@ -314,21 +321,58 @@ public sealed class SpecialDayManager
         _friendlyFireEnabledBySpecialDay = false;
     }
 
-    private void AnnounceSpecialDayEnded(ISpecialDay specialDay)
+    private void AnnounceSpecialDayEnded(ISpecialDay specialDay, IReadOnlyList<string> winners)
     {
-        var survivors = _players.GetAllPlayers()
-            .Where(player => player.Player.IsValid && player.Player.IsAlive)
-            .Select(FormatSurvivorName)
-            .ToList();
-
-        var survivorText = survivors.Count == 0
+        var winnerLabel = winners.Count == 1
+            ? _core.Localizer["special_day_winner_label"]
+            : _core.Localizer["special_day_winners_label"];
+        var winnerText = winners.Count == 0
             ? "0"
-            : $"{survivors.Count}: {string.Join("[silver], ", survivors)}";
+            : string.Join("[silver], ", winners);
 
-        _players.SendMessage(MessageType.Chat, "special_day_ended", true, args: [specialDay.Name, survivorText]);
+        _players.SendMessage(MessageType.Chat, "special_day_ended", true, args: [specialDay.Name, winnerLabel, winnerText]);
     }
 
-    private static string FormatSurvivorName(IJBPlayer player)
+    private void CaptureParticipants()
+    {
+        _participants.Clear();
+
+        foreach (var player in _players.GetAllPlayers())
+        {
+            if (!player.Player.IsValid || !player.Player.IsAlive)
+                continue;
+
+            _participants[player.SteamID] = player.Player.Name;
+        }
+    }
+
+    private IReadOnlyList<string> RecordSpecialDayStats()
+    {
+        if (_participants.Count == 0)
+            return [];
+
+        var aliveParticipants = _players.GetAllPlayers()
+            .Where(player => player.Player.IsValid && player.Player.IsAlive && _participants.ContainsKey(player.SteamID))
+            .ToDictionary(player => player.SteamID);
+        var winners = new List<string>();
+
+        foreach (var (steamId, playerName) in _participants)
+        {
+            if (aliveParticipants.TryGetValue(steamId, out var player))
+            {
+                var stats = _statsDB.AddSpecialDayWin(steamId, player.Player.Name);
+                winners.Add(FormatWinnerName(player, stats.SpecialDayWins));
+            }
+            else
+            {
+                _statsDB.AddSpecialDayLoss(steamId, playerName);
+            }
+        }
+
+        return winners;
+    }
+
+    private static string FormatWinnerName(IJBPlayer player, int wins)
     {
         var color = player.Team switch
         {
@@ -337,7 +381,7 @@ public sealed class SpecialDayManager
             _ => "[silver]"
         };
 
-        return $"{color}{player.Player.Name}[silver]";
+        return $"{color}{player.Player.Name}[silver] ([lime]{wins} Wins[silver])";
     }
 
     private void SendCountdownMessage(ISpecialDay specialDay, int remaining)

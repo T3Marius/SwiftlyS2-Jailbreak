@@ -253,13 +253,7 @@ public sealed class KnifeFightLastRequest : LastRequestBase
     {
         var pawn = entity.As<CCSPlayerPawn>();
         if (pawn.IsValid)
-            return pawn.ToPlayer();
-
-        foreach (var player in Core.PlayerManager.GetAllPlayers())
-        {
-            if (player.PlayerPawn?.Address == entity.Address)
-                return player;
-        }
+            return Core.PlayerManager.GetPlayerFromPawn(pawn) ?? pawn.ToPlayer();
 
         return null;
     }

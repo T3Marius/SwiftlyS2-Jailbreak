@@ -45,6 +45,8 @@ public sealed class Main : BasePlugin
              .Configure(b => b.AddTomlFile("specialday.toml", false, true));
         Core.Configuration.InitializeTomlWithModel<PrisonerConfig>("prisoner.toml", "Prisoner")
              .Configure(b => b.AddTomlFile("prisoner.toml", false, true));
+        Core.Configuration.InitializeTomlWithModel<JBStatsConfig>("jbstats.toml", "JBStats")
+             .Configure(b => b.AddTomlFile("jbstats.toml", false, true));
 
         collection.AddSwiftly(Core)
                   .AddSingleton<CuffsManager>()
@@ -60,6 +62,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<LastRequestManager>()
                   .AddSingleton<GameConfig>()
                   .AddSingleton<WardenDatabase>()
+                  .AddSingleton<JBStatsDB>()
                   .AddSingleton<Api>()
                   .AddSingleton<Events>()
                   .AddSingleton<Listeners>()
@@ -67,7 +70,9 @@ public sealed class Main : BasePlugin
                   .AddSingleton<WardenCommands>()
                   .AddSingleton<DeputyCommands>()
                   .AddSingleton<PrisonerCommands>()
+                  .AddSingleton<JBStatsCommands>()
                   .AddSingleton<WardenMenu>()
+                  .AddSingleton<JBStats>()
                   .AddSingleton<BoxManager>()
                   .AddSingleton<BunnyhoopManager>();
 
@@ -92,9 +97,13 @@ public sealed class Main : BasePlugin
         collection.AddOptionsWithValidateOnStart<PrisonerConfig>()
                   .BindConfiguration("Prisoner");
 
+        collection.AddOptionsWithValidateOnStart<JBStatsConfig>()
+                  .BindConfiguration("JBStats");
+
         _provider = collection.BuildServiceProvider();
 
         _provider.GetRequiredService<WardenDatabase>().Initialize();
+        _provider.GetRequiredService<JBStatsDB>().Initialize();
         _provider.GetRequiredService<GameConfig>().Register(hotReload);
 
         if (hotReload)
@@ -105,6 +114,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<WardenCommands>().Register();
         _provider.GetRequiredService<DeputyCommands>().Register();
         _provider.GetRequiredService<PrisonerCommands>().Register();
+        _provider.GetRequiredService<JBStatsCommands>().Register();
         _provider.GetRequiredService<Events>().Register();
         _provider.GetRequiredService<Listeners>().Register();
         _provider.GetRequiredService<NetMessages>().Register();
@@ -129,6 +139,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<WardenCommands>().Unregister();
         _provider.GetRequiredService<DeputyCommands>().Unregister();
         _provider.GetRequiredService<PrisonerCommands>().Unregister();
+        _provider.GetRequiredService<JBStatsCommands>().Unregister();
         _provider.GetRequiredService<Events>().Unregister();
         _provider.GetRequiredService<Listeners>().Unregister();
         _provider.GetRequiredService<NetMessages>().Unregister();

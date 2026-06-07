@@ -28,6 +28,7 @@ public sealed class LastRequestManager
     private readonly IJBPlayerManagement _players;
     private readonly BeaconManager _beaconManager;
     private readonly CuffsManager _cuffsManager;
+    private readonly JBStatsDB _statsDB;
     private readonly ILogger<LastRequestManager> _log;
     private readonly Dictionary<string, ILastRequest> _lastRequests = new(StringComparer.OrdinalIgnoreCase);
 
@@ -46,12 +47,14 @@ public sealed class LastRequestManager
         IJBPlayerManagement players,
         BeaconManager beaconManager,
         CuffsManager cuffsManager,
+        JBStatsDB statsDB,
         ILogger<LastRequestManager> log)
     {
         _core = core;
         _players = players;
         _beaconManager = beaconManager;
         _cuffsManager = cuffsManager;
+        _statsDB = statsDB;
         _log = log;
     }
 
@@ -239,8 +242,10 @@ public sealed class LastRequestManager
         CleanupVisuals();
         _currentContext = null;
 
+        var winnerWins = RecordLastRequestStats(winner, loser);
+
         if (announce)
-            AnnounceLastRequestEnded(lastRequest, winner);
+            AnnounceLastRequestEnded(lastRequest, winner, winnerWins);
 
         _log.LogInformation("Ended Last Request. Id={Id}, Name={Name}, Winner={Winner}, Loser={Loser}",
             lastRequest.Id,
@@ -539,10 +544,23 @@ public sealed class LastRequestManager
         _players.SendMessage(MessageType.Chat, "last_request_selected", true, args: [FormatPlayerName(context.Prisoner), opponent, lastRequest.Name, variant]);
     }
 
-    private void AnnounceLastRequestEnded(ILastRequest lastRequest, IJBPlayer? winner)
+    private int RecordLastRequestStats(IJBPlayer? winner, IJBPlayer? loser)
+    {
+        var winnerWins = 0;
+
+        if (winner != null)
+            winnerWins = _statsDB.AddLastRequestWin(winner.SteamID, winner.Player.Name).LastRequestWins;
+
+        if (loser != null && (winner == null || loser.SteamID != winner.SteamID))
+            _statsDB.AddLastRequestLoss(loser.SteamID, loser.Player.Name);
+
+        return winnerWins;
+    }
+
+    private void AnnounceLastRequestEnded(ILastRequest lastRequest, IJBPlayer? winner, int winnerWins)
     {
         var winnerName = winner == null ? _core.Localizer["none"] : FormatPlayerName(winner);
-        _players.SendMessage(MessageType.Chat, "last_request_ended", true, args: [lastRequest.Name, winnerName]);
+        _players.SendMessage(MessageType.Chat, "last_request_ended", true, args: [lastRequest.Name, winnerName, winnerWins]);
     }
 
     private static bool IsParticipant(ILastRequest lastRequest, LastRequestStartContext context, IJBPlayer player)
@@ -616,13 +634,7 @@ public sealed class LastRequestManager
     {
         var pawn = entity.As<CCSPlayerPawn>();
         if (pawn.IsValid)
-            return pawn.ToPlayer();
-
-        foreach (var player in _core.PlayerManager.GetAllPlayers())
-        {
-            if (player.PlayerPawn?.Address == entity.Address)
-                return player;
-        }
+            return _core.PlayerManager.GetPlayerFromPawn(pawn) ?? pawn.ToPlayer();
 
         return null;
     }

@@ -41,6 +41,7 @@ public sealed class Events
     private CancellationTokenSource? _doorsCheckCts;
     private CancellationTokenSource? _checkPrisonersVoiceCts;
     private readonly Random _random = new();
+    private bool _isRoundEnding;
 
     public Events(
         ISwiftlyCore core, 
@@ -142,13 +143,15 @@ public sealed class Events
 
         var steamId = e.UserIdPlayer.SteamID;
         StopHudTimer(steamId);
-        _cuffsManager.CleanupPlayer(steamId);
-        _players.RemovePlayer(steamId);
+        _cuffsManager.CleanupPlayer(e.UserIdPlayer);
+        _players.RemovePlayer(e.UserIdPlayer);
         return HookResult.Continue;
     }
 
     private HookResult OnRoundStart(EventRoundStart e)
     {
+        _isRoundEnding = false;
+
         foreach (var p in _players.GetAllPlayers())
             p.WasUnmutedByWarden = false;
 
@@ -276,6 +279,14 @@ public sealed class Events
     
     private HookResult OnRoundEnd(EventRoundEnd e)
     {
+        _isRoundEnding = true;
+
+        _wardenCheckCts?.Cancel();
+        _wardenCheckCts = null;
+
+        _doorsCheckCts?.Cancel();
+        _doorsCheckCts = null;
+
         foreach (var p in _players.GetAllPlayers())
             p.WasUnmutedByWarden = false;
 
@@ -360,7 +371,8 @@ public sealed class Events
     {
         PlayerUtils.Color(player.Player, new Color(255, 255, 255, 255), _core.Scheduler);
 
-        player.CanBecomeWarden = !_specialDayManager.HasQueuedOrActiveSpecialDay
+        player.CanBecomeWarden = !_isRoundEnding
+            && !_specialDayManager.HasQueuedOrActiveSpecialDay
             && !_lastRequestManager.IsLastRequestActive
             && player.Team == JBTeam.Guard;
 

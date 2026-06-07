@@ -25,14 +25,16 @@ public sealed class JBPlayerManagement : IJBPlayerManagement
         if (!player.IsValid)
             return null;
 
-        if (_players.TryGetValue(player.SteamID, out var jbPlayer))
+        var playerKey = PlayerIdentity.GetKey(player);
+
+        if (_players.TryGetValue(playerKey, out var jbPlayer))
         {
             jbPlayer.RefreshPlayer(player);
             return jbPlayer;
         }
 
         jbPlayer = new JBPlayer(player, _core, _modelsConfig, _iconManager);
-        _players[player.SteamID] = jbPlayer;
+        _players[playerKey] = jbPlayer;
         return jbPlayer;
     }
 
@@ -49,24 +51,35 @@ public sealed class JBPlayerManagement : IJBPlayerManagement
 
     public void RemovePlayer(ulong steamId)
     {
-        _players.Remove(steamId);
+        foreach (var playerKey in _players
+                     .Where(x => x.Value.SteamID == steamId)
+                     .Select(x => x.Key)
+                     .ToList())
+        {
+            _players.Remove(playerKey);
+        }
+    }
+
+    public void RemovePlayer(IPlayer player)
+    {
+        _players.Remove(PlayerIdentity.GetKey(player));
     }
 
     public void SyncTeams()
     {
-        var liveSteamIds = new HashSet<ulong>();
+        var livePlayerKeys = new HashSet<ulong>();
 
         foreach (var rawPlayer in _core.PlayerManager.GetAllValidPlayers())
         {
-            liveSteamIds.Add(rawPlayer.SteamID);
+            livePlayerKeys.Add(PlayerIdentity.GetKey(rawPlayer));
 
             var player = SyncPlayer(rawPlayer);
             if (player == null)
                 continue;
         }
 
-        foreach (var steamId in _players.Keys.Where(steamId => !liveSteamIds.Contains(steamId)).ToList())
-            _players.Remove(steamId);
+        foreach (var playerKey in _players.Keys.Where(playerKey => !livePlayerKeys.Contains(playerKey)).ToList())
+            _players.Remove(playerKey);
     }
 
     public IEnumerable<IJBPlayer> GetAllPlayers()

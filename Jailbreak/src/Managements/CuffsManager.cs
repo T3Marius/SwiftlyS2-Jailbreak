@@ -63,27 +63,29 @@ public sealed class CuffsManager
         if (!warden.IsWarden || !warden.Player.IsValid)
             return;
 
-        _wardenTaserOwners.Add(warden.SteamID);
+        _wardenTaserOwners.Add(GetPlayerKey(warden));
         PlayerUtils.GiveWeapon(warden.Player, "weapon_taser", _core.Scheduler);
         GiveInfiniteTaserAmmo(warden);
     }
     
     public void OnWardenRemove(IJBPlayer warden)
     {
-        _wardenTaserOwners.Remove(warden.SteamID);
-        _mouse2HeldWardens.Remove(warden.SteamID);
-        _grabbedByWarden.Remove(warden.SteamID);
+        var wardenKey = GetPlayerKey(warden);
 
-        foreach (var prisonerSteamId in _cuffedByWarden
-                    .Where(x => x.Value == warden.SteamID)
+        _wardenTaserOwners.Remove(wardenKey);
+        _mouse2HeldWardens.Remove(wardenKey);
+        _grabbedByWarden.Remove(wardenKey);
+
+        foreach (var prisonerKey in _cuffedByWarden
+                    .Where(x => x.Value == wardenKey)
                     .Select(x => x.Key)
                     .ToList())
         {
-            var prisoner = _players.GetAllPlayers().FirstOrDefault(p => p.SteamID == prisonerSteamId);
+            var prisoner = FindPlayerByKey(prisonerKey);
             if (prisoner != null)
                 Uncuff(prisoner);
             else
-                _cuffedByWarden.Remove(prisonerSteamId);
+                _cuffedByWarden.Remove(prisonerKey);
         }
     }
 
@@ -106,6 +108,33 @@ public sealed class CuffsManager
                 Uncuff(prisoner);
             else
                 _cuffedByWarden.Remove(prisonerSteamId);
+        }
+    }
+
+    public void CleanupPlayer(IPlayer player)
+    {
+        CleanupPlayerKey(PlayerIdentity.GetKey(player));
+    }
+
+    private void CleanupPlayerKey(ulong playerKey)
+    {
+        _wardenTaserOwners.Remove(playerKey);
+        _mouse2HeldWardens.Remove(playerKey);
+        _grabbedByWarden.Remove(playerKey);
+
+        if (_cuffedByWarden.ContainsKey(playerKey))
+            _cuffedByWarden.Remove(playerKey);
+
+        foreach (var prisonerKey in _cuffedByWarden
+                     .Where(x => x.Value == playerKey)
+                     .Select(x => x.Key)
+                     .ToList())
+        {
+            var prisoner = FindPlayerByKey(prisonerKey);
+            if (prisoner != null)
+                Uncuff(prisoner);
+            else
+                _cuffedByWarden.Remove(prisonerKey);
         }
     }
 
@@ -138,13 +167,12 @@ public sealed class CuffsManager
 
         if (!e.Pressed)
         {
-            _mouse2HeldWardens.Remove(player.SteamID);
-            _grabbedByWarden.Remove(player.SteamID);
+            ReleaseGrab(GetPlayerKey(player));
             return;
         }
 
         if (player.IsWarden)
-            _mouse2HeldWardens.Add(player.SteamID);
+            _mouse2HeldWardens.Add(GetPlayerKey(player));
     }
 
     private void OnTick()
@@ -160,27 +188,27 @@ public sealed class CuffsManager
         foreach (var prisoner in _players.GetAllPlayers().Where(p => p.IsCuffed))
             PlayerUtils.FreezeVelocity(prisoner.Player, new Color(0, 255, 0, 255));
 
-        foreach (var wardenSteamId in _mouse2HeldWardens.ToList())
+        foreach (var wardenKey in _mouse2HeldWardens.ToList())
         {
-            var warden = _players.GetAllPlayers().FirstOrDefault(p => p.SteamID == wardenSteamId);
+            var warden = FindPlayerByKey(wardenKey);
             if (warden == null || !warden.IsWarden || !warden.Player.IsValid || !warden.Player.IsAlive)
             {
-                ReleaseGrab(wardenSteamId);
+                ReleaseGrab(wardenKey);
                 continue;
             }
 
             if ((warden.Player.PressedButtons & GameButtonFlags.Mouse2) == 0)
             {
-                ReleaseGrab(wardenSteamId);
+                ReleaseGrab(wardenKey);
                 continue;
             }
 
-            if (_grabbedByWarden.TryGetValue(wardenSteamId, out var grabbedSteamId))
+            if (_grabbedByWarden.TryGetValue(wardenKey, out var grabbedKey))
             {
-                var grabbed = _players.GetAllPlayers().FirstOrDefault(p => p.SteamID == grabbedSteamId);
+                var grabbed = FindPlayerByKey(grabbedKey);
                 if (grabbed == null || !grabbed.IsCuffed || !grabbed.Player.IsAlive)
                 {
-                    _grabbedByWarden.Remove(wardenSteamId);
+                    _grabbedByWarden.Remove(wardenKey);
                     continue;
                 }
 
@@ -192,7 +220,7 @@ public sealed class CuffsManager
             if (target == null)
                 continue;
 
-            _grabbedByWarden[wardenSteamId] = target.SteamID;
+            _grabbedByWarden[wardenKey] = GetPlayerKey(target);
             MoveGrabbedPrisoner(warden, target);
         }
     }
@@ -276,7 +304,7 @@ public sealed class CuffsManager
     private void Cuff(IJBPlayer prisoner, IJBPlayer warden)
     {
         prisoner.IsCuffed = true;
-        _cuffedByWarden[prisoner.SteamID] = warden.SteamID;
+        _cuffedByWarden[GetPlayerKey(prisoner)] = GetPlayerKey(warden);
 
         PlayerUtils.FreezeVelocity(prisoner.Player, new Color(0, 255, 0, 255));
     }
@@ -284,9 +312,10 @@ public sealed class CuffsManager
     private void Uncuff(IJBPlayer prisoner)
     {
         prisoner.IsCuffed = false;
-        _cuffedByWarden.Remove(prisoner.SteamID);
+        var prisonerKey = GetPlayerKey(prisoner);
+        _cuffedByWarden.Remove(prisonerKey);
 
-        foreach (var pair in _grabbedByWarden.Where(x => x.Value == prisoner.SteamID).ToList())
+        foreach (var pair in _grabbedByWarden.Where(x => x.Value == prisonerKey).ToList())
             _grabbedByWarden.Remove(pair.Key);
 
         var color = prisoner.IsRebel
@@ -298,7 +327,7 @@ public sealed class CuffsManager
 
     private bool IsTaserDamage(IJBPlayer attacker, CTakeDamageInfo info)
     {
-        if (!_wardenTaserOwners.Contains(attacker.SteamID))
+        if (!_wardenTaserOwners.Contains(GetPlayerKey(attacker)))
             return false;
 
         var ability = info.Ability.Value;
@@ -415,10 +444,10 @@ public sealed class CuffsManager
         return origin + new Vector(0, 0, 64);
     }
 
-    private void ReleaseGrab(ulong wardenSteamId)
+    private void ReleaseGrab(ulong wardenKey)
     {
-        _mouse2HeldWardens.Remove(wardenSteamId);
-        _grabbedByWarden.Remove(wardenSteamId);
+        _mouse2HeldWardens.Remove(wardenKey);
+        _grabbedByWarden.Remove(wardenKey);
     }
 
     private IPlayer? GetPlayerFromEntity(CEntityInstance entity)
@@ -426,23 +455,26 @@ public sealed class CuffsManager
         var pawn = entity.As<CCSPlayerPawn>();
         if (pawn.IsValid)
         {
+            var playerFromPawn = _core.PlayerManager.GetPlayerFromPawn(pawn);
+            if (playerFromPawn != null)
+                return playerFromPawn;
+
             var player = pawn.ToPlayer();
             if (player != null)
                 return player;
         }
 
-        return GetPlayerFromEntityAddress(entity.Address);
+        return null;
     }
 
-    private IPlayer? GetPlayerFromEntityAddress(nint address)
+    private IJBPlayer? FindPlayerByKey(ulong playerKey)
     {
-        foreach (var player in _core.PlayerManager.GetAllPlayers())
-        {
-            if (player.PlayerPawn?.Address == address)
-                return player;
-        }
+        return _players.GetAllPlayers().FirstOrDefault(p => GetPlayerKey(p) == playerKey);
+    }
 
-        return null;
+    private static ulong GetPlayerKey(IJBPlayer player)
+    {
+        return PlayerIdentity.GetKey(player.Player);
     }
 
     private void Unhook(ref Guid? hookId)

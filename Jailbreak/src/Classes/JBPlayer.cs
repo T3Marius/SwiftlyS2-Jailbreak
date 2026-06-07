@@ -13,6 +13,7 @@ public sealed class JBPlayer : IJBPlayer
     private readonly ISwiftlyCore _core;
     private readonly ModelsConfig _modelsConfig;
     private readonly IconManager  _iconManager;
+    private bool _usesSteamLookup;
 
     public IPlayer Player => GetLivePlayer() ?? _player;
     public ulong SteamID { get; }
@@ -38,6 +39,7 @@ public sealed class JBPlayer : IJBPlayer
     {
         _player = player;
         SteamID = player.SteamID;
+        _usesSteamLookup = PlayerIdentity.UsesSteamKey(player);
         _core = core;
         _modelsConfig = modelsConfig.Value;
         _iconManager = iconManager;
@@ -46,6 +48,7 @@ public sealed class JBPlayer : IJBPlayer
     internal void RefreshPlayer(IPlayer player)
     {
         _player = player;
+        _usesSteamLookup = PlayerIdentity.UsesSteamKey(player);
     }
 
     public void SetWarden(bool state, string? offReason = null, string? killerName = null, bool silent = false)
@@ -239,6 +242,9 @@ public sealed class JBPlayer : IJBPlayer
         {
             if (_player.IsValid)
                 return _player;
+
+            if (!_usesSteamLookup)
+                return null;
 
             var livePlayer = _core.PlayerManager.GetPlayerFromSteamId(SteamID);
             if (livePlayer is not { IsValid: true })

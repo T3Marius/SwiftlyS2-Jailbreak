@@ -85,11 +85,11 @@ public sealed class BoxManager
         if (attackerPawn.Value == null)
             return;
         
-        var attacker = attackerPawn.Value.ToPlayer();
+        var attacker = _core.PlayerManager.GetPlayerFromPawn(attackerPawn.Value) ?? attackerPawn.Value.ToPlayer();
         if (attacker == null)
             return;
         
-        var victim = GetPlayerFromEntityAddress(e.Entity.Address);
+        var victim = GetPlayerFromEntity(e.Entity);
         if (victim == null)
             return;
 
@@ -99,13 +99,11 @@ public sealed class BoxManager
             e.Result = HookResult.Stop;
         }
     }
-    private IPlayer? GetPlayerFromEntityAddress(nint addres)
+    private IPlayer? GetPlayerFromEntity(SwiftlyS2.Shared.SchemaDefinitions.CEntityInstance entity)
     {
-        foreach (var player in _core.PlayerManager.GetAllPlayers())
-        {
-            if (player.PlayerPawn?.Address == addres)
-                return player;
-        }
+        var pawn = entity.As<SwiftlyS2.Shared.SchemaDefinitions.CCSPlayerPawn>();
+        if (pawn.IsValid)
+            return _core.PlayerManager.GetPlayerFromPawn(pawn) ?? pawn.ToPlayer();
 
         return null;
     }
