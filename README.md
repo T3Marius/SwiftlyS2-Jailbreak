@@ -64,6 +64,7 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 | Day | Module | Settings |
 | --- | --- | --- |
 | Knife Fight | `Modules/SpecialDays` | Knives only, no guns menu, no countdown freeze, friendly fire enabled. |
+| Free For All | `Modules/SpecialDays` | Everyone is on his own. Player uses !sguns to select their desier guns. |
 
 ### Current Last Requests
 
