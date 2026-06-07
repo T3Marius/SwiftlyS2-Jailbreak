@@ -1,6 +1,8 @@
 using Jailbreak.Contract;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Events;
+using SwiftlyS2.Shared.GameEventDefinitions;
+using SwiftlyS2.Shared.GameEvents;
 using SwiftlyS2.Shared.Misc;
 using SwiftlyS2.Shared.Natives;
 using SwiftlyS2.Shared.Players;
@@ -19,7 +21,6 @@ public sealed class DrawManager
     private const float SurfaceOffset = 1.5f;
     private const float BeamWidth = 3.4f;
     private const float JointCapRadius = 2.8f;
-    private const int MaxSegmentsPerPlayer = 1200;
 
     private readonly ISwiftlyCore _core;
     private readonly IJBPlayerManagement _players;
@@ -29,6 +30,7 @@ public sealed class DrawManager
     private readonly HashSet<ulong> _enabled = [];
     private readonly HashSet<ulong> _holdingMouse2 = [];
     private readonly Dictionary<ulong, DrawState> _states = [];
+    private Guid? _roundEndHookId;
 
     public DrawManager(
         ISwiftlyCore core,
@@ -48,6 +50,7 @@ public sealed class DrawManager
         _core.Event.OnClientKeyStateChanged += OnClientKeyStateChanged;
         _core.Event.OnTick += OnTick;
         _core.Event.OnMapUnload += OnMapUnload;
+        _roundEndHookId = _core.GameEvent.HookPost<EventRoundEnd>(OnRoundEnd);
     }
 
     public void Unregister()
@@ -55,6 +58,7 @@ public sealed class DrawManager
         _core.Event.OnClientKeyStateChanged -= OnClientKeyStateChanged;
         _core.Event.OnTick -= OnTick;
         _core.Event.OnMapUnload -= OnMapUnload;
+        Unhook(ref _roundEndHookId);
         CleanupAll();
     }
 
@@ -151,6 +155,12 @@ public sealed class DrawManager
         CleanupAll();
     }
 
+    private HookResult OnRoundEnd(EventRoundEnd e)
+    {
+        CleanupAll();
+        return HookResult.Continue;
+    }
+
     private bool CanDraw(IJBPlayer? player)
     {
         return player != null
@@ -221,7 +231,6 @@ public sealed class DrawManager
     private void CreateBeam(ulong playerKey, Vector start, Vector end, Color color, float width)
     {
         var state = GetState(playerKey);
-        PruneOldestSegments(state);
 
         var beam = _core.EntitySystem.CreateEntity<CBeam>();
         beam.DispatchSpawn();
@@ -279,17 +288,6 @@ public sealed class DrawManager
         beam.RenderModeUpdated();
         beam.RenderFXUpdated();
         beam.RenderUpdated();
-    }
-
-    private static void PruneOldestSegments(DrawState state)
-    {
-        while (state.Segments.Count >= MaxSegmentsPerPlayer)
-        {
-            var oldest = state.Segments.Dequeue();
-            var oldBeam = oldest.Value;
-            if (oldBeam?.IsValid == true)
-                oldBeam.Despawn();
-        }
     }
 
     private static (Vector AxisA, Vector AxisB) GetSurfaceAxes(Vector normal)
@@ -428,6 +426,15 @@ public sealed class DrawManager
         var dy = a.Y - b.Y;
         var dz = a.Z - b.Z;
         return MathF.Sqrt((dx * dx) + (dy * dy) + (dz * dz));
+    }
+
+    private void Unhook(ref Guid? hookId)
+    {
+        if (!hookId.HasValue)
+            return;
+
+        _core.GameEvent.Unhook(hookId.Value);
+        hookId = null;
     }
 
     private static Color ColorFromHue(float hue, byte alpha)

@@ -20,11 +20,14 @@ public sealed class CuffsManager
     private readonly DrawManager         _drawManager;
 
     private const string CuffWeapon   = "weapon_taser";
-    private const float GrabDistance  = 110.0f;
+    private const float DefaultGrabDistance = 110.0f;
+    private const float MaxGrabDistance = 280.0f;
+    private const float GrabDistanceStep = 4.0f;
     private const float TraceDistance = 350.0f;
 
     private readonly Dictionary<ulong, ulong> _cuffedByWarden    = [];
     private readonly Dictionary<ulong, ulong> _grabbedByWarden   = [];
+    private readonly Dictionary<ulong, float> _grabDistances     = [];
     private readonly HashSet<ulong>           _wardenTaserOwners = [];
     private readonly HashSet<ulong>           _mouse2HeldWardens = [];
     private Guid? _weaponFireHookId;
@@ -77,6 +80,7 @@ public sealed class CuffsManager
         _wardenTaserOwners.Remove(wardenKey);
         _mouse2HeldWardens.Remove(wardenKey);
         _grabbedByWarden.Remove(wardenKey);
+        _grabDistances.Remove(wardenKey);
 
         foreach (var prisonerKey in _cuffedByWarden
                     .Where(x => x.Value == wardenKey)
@@ -96,6 +100,7 @@ public sealed class CuffsManager
         _wardenTaserOwners.Remove(steamId);
         _mouse2HeldWardens.Remove(steamId);
         _grabbedByWarden.Remove(steamId);
+        _grabDistances.Remove(steamId);
 
         if (_cuffedByWarden.ContainsKey(steamId))
             _cuffedByWarden.Remove(steamId);
@@ -123,6 +128,7 @@ public sealed class CuffsManager
         _wardenTaserOwners.Remove(playerKey);
         _mouse2HeldWardens.Remove(playerKey);
         _grabbedByWarden.Remove(playerKey);
+        _grabDistances.Remove(playerKey);
 
         if (_cuffedByWarden.ContainsKey(playerKey))
             _cuffedByWarden.Remove(playerKey);
@@ -147,6 +153,7 @@ public sealed class CuffsManager
 
         _cuffedByWarden.Clear();
         _grabbedByWarden.Clear();
+        _grabDistances.Clear();
         _wardenTaserOwners.Clear();
         _mouse2HeldWardens.Clear();
     }
@@ -220,7 +227,7 @@ public sealed class CuffsManager
                     continue;
                 }
 
-                MoveGrabbedPrisoner(warden, grabbed);
+                MoveGrabbedPrisoner(wardenKey, warden, grabbed);
                 continue;
             }
 
@@ -229,7 +236,8 @@ public sealed class CuffsManager
                 continue;
 
             _grabbedByWarden[wardenKey] = GetPlayerKey(target);
-            MoveGrabbedPrisoner(warden, target);
+            _grabDistances[wardenKey] = DefaultGrabDistance;
+            MoveGrabbedPrisoner(wardenKey, warden, target);
         }
     }
 
@@ -428,7 +436,7 @@ public sealed class CuffsManager
         return target;
     }
 
-    private void MoveGrabbedPrisoner(IJBPlayer warden, IJBPlayer prisoner)
+    private void MoveGrabbedPrisoner(ulong wardenKey, IJBPlayer warden, IJBPlayer prisoner)
     {
         var pawn = warden.Player.PlayerPawn;
         if (pawn == null || !pawn.IsValid)
@@ -436,14 +444,28 @@ public sealed class CuffsManager
 
         pawn.EyeAngles.ToDirectionVectors(out var forward, out _, out _);
 
+        var distance = UpdateGrabDistance(wardenKey, warden.Player.PressedButtons);
         var start = GetEyePosition(warden.Player);
         var pos = start + new Vector(
-            forward.X * GrabDistance,
-            forward.Y * GrabDistance,
-            forward.Z * GrabDistance - 35.0f
+            forward.X * distance,
+            forward.Y * distance,
+            forward.Z * distance - 35.0f
         );
 
         prisoner.Player.Teleport(pos: pos, velocity: Vector.Zero);
+    }
+
+    private float UpdateGrabDistance(ulong wardenKey, GameButtonFlags buttons)
+    {
+        var distance = _grabDistances.GetValueOrDefault(wardenKey, DefaultGrabDistance);
+
+        if ((buttons & GameButtonFlags.Mouse1) != 0)
+            distance = Math.Min(MaxGrabDistance, distance + GrabDistanceStep);
+        else if ((buttons & GameButtonFlags.Mouse2) != 0)
+            distance = Math.Max(DefaultGrabDistance, distance - GrabDistanceStep);
+
+        _grabDistances[wardenKey] = distance;
+        return distance;
     }
 
     private Vector GetEyePosition(IPlayer player)
@@ -456,6 +478,7 @@ public sealed class CuffsManager
     {
         _mouse2HeldWardens.Remove(wardenKey);
         _grabbedByWarden.Remove(wardenKey);
+        _grabDistances.Remove(wardenKey);
     }
 
     private IPlayer? GetPlayerFromEntity(CEntityInstance entity)
