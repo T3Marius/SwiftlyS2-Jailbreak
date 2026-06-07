@@ -208,3 +208,7 @@ Releases are created from tags through `.github/workflows/release.yml`.
 <a href="https://buymeacoffee.com/t3marius" target="_blank">
   <img
     src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png"
+    alt="Buy Me A Coffee"
+    height="60"
+  />
+</a>
