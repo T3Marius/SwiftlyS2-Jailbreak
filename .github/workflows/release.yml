@@ -1,0 +1,158 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release, for example v0.1.0-beta.1 or v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.tag }}"
+            git fetch --force --tags
+            git checkout "refs/tags/${tag}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+
+          if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag '${tag}' is not a supported release tag."
+            echo "Use vX.Y.Z for stable releases or vX.Y.Z-beta.N for beta prereleases."
+            exit 1
+          fi
+
+          prerelease=false
+          release_kind="Stable"
+          if [[ "${tag}" == *-* ]]; then
+            prerelease=true
+            release_kind="Beta"
+          fi
+
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          echo "prerelease=${prerelease}" >> "${GITHUB_OUTPUT}"
+          echo "release_kind=${release_kind}" >> "${GITHUB_OUTPUT}"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore Jailbreak.slnx
+
+      - name: Build
+        run: dotnet build Jailbreak.slnx --configuration Release --no-restore
+
+      - name: Package plugins
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="${{ steps.tag.outputs.tag }}"
+          package_name="SwiftlyS2-Jailbreak-${tag}.zip"
+
+          if [[ ! -d "build/plugins" ]]; then
+            echo "Expected build/plugins to exist after build."
+            exit 1
+          fi
+
+          (
+            cd build
+            zip -r "../${package_name}" plugins
+          )
+
+          echo "package_name=${package_name}" >> "${GITHUB_OUTPUT}"
+
+      - name: Generate release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="${{ steps.tag.outputs.tag }}"
+          prerelease="${{ steps.tag.outputs.prerelease }}"
+          release_kind="${{ steps.tag.outputs.release_kind }}"
+          repo_url="${{ github.server_url }}/${{ github.repository }}"
+
+          current_commit="$(git rev-list -n 1 "${tag}")"
+
+          previous_tag=""
+          if [[ "${prerelease}" == "true" ]]; then
+            previous_tag="$(git describe --tags --abbrev=0 "${current_commit}^" 2>/dev/null || true)"
+          else
+            previous_tag="$(
+              git tag --merged "${current_commit}" --sort=-v:refname \
+                | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+                | grep -v "^${tag}$" \
+                | head -n 1 || true
+            )"
+          fi
+
+          {
+            echo "# Jailbreak ${tag}"
+            echo
+            echo "**Release type:** ${release_kind}"
+            echo
+
+            if [[ -n "${previous_tag}" ]]; then
+              echo "**Changes since:** ${previous_tag}"
+              range="${previous_tag}..${tag}"
+            else
+              echo "**Changes since:** first release"
+              range="${tag}"
+            fi
+
+            echo
+            echo "## Commits"
+            echo
+
+            if [[ -n "${previous_tag}" ]]; then
+              commit_count="$(git rev-list --count "${range}")"
+            else
+              commit_count="$(git rev-list --count "${tag}")"
+            fi
+
+            if [[ "${commit_count}" == "0" ]]; then
+              echo "- No commits since the previous release."
+            else
+              git log --reverse --format='%H%x09%s' "${range}" | while IFS=$'\t' read -r hash subject; do
+                short_hash="${hash:0:7}"
+                echo "- ${subject} ([${short_hash}](${repo_url}/commit/${hash}))"
+              done
+            fi
+          } > release-notes.md
+
+          cat release-notes.md
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Jailbreak ${{ steps.tag.outputs.tag }}
+          body_path: release-notes.md
+          prerelease: ${{ steps.tag.outputs.prerelease }}
+          files: ${{ steps.package.outputs.package_name }}
