@@ -60,6 +60,7 @@ public sealed class WardenMenu
         AddSubmenu(builder, player, "warden_menu_option.toggle_voice", () => VoiceSubmenu(player));
         AddSubmenu(builder, player, "warden_menu_option.manage_deputy", () => DeputySubmenu(player));
         AddSubmenu(builder, player, "warden_menu_option.manage_freeday", () => FreedaySubmenu(player));
+        AddSubmenu(builder, player, "warden_menu_option.color_prisoners", () => ColorPrisonersSubmenu(player));
         AddSubmenu(builder, player, "warden_menu_option.special_days", () => SpecialDaysSubmenu(player));
         AddSubmenu(builder, player, "warden_menu_option.visual_management", () => VisualManagementSubmenu(player));
 
@@ -247,6 +248,79 @@ public sealed class WardenMenu
         AddSubmenu(builder, player, "freeday_submenu_option.remove_freeday", () => RemoveFreedaySubmenu(player));
 
         return builder.Build();
+    }
+
+    private IMenuAPI ColorPrisonersSubmenu(IJBPlayer player)
+    {
+        var builder = CreateBuilder(player, "color_prisoners_submenu.title");
+        var prisoners = GetColorablePrisoners().ToList();
+
+        AddSubmenu(builder, player, "color_prisoners_submenu_option.all_prisoners", () => PrisonerColorSelectionSubmenu(
+            player,
+            player.Localizer["color_prisoners_target.all_prisoners"],
+            () => GetColorablePrisoners()));
+
+        if (prisoners.Count == 0)
+        {
+            builder.AddOption(new TextMenuOption(player.Localizer["color_prisoners_submenu_option.no_prisoners"]));
+            return builder.Build();
+        }
+
+        foreach (var prisoner in prisoners)
+        {
+            AddSubmenu(builder, prisoner.Player.Name, () => PrisonerColorSelectionSubmenu(
+                player,
+                prisoner.Player.Name,
+                () => IsColorablePrisoner(prisoner) ? [prisoner] : []));
+        }
+
+        return builder.Build();
+    }
+
+    private IMenuAPI PrisonerColorSelectionSubmenu(IJBPlayer player, string targetName, Func<IEnumerable<IJBPlayer>> targets)
+    {
+        var builder = _core.MenusAPI.CreateBuilder().Design
+            .SetMenuTitle(player.Localizer["color_prisoners_colors_submenu.title", targetName]);
+
+        foreach (var choice in ColorChoices)
+        {
+            AddButton(builder, player.Localizer[choice.LocalizerKey], () =>
+            {
+                _core.Scheduler.NextWorldUpdate(() =>
+                {
+                    if (BlockDuringSpecialDay(player))
+                        return;
+
+                    var colored = 0;
+                    foreach (var prisoner in targets().Where(IsColorablePrisoner))
+                    {
+                        PlayerUtils.Color(prisoner.Player, choice.Color, _core.Scheduler);
+                        colored++;
+                    }
+
+                    player.SendMessage(MessageType.Chat, "color_prisoners_colored", true, args: [colored, player.Localizer[choice.LocalizerKey]]);
+                });
+            });
+        }
+
+        return builder.Build();
+    }
+
+    private IEnumerable<IJBPlayer> GetColorablePrisoners()
+    {
+        return _players.GetPlayersByTeam(JBTeam.Prisoner)
+            .Where(IsColorablePrisoner)
+            .OrderBy(prisoner => prisoner.Player.Name)
+            .ToList();
+    }
+
+    private static bool IsColorablePrisoner(IJBPlayer prisoner)
+    {
+        return prisoner.Player.IsValid
+            && prisoner.Player.IsAlive
+            && prisoner.Team == JBTeam.Prisoner
+            && !prisoner.IsRebel
+            && !prisoner.IsFreeday;
     }
 
     private IMenuAPI GiveFreedaySubmenu(IJBPlayer player)
@@ -559,6 +633,11 @@ public sealed class WardenMenu
     private static void AddSubmenu(IMenuBuilderAPI builder, IJBPlayer player, string labelKey, Func<IMenuAPI> submenu)
     {
         builder.AddOption(new SubmenuMenuOption(player.Localizer[labelKey], submenu));
+    }
+
+    private static void AddSubmenu(IMenuBuilderAPI builder, string label, Func<IMenuAPI> submenu)
+    {
+        builder.AddOption(new SubmenuMenuOption(label, submenu));
     }
 
     private static void AddDynamicSubmenu(IMenuBuilderAPI builder, Func<string> label, Func<IMenuAPI> submenu)
