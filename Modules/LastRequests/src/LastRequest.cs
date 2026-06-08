@@ -18,7 +18,7 @@ namespace LastRequests;
     Author = "T3Marius",
     Name = "[JB Core] LastRequests",
     Id = "LastRequests",
-    Version = "1.0.0"
+    Version = "0.1.0"
 )]
 public sealed class Main : BasePlugin
 {
