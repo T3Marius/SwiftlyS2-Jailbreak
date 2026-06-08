@@ -226,6 +226,7 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [ ] Add broader drawing cleanup/management options.
 - [ ] Add speaking icon to whomever is speaking
 - [ ] Add gameplay sounds (Warden set, Rebel set, etc)
+- [ ] Add warden tag (both chat and scoreboard)
 - [ ] Add more TODO items.
 
 ## ☕ If you'd like to support me! Any donation is deeply appreciated.
