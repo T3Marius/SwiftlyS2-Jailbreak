@@ -27,6 +27,7 @@ public sealed class DrawManager
     private readonly SpecialDayManager _specialDayManager;
     private readonly WardenDatabase _wardenDatabase;
     private readonly TraceParams _drawTraceParams;
+    private readonly HashSet<ulong> _drawAccess = [];
     private readonly HashSet<ulong> _enabled = [];
     private readonly HashSet<ulong> _holdingMouse2 = [];
     private readonly Dictionary<ulong, DrawState> _states = [];
@@ -64,6 +65,9 @@ public sealed class DrawManager
 
     public bool ToggleDrawing(IJBPlayer player)
     {
+        if (!CanUseDrawing(player))
+            return false;
+
         var playerKey = GetPlayerKey(player);
         if (_enabled.Remove(playerKey))
         {
@@ -76,6 +80,46 @@ public sealed class DrawManager
         return true;
     }
 
+    public bool CanUseDrawing(IJBPlayer player)
+    {
+        return player.IsWarden
+            || (HasDrawAccess(player)
+                && player.Team == JBTeam.Prisoner
+                && !player.IsRebel
+                && !player.IsFreeday);
+    }
+
+    public bool HasDrawAccess(IJBPlayer player)
+    {
+        return _drawAccess.Contains(GetPlayerKey(player));
+    }
+
+    public void GrantDrawAccess(IJBPlayer player)
+    {
+        _drawAccess.Add(GetPlayerKey(player));
+    }
+
+    public void RevokeDrawAccess(IJBPlayer player)
+    {
+        var playerKey = GetPlayerKey(player);
+        _drawAccess.Remove(playerKey);
+        _enabled.Remove(playerKey);
+        _holdingMouse2.Remove(playerKey);
+        ResetStroke(playerKey);
+    }
+
+    public void ClearRoundAccess()
+    {
+        foreach (var playerKey in _drawAccess.ToList())
+        {
+            _enabled.Remove(playerKey);
+            _holdingMouse2.Remove(playerKey);
+            ResetStroke(playerKey);
+        }
+
+        _drawAccess.Clear();
+    }
+
     public bool IsDrawingEnabled(IJBPlayer player)
     {
         return _enabled.Contains(GetPlayerKey(player));
@@ -85,6 +129,7 @@ public sealed class DrawManager
     {
         var playerKey = PlayerIdentity.GetKey(player);
         _enabled.Remove(playerKey);
+        _drawAccess.Remove(playerKey);
         _holdingMouse2.Remove(playerKey);
         RemoveSegments(playerKey);
         _states.Remove(playerKey);
@@ -96,6 +141,7 @@ public sealed class DrawManager
             RemoveSegments(playerKey);
 
         _enabled.Clear();
+        _drawAccess.Clear();
         _holdingMouse2.Clear();
         _states.Clear();
     }
@@ -166,7 +212,7 @@ public sealed class DrawManager
         return player != null
             && _enabled.Contains(GetPlayerKey(player))
             && !_specialDayManager.IsSpecialDayActive
-            && player.IsWarden
+            && CanUseDrawing(player)
             && player.Player.IsValid
             && player.Player.IsAlive
             && player.Player.PlayerPawn?.IsValid == true;
@@ -247,6 +293,26 @@ public sealed class DrawManager
         var playerKey = GetPlayerKey(player);
         RemoveSegments(playerKey);
         ResetStroke(playerKey);
+    }
+
+    public int ClearAllDrawings()
+    {
+        var cleared = 0;
+        foreach (var playerKey in _states.Keys.ToList())
+        {
+            if (RemoveSegments(playerKey))
+                cleared++;
+
+            ResetStroke(playerKey);
+        }
+
+        return cleared;
+    }
+
+    public bool HasDrawing(IJBPlayer player)
+    {
+        var playerKey = GetPlayerKey(player);
+        return _states.TryGetValue(playerKey, out var state) && state.Segments.Count > 0;
     }
 
     private Color GetDrawColor(IJBPlayer player)
@@ -394,20 +460,26 @@ public sealed class DrawManager
             state.LastPoint = null;
     }
 
-    private void RemoveSegments(ulong playerKey)
+    private bool RemoveSegments(ulong playerKey)
     {
         if (!_states.TryGetValue(playerKey, out var state))
-            return;
+            return false;
+
+        var removed = false;
 
         foreach (var segment in state.Segments)
         {
             var beam = segment.Value;
             if (beam?.IsValid == true)
+            {
                 beam.Despawn();
+                removed = true;
+            }
         }
 
         state.Segments.Clear();
         state.LastPoint = null;
+        return removed;
     }
 
     private IJBPlayer? FindPlayerByKey(ulong playerKey)

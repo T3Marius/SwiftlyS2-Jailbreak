@@ -27,6 +27,6 @@ public sealed class WardenCommandsCfg
     public List<string> ToggleCells { get; set; } = ["cells", "c"];
     public List<string> ToggleDraw { get; set; } = ["draw"];
     public List<string> DrawColor { get; set; } = ["drawcolor"];
-    public List<string> DrawClear { get; set; } = ["drawclear"];
+    public List<string> DrawClear { get; set; } = ["drawclear", "cleardraw"];
     public List<string> GuardGuns { get; set; } = ["guns"];
 }

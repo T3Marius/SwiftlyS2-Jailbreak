@@ -95,6 +95,8 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 - Laser and ping colors support normal colors and rainbow mode.
 - Visual color preferences are saved per warden in the database and cached for performance.
 - Warden drawing mode can be toggled with `!draw` and draws smoothed persistent CBeam strokes while holding Mouse2.
+- Warden can grant temporary prisoner drawing access from the menu; access is cleared on round start.
+- Warden can clean up all drawings, their own drawings, or a specific prisoner's drawings from the menu.
 
 ## Commands
 
@@ -111,7 +113,7 @@ All warden command aliases are configurable in `warden.toml`.
 | ToggleCells | `!cells`, `!c` | Open or close cells. |
 | ToggleDraw | `!draw` | Toggle warden drawing mode. |
 | DrawColor | `!drawcolor` | Open the drawing color menu. |
-| DrawClear | `!drawclear` | Clear your own drawings. |
+| DrawClear | `!drawclear`, `!cleardraw` | Clear your own drawings. |
 | GuardGuns | `!guns` | Open the guard guns menu. |
 | SpecialGuns | `!sguns` | Open the active Special Day guns menu when enabled. |
 | Surrender | `!s`, `!surrender` | Request rebel surrender from the warden. |
@@ -131,6 +133,8 @@ Opened with `!wmenu`.
   - Laser Color
   - Ping Color
   - Draw Color
+  - Prisoner Draw Access
+  - Drawing Cleanup
 
 ## Required Workshop Addon
 
@@ -237,10 +241,10 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [x] Add warden drawing mode.
 - [x] Add drawing color selection.
 - [x] Add drawing cleanup command.
-- [ ] Add broader drawing cleanup/management options.
+- [x] Add broader drawing cleanup/management options.
 - [x] Add gameplay sounds for warden, rebels, cuffs, and Last Requests.
 - [x] Add warden tag (both chat and scoreboard).
-- [ ] Add warden ability to gave prisoners draw accces.
+- [x] Add warden ability to give prisoners draw access.
 - [ ] Add more TODO items.
 
 ## ☕ If you'd like to support me! Any donation is deeply appreciated.

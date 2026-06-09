@@ -16,6 +16,7 @@ public sealed class WardenMenu
     private readonly WardenDatabase _wardenDatabase;
     private readonly SpecialDayManager _specialDayManager;
     private readonly LastRequestManager _lastRequestManager;
+    private readonly DrawManager _drawManager;
 
     private static readonly ColorChoice[] ColorChoices =
     [
@@ -35,7 +36,8 @@ public sealed class WardenMenu
         IJBPlayerManagement players,
         WardenDatabase wardenDatabase,
         SpecialDayManager specialDayManager,
-        LastRequestManager lastRequestManager)
+        LastRequestManager lastRequestManager,
+        DrawManager drawManager)
     {
         _core = core;
         _cellManager = cellManager;
@@ -44,6 +46,7 @@ public sealed class WardenMenu
         _wardenDatabase = wardenDatabase;
         _specialDayManager = specialDayManager;
         _lastRequestManager = lastRequestManager;
+        _drawManager = drawManager;
     }
 
     // ─── Root ────────────────────────────────────────────────────────────────
@@ -181,6 +184,123 @@ public sealed class WardenMenu
             builder,
             () => player.Localizer["visual_management_submenu_option.draw_color_current", GetSelectedDrawColorName(player)],
             () => DrawColorSubmenu(player));
+
+        AddSubmenu(builder, player, "visual_management_submenu_option.draw_access", () => DrawAccessSubmenu(player));
+        AddSubmenu(builder, player, "visual_management_submenu_option.draw_cleanup", () => DrawCleanupSubmenu(player));
+
+        return builder.Build();
+    }
+
+    private IMenuAPI DrawCleanupSubmenu(IJBPlayer player)
+    {
+        var builder = CreateBuilder(player, "draw_cleanup_submenu.title");
+
+        AddButton(builder, player.Localizer["draw_cleanup_submenu_option.clear_all"], () =>
+        {
+            _core.Scheduler.NextWorldUpdate(() =>
+            {
+                if (BlockDuringSpecialDay(player))
+                    return;
+
+                var cleared = _drawManager.ClearAllDrawings();
+                _players.SendMessage(MessageType.Chat, "draw_cleanup_all_cleared", true, args: [player.Player.Name, cleared]);
+            });
+        });
+
+        AddButton(builder, player.Localizer["draw_cleanup_submenu_option.clear_mine"], () =>
+        {
+            _core.Scheduler.NextWorldUpdate(() =>
+            {
+                if (BlockDuringSpecialDay(player))
+                    return;
+
+                _drawManager.ClearDrawing(player);
+                player.SendMessage(MessageType.Chat, "draw_cleared", true);
+            });
+        });
+
+        AddSubmenu(builder, player, "draw_cleanup_submenu_option.clear_prisoner", () => DrawCleanupPrisonersSubmenu(player));
+
+        return builder.Build();
+    }
+
+    private IMenuAPI DrawCleanupPrisonersSubmenu(IJBPlayer player)
+    {
+        var builder = CreateBuilder(player, "draw_cleanup_prisoners_submenu.title");
+        var prisoners = _players.GetPlayersByTeam(JBTeam.Prisoner)
+            .Where(prisoner => prisoner.Player.IsValid)
+            .OrderBy(prisoner => prisoner.Player.Name)
+            .ToList();
+
+        if (prisoners.Count == 0)
+        {
+            builder.AddOption(new TextMenuOption(player.Localizer["draw_cleanup_prisoners_submenu_option.no_prisoners"]));
+            return builder.Build();
+        }
+
+        foreach (var prisoner in prisoners)
+        {
+            AddDynamicButton(builder, () =>
+            {
+                var state = player.Localizer[_drawManager.HasDrawing(prisoner) ? "menu_state.enabled" : "menu_state.none"];
+                return player.Localizer["draw_cleanup_prisoners_submenu_option.prisoner_state_label", prisoner.Player.Name, state];
+            }, () =>
+            {
+                _core.Scheduler.NextWorldUpdate(() =>
+                {
+                    if (BlockDuringSpecialDay(player))
+                        return;
+
+                    _drawManager.ClearDrawing(prisoner);
+                    player.SendMessage(MessageType.Chat, "draw_cleanup_prisoner_cleared", true, args: prisoner.Player.Name);
+                });
+            });
+        }
+
+        return builder.Build();
+    }
+
+    private IMenuAPI DrawAccessSubmenu(IJBPlayer player)
+    {
+        var builder = CreateBuilder(player, "draw_access_submenu.title");
+        var prisoners = GetDrawAccessPrisoners().ToList();
+
+        if (prisoners.Count == 0)
+        {
+            builder.AddOption(new TextMenuOption(player.Localizer["draw_access_submenu_option.no_prisoners"]));
+            return builder.Build();
+        }
+
+        foreach (var prisoner in prisoners)
+        {
+            AddDynamicButton(builder, () =>
+            {
+                var state = player.Localizer[_drawManager.HasDrawAccess(prisoner) ? "menu_state.enabled" : "menu_state.disabled"];
+                return player.Localizer["draw_access_submenu_option.prisoner_state_label", prisoner.Player.Name, state];
+            }, () =>
+            {
+                _core.Scheduler.NextWorldUpdate(() =>
+                {
+                    if (BlockDuringSpecialDay(player))
+                        return;
+
+                    if (!IsDrawAccessPrisoner(prisoner))
+                        return;
+
+                    if (_drawManager.HasDrawAccess(prisoner))
+                    {
+                        _drawManager.RevokeDrawAccess(prisoner);
+                        player.SendMessage(MessageType.Chat, "draw_access_revoked_warden", true, args: prisoner.Player.Name);
+                        prisoner.SendMessage(MessageType.Chat, "draw_access_revoked", true, args: player.Player.Name);
+                        return;
+                    }
+
+                    _drawManager.GrantDrawAccess(prisoner);
+                    player.SendMessage(MessageType.Chat, "draw_access_given_warden", true, args: prisoner.Player.Name);
+                    prisoner.SendMessage(MessageType.Chat, "draw_access_given", true, args: player.Player.Name);
+                });
+            });
+        }
 
         return builder.Build();
     }
@@ -345,6 +465,23 @@ public sealed class WardenMenu
     }
 
     private static bool IsColorablePrisoner(IJBPlayer prisoner)
+    {
+        return prisoner.Player.IsValid
+            && prisoner.Player.IsAlive
+            && prisoner.Team == JBTeam.Prisoner
+            && !prisoner.IsRebel
+            && !prisoner.IsFreeday;
+    }
+
+    private IEnumerable<IJBPlayer> GetDrawAccessPrisoners()
+    {
+        return _players.GetPlayersByTeam(JBTeam.Prisoner)
+            .Where(IsDrawAccessPrisoner)
+            .OrderBy(prisoner => prisoner.Player.Name)
+            .ToList();
+    }
+
+    private static bool IsDrawAccessPrisoner(IJBPlayer prisoner)
     {
         return prisoner.Player.IsValid
             && prisoner.Player.IsAlive

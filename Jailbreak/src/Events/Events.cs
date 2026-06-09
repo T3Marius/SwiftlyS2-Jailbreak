@@ -165,6 +165,7 @@ public sealed class Events
     private HookResult OnRoundStart(EventRoundStart e)
     {
         _isRoundEnding = false;
+        _drawManager.ClearRoundAccess();
 
         foreach (var p in _players.GetAllPlayers())
             p.WasUnmutedByWarden = false;
