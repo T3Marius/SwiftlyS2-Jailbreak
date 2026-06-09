@@ -245,6 +245,8 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [x] Add gameplay sounds for warden, rebels, cuffs, and Last Requests.
 - [x] Add warden tag (both chat and scoreboard).
 - [x] Add warden ability to give prisoners draw access.
+- [ ] Add queue system for the guardians team if full. (!q, !queue, !uq, !unqueue)
+- [ ] Add premium flag to queue system (automaticly in front of the list unlike normal players)
 - [ ] Add more TODO items.
 
 ## ☕ If you'd like to support me! Any donation is deeply appreciated.
