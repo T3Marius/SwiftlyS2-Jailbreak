@@ -22,6 +22,7 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 - Cuffs are given to the warden and cleaned up when warden is removed.
 - Warden can remove weapons by shooting them.
 - HUD center message shows the current warden and deputy.
+- Warden chat and scoreboard tags are applied while the role is active.
 
 ### Deputy System
 
@@ -224,9 +225,10 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [x] Add drawing color selection.
 - [x] Add drawing cleanup command.
 - [ ] Add broader drawing cleanup/management options.
-- [ ] Add speaking icon to whomever is speaking
-- [ ] Add gameplay sounds (Warden set, Rebel set, etc)
-- [ ] Add warden tag (both chat and scoreboard)
+- [ ] Add speaking icon to warden.
+- [ ] Add gameplay sounds (Warden set, Rebel set, etc).
+- [x] Add warden tag (both chat and scoreboard).
+- [ ] Add warden ability to gave prisoners draw accces.
 - [ ] Add more TODO items.
 
 ## ☕ If you'd like to support me! Any donation is deeply appreciated.
