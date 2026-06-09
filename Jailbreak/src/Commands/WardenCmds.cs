@@ -22,6 +22,7 @@ public sealed class WardenCommands
     private readonly DrawManager             _drawManager;
     private readonly SpecialDayManager       _specialDayManager;
     private readonly LastRequestManager      _lastRequestManager;
+    private readonly WardenTagManager        _wardenTagManager;
     private readonly ILogger<WardenCommands> _log;
 
     public WardenCommands(
@@ -35,6 +36,7 @@ public sealed class WardenCommands
         DrawManager drawManager,
         SpecialDayManager specialDayManager,
         LastRequestManager lastRequestManager,
+        WardenTagManager wardenTagManager,
         ILogger<WardenCommands> log)
     {
         _core    = core;
@@ -47,6 +49,7 @@ public sealed class WardenCommands
         _drawManager = drawManager;
         _specialDayManager = specialDayManager;
         _lastRequestManager = lastRequestManager;
+        _wardenTagManager = wardenTagManager;
         _log     = log;
     }
 
@@ -256,6 +259,7 @@ public sealed class WardenCommands
         player.SetWarden(true);
         if (player.IsWarden)
         {
+            _wardenTagManager.RefreshNow();
             _cuffsManager.OnWardenGive(player);
             player.SendMessage(MessageType.Chat, "you_are_new_warden", true);
         }
@@ -280,6 +284,7 @@ public sealed class WardenCommands
 
         _cuffsManager.OnWardenRemove(player);
         player.SetWarden(false, "giveup");
+        _wardenTagManager.RefreshNow();
     }
     private void WardenHelp(ICommandContext ctx)
     {

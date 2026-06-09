@@ -21,6 +21,7 @@ public sealed class Events
     private readonly SpecialDayManager   _specialDayManager;
     private readonly LastRequestManager  _lastRequestManager;
     private readonly GuardGunsManager    _guardGunsManager;
+    private readonly WardenTagManager    _wardenTagManager;
 
     /* ------------------- Configs ------------------- */
     private readonly WardenConfig        _wardenConfig;
@@ -56,6 +57,7 @@ public sealed class Events
         SpecialDayManager specialDayManager,
         LastRequestManager lastRequestManager,
         GuardGunsManager guardGunsManager,
+        WardenTagManager wardenTagManager,
         IOptions<WardenConfig> wardenConfig, 
         IOptions<ModelsConfig> modelsConfig, 
         IOptions<UtilsConfig> utilsConfig,
@@ -70,6 +72,7 @@ public sealed class Events
         _specialDayManager = specialDayManager;
         _lastRequestManager = lastRequestManager;
         _guardGunsManager = guardGunsManager;
+        _wardenTagManager = wardenTagManager;
         _wardenConfig = wardenConfig.Value;
         _modelsConfig = modelsConfig.Value;
         _utilsConfig = utilsConfig.Value;
@@ -224,6 +227,7 @@ public sealed class Events
         {
             _cuffsManager.OnWardenRemove(currentWarden);
             currentWarden.SetWarden(false, silent: true);
+            _wardenTagManager.RefreshNow();
         }
 
         var specialDayRound = _specialDayManager.HasQueuedOrActiveSpecialDay;
@@ -262,6 +266,7 @@ public sealed class Events
             selected.SetWarden(true);
             if (selected.IsWarden)
             {
+                _wardenTagManager.RefreshNow();
                 _cuffsManager.OnWardenGive(selected);
                 selected.SendMessage(MessageType.Chat, "you_are_new_warden", true);
             }
@@ -324,6 +329,7 @@ public sealed class Events
         {
             _cuffsManager.OnWardenRemove(currentWarden);
             currentWarden.SetWarden(false);
+            _wardenTagManager.RefreshNow();
         }
 
         _cuffsManager.CleanupAll();
@@ -354,6 +360,7 @@ public sealed class Events
         {
             _cuffsManager.OnWardenRemove(victim);
             victim.SetWarden(false, "killed", e.AttackerPlayer.Name);
+            _wardenTagManager.RefreshNow();
         }
 
         return HookResult.Continue;

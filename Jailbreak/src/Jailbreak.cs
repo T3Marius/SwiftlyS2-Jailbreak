@@ -11,7 +11,7 @@ namespace Jailbreak;
     Name = "Jailbreak",
     Id = "Jailbreak",
     Author = "Marius",
-    Version = "0.1.0-beta.5"
+    Version = "0.1.0-beta.6"
 )]
 public sealed class Main : BasePlugin
 {
@@ -62,6 +62,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<SpecialDayManager>()
                   .AddSingleton<LastRequestManager>()
                   .AddSingleton<GuardGunsManager>()
+                  .AddSingleton<WardenTagManager>()
                   .AddSingleton<GameConfig>()
                   .AddSingleton<WardenDatabase>()
                   .AddSingleton<GuardGunsDatabase>()
@@ -125,6 +126,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<SpecialDayManager>().Register();
         _provider.GetRequiredService<LastRequestManager>().Register();
         _provider.GetRequiredService<GuardGunsManager>().Register();
+        _provider.GetRequiredService<WardenTagManager>().Register();
         _provider.GetRequiredService<BeaconManager>().Register();
         _provider.GetRequiredService<RebelManager>().Register();
         _provider.GetRequiredService<TeamManager>().Register();
@@ -152,6 +154,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<SpecialDayManager>().Unregister();
         _provider.GetRequiredService<LastRequestManager>().Unregister();
         _provider.GetRequiredService<GuardGunsManager>().Unregister();
+        _provider.GetRequiredService<WardenTagManager>().Unregister();
         _provider.GetRequiredService<GameConfig>().Unregister();
         _provider.GetRequiredService<BeaconManager>().Unregister();
         _provider.GetRequiredService<RebelManager>().Unregister();

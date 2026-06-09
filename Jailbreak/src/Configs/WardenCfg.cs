@@ -3,8 +3,19 @@ namespace Jailbreak;
 public sealed class WardenConfig
 {
     public WardenCommandsCfg Commands { get; set; } = new();
+    public WardenTagCfg Tag { get; set; } = new();
     public int AutoGiveWardenWhenNone { get; set; } = 10;
 }
+
+public sealed class WardenTagCfg
+{
+    public bool Enable { get; set; } = true;
+    public string Chat { get; set; } = "[gold]★[default] [blue]Warden[default] ";
+    public string NameColor { get; set; } = "[red]";
+    public string Scoreboard { get; set; } = "★ Warden";
+    public float ScoreboardRefreshSeconds { get; set; } = 0.5f;
+}
+
 public sealed class WardenCommandsCfg
 {
     public List<string> BecomeWarden { get; set; } = ["w", "warden"];
