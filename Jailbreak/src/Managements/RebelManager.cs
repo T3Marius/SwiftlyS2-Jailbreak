@@ -15,6 +15,7 @@ public sealed class RebelManager
     private readonly UtilsConfig         _utilsConfig;
     private readonly SpecialDayManager   _specialDayManager;
     private readonly LastRequestManager  _lastRequestManager;
+    private readonly JailbreakSoundManager _soundManager;
 
     private Guid? _weaponFireHookId;
     private Guid? _playerHurtHookId;
@@ -25,13 +26,15 @@ public sealed class RebelManager
         IJBPlayerManagement players,
         IOptions<UtilsConfig> utilsConfig,
         SpecialDayManager specialDayManager,
-        LastRequestManager lastRequestManager)
+        LastRequestManager lastRequestManager,
+        JailbreakSoundManager soundManager)
     {
         _core = core;
         _players = players;
         _utilsConfig = utilsConfig.Value;
         _specialDayManager = specialDayManager;
         _lastRequestManager = lastRequestManager;
+        _soundManager = soundManager;
     }
 
     public void Register()
@@ -51,6 +54,7 @@ public sealed class RebelManager
     private void MakeRebel(IJBPlayer player)
     {
         player.SetRebel(true);
+        _soundManager.Play(JailbreakSound.RebelSet);
         _players.SendMessage(MessageType.Alert, "became_rebel_alert", false, args: player.Player.Name);
         _players.SendMessage(MessageType.Chat, "became_rebel_chat", true, args: player.Player.Name);
     }

@@ -9,7 +9,6 @@ using SwiftlyS2.Shared.Misc;
 using SwiftlyS2.Shared.Natives;
 using SwiftlyS2.Shared.Players;
 using SwiftlyS2.Shared.SchemaDefinitions;
-using SwiftlyS2.Shared.Sounds;
 
 namespace Jailbreak;
 
@@ -29,6 +28,8 @@ public sealed class LastRequestManager
     private readonly BeaconManager _beaconManager;
     private readonly CuffsManager _cuffsManager;
     private readonly JBStatsDB _statsDB;
+    private readonly SpecialDayManager _specialDayManager;
+    private readonly JailbreakSoundManager _soundManager;
     private readonly ILogger<LastRequestManager> _log;
     private readonly Dictionary<string, ILastRequest> _lastRequests = new(StringComparer.OrdinalIgnoreCase);
 
@@ -36,11 +37,12 @@ public sealed class LastRequestManager
     private Guid? _playerDisconnectHookId;
     private Guid? _roundEndHookId;
     private CancellationTokenSource? _countdownCts;
-    private CancellationTokenSource? _blipSoundCts;
+    private CancellationTokenSource? _fightBeaconSoundCts;
     private LastRequestStartContext? _currentContext;
     private CHandle<CBeam>? _duelBeamHandle;
     private bool _currentStarted;
     private bool _countdownActive;
+    private bool _availableSoundPlayed;
 
     public LastRequestManager(
         ISwiftlyCore core,
@@ -48,6 +50,8 @@ public sealed class LastRequestManager
         BeaconManager beaconManager,
         CuffsManager cuffsManager,
         JBStatsDB statsDB,
+        SpecialDayManager specialDayManager,
+        JailbreakSoundManager soundManager,
         ILogger<LastRequestManager> log)
     {
         _core = core;
@@ -55,6 +59,8 @@ public sealed class LastRequestManager
         _beaconManager = beaconManager;
         _cuffsManager = cuffsManager;
         _statsDB = statsDB;
+        _specialDayManager = specialDayManager;
+        _soundManager = soundManager;
         _log = log;
     }
 
@@ -128,8 +134,7 @@ public sealed class LastRequestManager
         _currentContext = context;
         _currentStarted = false;
 
-        _blipSoundCts?.Cancel();
-        _blipSoundCts = null;
+        StopFightBeaconSound();
 
         DisableCurrentWarden();
         ApplyVisuals(context);
@@ -142,20 +147,6 @@ public sealed class LastRequestManager
         }
 
         StartCountdown(lastRequest, context);
-
-        _blipSoundCts = _core.Scheduler.RepeatBySeconds(1.0f, () =>
-        {
-            foreach (var player in _players.GetAllPlayers())
-                player.Player.ExecuteCommand("play sounds/buttons/blip1.vsnd_c");
-
-            if (!IsLastRequestActive)
-            {
-                _blipSoundCts?.Cancel();
-                _blipSoundCts = null;
-                return;
-            }
-        });
-
         return true;
     }
 
@@ -171,7 +162,17 @@ public sealed class LastRequestManager
             && player.Player.IsValid
             && player.Player.IsAlive
             && !player.IsRebel
-            && _players.GetPlayersByTeam(JBTeam.Prisoner).Count(IsAlive) == 1;
+            && GetEligibleLastRequestPrisoners().Count == 1;
+    }
+
+    public IReadOnlyList<IJBPlayer> GetEligibleLastRequestPrisoners()
+    {
+        if (_specialDayManager.HasQueuedOrActiveSpecialDay || CurrentLastRequest != null)
+            return [];
+
+        return _players.GetPlayersByTeam(JBTeam.Prisoner)
+            .Where(IsEligibleLastRequestPrisoner)
+            .ToArray();
     }
 
     private void StartCountdown(ILastRequest lastRequest, LastRequestStartContext context)
@@ -210,6 +211,8 @@ public sealed class LastRequestManager
             ApplyStartLoadout(lastRequest, context);
             lastRequest.Start(context);
             _currentStarted = true;
+            _soundManager.Play(JailbreakSound.LastRequestStarted);
+            StartFightBeaconSound();
             _players.SendMessage(MessageType.Chat, "last_request_started", true, args: [lastRequest.Name, context.Prisoner.Player.Name]);
             _log.LogInformation("Started Last Request. Id={Id}, Name={Name}, Prisoner={Prisoner}, Guard={Guard}",
                 lastRequest.Id,
@@ -227,6 +230,7 @@ public sealed class LastRequestManager
     private void EndLastRequest(IJBPlayer? winner, IJBPlayer? loser, bool announce)
     {
         StopCountdown();
+        StopFightBeaconSound();
 
         var lastRequest = CurrentLastRequest;
         if (lastRequest == null)
@@ -258,7 +262,10 @@ public sealed class LastRequestManager
     {
         var lastRequest = CurrentLastRequest;
         if (lastRequest == null || _currentContext == null || e.UserIdPlayer == null)
+        {
+            QueueAvailabilityCheck();
             return HookResult.Continue;
+        }
 
         var victim = _players.SyncPlayer(e.UserIdPlayer);
         var attacker = e.AttackerPlayer == null ? null : _players.SyncPlayer(e.AttackerPlayer);
@@ -281,7 +288,10 @@ public sealed class LastRequestManager
     {
         var lastRequest = CurrentLastRequest;
         if (lastRequest == null || e.UserIdPlayer == null)
+        {
+            QueueAvailabilityCheck();
             return HookResult.Continue;
+        }
 
         var player = _players.SyncPlayer(e.UserIdPlayer);
         if (player == null || _currentContext == null || !ShouldEndOnDisconnect(_currentContext, player))
@@ -301,12 +311,14 @@ public sealed class LastRequestManager
 
     private HookResult OnRoundEnd(EventRoundEnd e)
     {
+        _availableSoundPlayed = false;
         EndLastRequest(null, null, announce: false);
         return HookResult.Continue;
     }
 
     private void OnMapUnload(IOnMapUnloadEvent @event)
     {
+        _availableSoundPlayed = false;
         EndLastRequest(null, null, announce: false);
     }
 
@@ -489,6 +501,45 @@ public sealed class LastRequestManager
         _countdownCts = null;
     }
 
+    private void StartFightBeaconSound()
+    {
+        StopFightBeaconSound();
+
+        _fightBeaconSoundCts = _core.Scheduler.RepeatBySeconds(1.0f, () =>
+        {
+            if (!IsLastRequestActive || !_currentStarted)
+            {
+                StopFightBeaconSound();
+                return;
+            }
+
+            _soundManager.Play(JailbreakSound.LastRequestFightBeacon);
+        });
+    }
+
+    private void StopFightBeaconSound()
+    {
+        _fightBeaconSoundCts?.Cancel();
+        _fightBeaconSoundCts = null;
+    }
+
+    private void QueueAvailabilityCheck()
+    {
+        _core.Scheduler.NextWorldUpdate(CheckAndAnnounceAvailability);
+    }
+
+    private void CheckAndAnnounceAvailability()
+    {
+        if (_availableSoundPlayed || CurrentLastRequest != null || _specialDayManager.HasQueuedOrActiveSpecialDay)
+            return;
+
+        if (GetEligibleLastRequestPrisoners().Count != 1)
+            return;
+
+        _availableSoundPlayed = true;
+        _soundManager.Play(JailbreakSound.LastRequestAvailable);
+    }
+
     private void ApplyStartLoadout(ILastRequest lastRequest, LastRequestStartContext context)
     {
         _core.Scheduler.NextWorldUpdate(() =>
@@ -608,6 +659,11 @@ public sealed class LastRequestManager
     private static bool IsAlive(IJBPlayer player)
     {
         return player.Player.IsValid && player.Player.IsAlive;
+    }
+
+    private static bool IsEligibleLastRequestPrisoner(IJBPlayer player)
+    {
+        return IsAlive(player) && !player.IsRebel;
     }
 
     private static string FormatPlayerName(IJBPlayer player)

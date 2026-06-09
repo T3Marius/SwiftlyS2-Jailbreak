@@ -11,12 +11,14 @@ public sealed class Listeners
     private readonly IJBPlayerManagement    _players;
     private readonly ISwiftlyCore           _core;
     private readonly ModelsConfig          _modelsConfig;
+    private readonly SoundsConfig          _soundsConfig;
     private readonly SpecialDayManager     _specialDayManager;
 
-    public Listeners(ISwiftlyCore core, IJBPlayerManagement playerManagement, IOptions<ModelsConfig> modelsConfig, SpecialDayManager specialDayManager)
+    public Listeners(ISwiftlyCore core, IJBPlayerManagement playerManagement, IOptions<ModelsConfig> modelsConfig, IOptions<SoundsConfig> soundsConfig, SpecialDayManager specialDayManager)
     {
         _core    = core;
         _modelsConfig = modelsConfig.Value;
+        _soundsConfig=  soundsConfig.Value;
         _players = playerManagement;
         _specialDayManager = specialDayManager;
     }
@@ -41,8 +43,9 @@ public sealed class Listeners
         @event.AddItem(_modelsConfig.WardenModel);
         @event.AddItem(_modelsConfig.DeputyModel);
         @event.AddItem(_modelsConfig.FreedayModel);
-        foreach (var m in _modelsConfig.GuardModels)    @event.AddItem(m);
-        foreach (var m in _modelsConfig.PrisonerModels) @event.AddItem(m);
+        foreach (var m in _modelsConfig.GuardModels)     @event.AddItem(m);
+        foreach (var m in _modelsConfig.PrisonerModels)  @event.AddItem(m);
+        foreach (var s in _soundsConfig.SoundEventFiles) @event.AddItem(s);
     }
 
     private void OnMapUnload(IOnMapUnloadEvent @event)

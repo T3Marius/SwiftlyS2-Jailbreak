@@ -350,7 +350,7 @@ public sealed class PrisonerCommands
             return false;
         }
 
-        if (_players.GetPlayersByTeam(JBTeam.Prisoner).Count(IsAlive) != 1)
+        if (_lastRequestManager.GetEligibleLastRequestPrisoners().Count != 1)
         {
             prisoner.SendMessage(MessageType.Chat, "last_request_not_last_prisoner", true);
             return false;

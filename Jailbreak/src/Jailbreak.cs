@@ -11,7 +11,7 @@ namespace Jailbreak;
     Name = "Jailbreak",
     Id = "Jailbreak",
     Author = "Marius",
-    Version = "0.1.0-beta.6"
+    Version = "0.1.0-beta.7"
 )]
 public sealed class Main : BasePlugin
 {
@@ -47,6 +47,8 @@ public sealed class Main : BasePlugin
              .Configure(b => b.AddTomlFile("prisoner.toml", false, true));
         Core.Configuration.InitializeTomlWithModel<JBStatsConfig>("jbstats.toml", "JBStats")
              .Configure(b => b.AddTomlFile("jbstats.toml", false, true));
+        Core.Configuration.InitializeTomlWithModel<SoundsConfig>("sounds.toml", "Sounds")
+             .Configure(b => b.AddTomlFile("sounds.toml", false, true));
 
         collection.AddSwiftly(Core)
                   .AddSingleton<CuffsManager>()
@@ -63,6 +65,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<LastRequestManager>()
                   .AddSingleton<GuardGunsManager>()
                   .AddSingleton<WardenTagManager>()
+                  .AddSingleton<JailbreakSoundManager>()
                   .AddSingleton<GameConfig>()
                   .AddSingleton<WardenDatabase>()
                   .AddSingleton<GuardGunsDatabase>()
@@ -103,6 +106,9 @@ public sealed class Main : BasePlugin
 
         collection.AddOptionsWithValidateOnStart<JBStatsConfig>()
                   .BindConfiguration("JBStats");
+
+        collection.AddOptionsWithValidateOnStart<SoundsConfig>()
+                  .BindConfiguration("Sounds");
 
         _provider = collection.BuildServiceProvider();
 

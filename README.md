@@ -23,6 +23,7 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 - Warden can remove weapons by shooting them.
 - HUD center message shows the current warden and deputy.
 - Warden chat and scoreboard tags are applied while the role is active.
+- Gameplay sounds can be configured for warden set/remove, rebel set, cuffs, and Last Request events.
 
 ### Deputy System
 
@@ -131,6 +132,17 @@ Opened with `!wmenu`.
   - Ping Color
   - Draw Color
 
+## Required Workshop Addon
+
+The plugin can run with custom paths, but the built-in model and sound defaults are made for the Jailbreak addon below. Subscribe/add it to your server workshop collection if you want the default `models.toml` and `sounds.toml` values to work out of the box.
+
+<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3737014592" target="_blank">
+  <img
+    src="https://img.shields.io/badge/Steam%20Workshop-Jailbreak%20Addon-1b2838?style=for-the-badge&logo=steam&logoColor=white"
+    alt="Steam Workshop Jailbreak Addon"
+  />
+</a>
+
 ## Configuration
 
 | File | Section | Key settings |
@@ -138,9 +150,10 @@ Opened with `!wmenu`.
 | `warden.toml` | Warden | Warden command aliases and auto-assign delay. |
 | `deputy.toml` | Deputy | Deputy command aliases. |
 | `specialday.toml` | SpecialDay | Special Day round cooldown. |
-| `models.toml` | Models | Warden, deputy, rebel, freeday, guard, and prisoner models. |
+| `models.toml` | Models | Warden, deputy, rebel, freeday, guard, and prisoner models. Built-in defaults use the Jailbreak Workshop addon. |
 | `utils.toml` | Utils | Database connection, cell timing, box sound/name settings, and other shared settings. |
 | `voice.toml` | Voice | Prisoner mute behavior. |
+| `sounds.toml` | Sounds | Gameplay sounds, sound event files, and muted sound reasons. Built-in defaults use the Jailbreak Workshop addon. |
 | `jailbreak.cfg` | Game cvars | Generated in the plugin directory and applied on map start or hot reload. |
 
 ## Database
@@ -225,8 +238,7 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [x] Add drawing color selection.
 - [x] Add drawing cleanup command.
 - [ ] Add broader drawing cleanup/management options.
-- [ ] Add speaking icon to warden.
-- [ ] Add gameplay sounds (Warden set, Rebel set, etc).
+- [x] Add gameplay sounds for warden, rebels, cuffs, and Last Requests.
 - [x] Add warden tag (both chat and scoreboard).
 - [ ] Add warden ability to gave prisoners draw accces.
 - [ ] Add more TODO items.

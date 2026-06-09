@@ -22,6 +22,7 @@ public sealed class Events
     private readonly LastRequestManager  _lastRequestManager;
     private readonly GuardGunsManager    _guardGunsManager;
     private readonly WardenTagManager    _wardenTagManager;
+    private readonly JailbreakSoundManager _soundManager;
 
     /* ------------------- Configs ------------------- */
     private readonly WardenConfig        _wardenConfig;
@@ -58,6 +59,7 @@ public sealed class Events
         LastRequestManager lastRequestManager,
         GuardGunsManager guardGunsManager,
         WardenTagManager wardenTagManager,
+        JailbreakSoundManager soundManager,
         IOptions<WardenConfig> wardenConfig, 
         IOptions<ModelsConfig> modelsConfig, 
         IOptions<UtilsConfig> utilsConfig,
@@ -73,6 +75,7 @@ public sealed class Events
         _lastRequestManager = lastRequestManager;
         _guardGunsManager = guardGunsManager;
         _wardenTagManager = wardenTagManager;
+        _soundManager = soundManager;
         _wardenConfig = wardenConfig.Value;
         _modelsConfig = modelsConfig.Value;
         _utilsConfig = utilsConfig.Value;
@@ -267,6 +270,8 @@ public sealed class Events
             if (selected.IsWarden)
             {
                 _wardenTagManager.RefreshNow();
+                _soundManager.Play(JailbreakSound.WardenSet);
+                _soundManager.PlayToPlayer(selected, JailbreakSound.YouWarden);
                 _cuffsManager.OnWardenGive(selected);
                 selected.SendMessage(MessageType.Chat, "you_are_new_warden", true);
             }
@@ -360,6 +365,7 @@ public sealed class Events
         {
             _cuffsManager.OnWardenRemove(victim);
             victim.SetWarden(false, "killed", e.AttackerPlayer.Name);
+            _soundManager.Play(JailbreakSound.WardenRemoved, JailbreakSoundReason.Killed);
             _wardenTagManager.RefreshNow();
         }
 

@@ -18,6 +18,7 @@ public sealed class CuffsManager
     private readonly IJBPlayerManagement _players;
     private readonly SpecialDayManager   _specialDayManager;
     private readonly DrawManager         _drawManager;
+    private readonly JailbreakSoundManager _soundManager;
 
     private const string CuffWeapon   = "weapon_taser";
     private const float DefaultGrabDistance = 110.0f;
@@ -33,12 +34,18 @@ public sealed class CuffsManager
     private Guid? _weaponFireHookId;
     private Guid? _playerDeathHookId;
     
-    public CuffsManager(ISwiftlyCore core, IJBPlayerManagement players, SpecialDayManager specialDayManager, DrawManager drawManager)
+    public CuffsManager(
+        ISwiftlyCore core,
+        IJBPlayerManagement players,
+        SpecialDayManager specialDayManager,
+        DrawManager drawManager,
+        JailbreakSoundManager soundManager)
     {
         _core = core;
         _players = players;
         _specialDayManager = specialDayManager;
         _drawManager = drawManager;
+        _soundManager = soundManager;
     }
 
     public void Register()
@@ -321,6 +328,7 @@ public sealed class CuffsManager
     {
         prisoner.IsCuffed = true;
         _cuffedByWarden[GetPlayerKey(prisoner)] = GetPlayerKey(warden);
+        _soundManager.PlayFromPlayer(warden, JailbreakSound.CuffSet);
 
         PlayerUtils.FreezeVelocity(prisoner.Player, new Color(0, 255, 0, 255));
     }

@@ -23,6 +23,7 @@ public sealed class WardenCommands
     private readonly SpecialDayManager       _specialDayManager;
     private readonly LastRequestManager      _lastRequestManager;
     private readonly WardenTagManager        _wardenTagManager;
+    private readonly JailbreakSoundManager   _soundManager;
     private readonly ILogger<WardenCommands> _log;
 
     public WardenCommands(
@@ -37,6 +38,7 @@ public sealed class WardenCommands
         SpecialDayManager specialDayManager,
         LastRequestManager lastRequestManager,
         WardenTagManager wardenTagManager,
+        JailbreakSoundManager soundManager,
         ILogger<WardenCommands> log)
     {
         _core    = core;
@@ -50,6 +52,7 @@ public sealed class WardenCommands
         _specialDayManager = specialDayManager;
         _lastRequestManager = lastRequestManager;
         _wardenTagManager = wardenTagManager;
+        _soundManager = soundManager;
         _log     = log;
     }
 
@@ -260,6 +263,8 @@ public sealed class WardenCommands
         if (player.IsWarden)
         {
             _wardenTagManager.RefreshNow();
+            _soundManager.Play(JailbreakSound.WardenSet);
+            _soundManager.PlayToPlayer(player, JailbreakSound.YouWarden);
             _cuffsManager.OnWardenGive(player);
             player.SendMessage(MessageType.Chat, "you_are_new_warden", true);
         }
@@ -284,6 +289,7 @@ public sealed class WardenCommands
 
         _cuffsManager.OnWardenRemove(player);
         player.SetWarden(false, "giveup");
+        _soundManager.Play(JailbreakSound.WardenRemoved, JailbreakSoundReason.GiveUp);
         _wardenTagManager.RefreshNow();
     }
     private void WardenHelp(ICommandContext ctx)
