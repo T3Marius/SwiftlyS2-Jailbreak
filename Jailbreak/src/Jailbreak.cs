@@ -11,7 +11,7 @@ namespace Jailbreak;
     Name = "Jailbreak",
     Id = "Jailbreak",
     Author = "Marius",
-    Version = "0.1.0-beta.8"
+    Version = "0.1.0-beta.9"
 )]
 public sealed class Main : BasePlugin
 {
@@ -49,6 +49,8 @@ public sealed class Main : BasePlugin
              .Configure(b => b.AddTomlFile("jbstats.toml", false, true));
         Core.Configuration.InitializeTomlWithModel<SoundsConfig>("sounds.toml", "Sounds")
              .Configure(b => b.AddTomlFile("sounds.toml", false, true));
+        Core.Configuration.InitializeTomlWithModel<GuardQueueConfig>("queue.toml", "GuardQueue")
+             .Configure(b => b.AddTomlFile("queue.toml", false, true));
 
         collection.AddSwiftly(Core)
                   .AddSingleton<CuffsManager>()
@@ -57,6 +59,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<JBPlayerManagement>()
                   .AddSingleton<IJBPlayerManagement, JBPlayerManagement>()
                   .AddSingleton<TeamManager>()
+                  .AddSingleton<GuardQueueManager>()
                   .AddSingleton<RebelManager>()
                   .AddSingleton<BeaconManager>()
                   .AddSingleton<LaserManager>()
@@ -110,6 +113,9 @@ public sealed class Main : BasePlugin
         collection.AddOptionsWithValidateOnStart<SoundsConfig>()
                   .BindConfiguration("Sounds");
 
+        collection.AddOptionsWithValidateOnStart<GuardQueueConfig>()
+                  .BindConfiguration("GuardQueue");
+
         _provider = collection.BuildServiceProvider();
 
         _provider.GetRequiredService<WardenDatabase>().Initialize();
@@ -136,6 +142,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<BeaconManager>().Register();
         _provider.GetRequiredService<RebelManager>().Register();
         _provider.GetRequiredService<TeamManager>().Register();
+        _provider.GetRequiredService<GuardQueueManager>().Register();
         _provider.GetRequiredService<BoxManager>().Register();
         _provider.GetRequiredService<CuffsManager>().Register();
         _provider.GetRequiredService<LaserManager>().Register();
@@ -164,6 +171,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<GameConfig>().Unregister();
         _provider.GetRequiredService<BeaconManager>().Unregister();
         _provider.GetRequiredService<RebelManager>().Unregister();
+        _provider.GetRequiredService<GuardQueueManager>().Unregister();
         _provider.GetRequiredService<TeamManager>().Unregister();
         _provider.GetRequiredService<BoxManager>().Unregister();
         _provider.GetRequiredService<CuffsManager>().Unregister();

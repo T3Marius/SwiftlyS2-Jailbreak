@@ -1,4 +1,5 @@
 using Jailbreak.Contract;
+using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Commands;
 using SwiftlyS2.Shared.GameEventDefinitions;
@@ -10,17 +11,17 @@ namespace Jailbreak;
 
 public sealed class TeamManager
 {
-    private const int PrisonersPerGuard = 2;
-
     private readonly ISwiftlyCore        _core;
     private readonly IJBPlayerManagement _players;
+    private readonly UtilsConfig         _utilsConfig;
     private Guid? _clientCommandHookId;
     private Guid? _playerTeamHookId;
 
-    public TeamManager(ISwiftlyCore core, IJBPlayerManagement players)
+    public TeamManager(ISwiftlyCore core, IJBPlayerManagement players, IOptions<UtilsConfig> utilsConfig)
     {
         _core        = core;
         _players     = players;
+        _utilsConfig = utilsConfig.Value;
     }
 
     public void Register()
@@ -85,11 +86,22 @@ public sealed class TeamManager
         return HookResult.Continue;
     }
 
-    private bool CanJoinGuard(IPlayer player)
+    public bool CanJoinGuard(IPlayer player)
     {
         var counts = CountProjectedTeams(player, Team.CT);
         return IsGuardRatioAllowed(counts.Guards, counts.Prisoners);
     }
+
+    public bool MoveToGuard(IJBPlayer player)
+    {
+        if (!player.Player.IsValid || !CanJoinGuard(player.Player))
+            return false;
+
+        player.Player.SwitchTeam(Team.CT);
+        return true;
+    }
+
+    public int PrisonersPerGuard => Math.Max(1, _utilsConfig.PrisonerPerGuardRatio);
 
     private bool IsGuardRatioAllowed(int guards, int prisoners)
     {

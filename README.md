@@ -55,6 +55,7 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 - Guards can use `!guns` to select a primary and secondary weapon.
 - Guard gun preferences are saved in the database and restored on spawn outside Special Days.
 - Prisoners are stripped on round start outside Special Days and only receive a knife.
+- Prisoners can use `!queue` to join the guard queue when guards are full; premium permissions are placed before normal queue entries.
 
 ### Special Days
 
@@ -100,7 +101,7 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 
 ## Commands
 
-All warden command aliases are configurable in `warden.toml`.
+Command aliases are configurable in their matching config files.
 
 | Command | Default aliases | Description |
 | --- | --- | --- |
@@ -115,6 +116,8 @@ All warden command aliases are configurable in `warden.toml`.
 | DrawColor | `!drawcolor` | Open the drawing color menu. |
 | DrawClear | `!drawclear`, `!cleardraw` | Clear your own drawings. |
 | GuardGuns | `!guns` | Open the guard guns menu. |
+| GuardQueue | `!q`, `!queue` | Join the guard queue, or move directly if a guard slot is free. |
+| GuardUnqueue | `!uq`, `!unqueue` | Leave the guard queue. |
 | SpecialGuns | `!sguns` | Open the active Special Day guns menu when enabled. |
 | Surrender | `!s`, `!surrender` | Request rebel surrender from the warden. |
 | JailbreakStats | `!jbstats`, `!jstats`, `!stats` | Open Last Request and Special Day stats. |
@@ -158,6 +161,7 @@ The plugin can run with custom paths, but the built-in model and sound defaults 
 | `utils.toml` | Utils | Database connection, cell timing, box sound/name settings, and other shared settings. |
 | `voice.toml` | Voice | Prisoner mute behavior. |
 | `sounds.toml` | Sounds | Gameplay sounds, sound event files, and muted sound reasons. Built-in defaults use the Jailbreak Workshop addon. |
+| `queue.toml` | GuardQueue | Queue command aliases and premium permission flags. |
 | `jailbreak.cfg` | Game cvars | Generated in the plugin directory and applied on map start or hot reload. |
 
 ## Database
@@ -245,8 +249,18 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [x] Add gameplay sounds for warden, rebels, cuffs, and Last Requests.
 - [x] Add warden tag (both chat and scoreboard).
 - [x] Add warden ability to give prisoners draw access.
-- [ ] Add queue system for the guardians team if full. (!q, !queue, !uq, !unqueue)
-- [ ] Add premium flag to queue system (automaticly in front of the list unlike normal players)
+- [x] Add queue system for the guardians team if full. (!q, !queue, !uq, !unqueue)
+- [x] Add premium flag to queue system (automaticly in front of the list unlike normal players)
+
+- [ ] Add Teleport        day.
+- [ ] Add HideAndSeek     day.
+- [ ] Add War             day.
+- [ ] Add NoScope         day.
+- [ ] Add Scout           day.
+- [ ] Add Taser           day.
+- [ ] Add OneInTheChamber day.
+- [ ] Add OnlyHeadshot    day.
+
 - [ ] Add more TODO items.
 
 ## ☕ If you'd like to support me! Any donation is deeply appreciated.
