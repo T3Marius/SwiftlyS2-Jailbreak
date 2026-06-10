@@ -118,6 +118,7 @@ Command aliases are configurable in their matching config files.
 | GuardGuns | `!guns` | Open the guard guns menu. |
 | GuardQueue | `!q`, `!queue` | Join the guard queue, or move directly if a guard slot is free. |
 | GuardUnqueue | `!uq`, `!unqueue` | Leave the guard queue. |
+| GuardQueueList | `!queuelist` | Show the guard queue in chat, HTML, or both depending on config. |
 | SpecialGuns | `!sguns` | Open the active Special Day guns menu when enabled. |
 | Surrender | `!s`, `!surrender` | Request rebel surrender from the warden. |
 | JailbreakStats | `!jbstats`, `!jstats`, `!stats` | Open Last Request and Special Day stats. |
@@ -161,7 +162,7 @@ The plugin can run with custom paths, but the built-in model and sound defaults 
 | `utils.toml` | Utils | Database connection, cell timing, box sound/name settings, and other shared settings. |
 | `voice.toml` | Voice | Prisoner mute behavior. |
 | `sounds.toml` | Sounds | Gameplay sounds, sound event files, and muted sound reasons. Built-in defaults use the Jailbreak Workshop addon. |
-| `queue.toml` | GuardQueue | Queue command aliases and premium permission flags. |
+| `queue.toml` | GuardQueue | Queue command aliases, list output targets, and premium permission flags. |
 | `jailbreak.cfg` | Game cvars | Generated in the plugin directory and applied on map start or hot reload. |
 
 ## Database
@@ -251,9 +252,10 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [x] Add warden ability to give prisoners draw access.
 - [x] Add queue system for the guardians team if full. (!q, !queue, !uq, !unqueue)
 - [x] Add premium flag to queue system (automaticly in front of the list unlike normal players)
+- [x] Add queue list command with chat and HTML output.
 
-- [ ] Add Teleport        day.
-- [ ] Add HideAndSeek     day.
+- [X] Add Teleport        day.
+- [X] Add HideAndSeek     day.
 - [ ] Add War             day.
 - [ ] Add NoScope         day.
 - [ ] Add Scout           day.

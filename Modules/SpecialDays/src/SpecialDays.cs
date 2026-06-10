@@ -202,7 +202,7 @@ public sealed class HideAndSeekDay : SpecialDayBase
     public override void End()
     {
         SetPrisonersMoveType(MoveType_t.MOVETYPE_WALK);
-        Core.Event.OnEntityTakeDamage += OnTakeDamage;
+        Core.Event.OnEntityTakeDamage -= OnTakeDamage;
     }
     private void OnTakeDamage(IOnEntityTakeDamageEvent e)
     {

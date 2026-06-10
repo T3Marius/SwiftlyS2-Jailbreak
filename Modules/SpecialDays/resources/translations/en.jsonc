@@ -3,5 +3,11 @@
     "knife_fight.description": "Everyone fights with knives only.",
 
     "free_for_all.name": "Free For All",
-    "free_for_all.description": "Everyone is on his own! Use <font color='yellow'>!sguns</font> to select your desire weapons."
+    "free_for_all.description": "Everyone is on his own! Use <font color='yellow'>!sguns</font> to select your desire weapons.",
+
+    "teleport.name": "Teleport",
+    "teleport.description": "You change positions with the one you shoot at.",
+
+    "hide_and_seek.name": "Hide And Seek",
+    "hide_and_seek.description": "Find a place to hide before CT's gets released!"
 }
