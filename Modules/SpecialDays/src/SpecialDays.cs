@@ -246,7 +246,6 @@ public sealed class HideAndSeekDay : SpecialDayBase
             if (player != null)
                 return player;
         }
-
         return null;
     }
 }
