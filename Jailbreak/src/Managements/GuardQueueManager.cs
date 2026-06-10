@@ -49,6 +49,12 @@ public sealed class GuardQueueManager
                 _core.Command.RegisterCommand(command, UnqueueCommand);
         }
 
+        foreach (var command in _config.Commands.QueueList)
+        {
+            if (!_core.Command.IsCommandRegistered(command))
+                _core.Command.RegisterCommand(command, QueueListCommand);
+        }
+
         _playerTeamHookId = _core.GameEvent.HookPost<EventPlayerTeam>(OnPlayerTeam);
         _playerDisconnectHookId = _core.GameEvent.HookPost<EventPlayerDisconnect>(OnPlayerDisconnect);
     }
@@ -62,6 +68,12 @@ public sealed class GuardQueueManager
         }
 
         foreach (var command in _config.Commands.Unqueue)
+        {
+            if (_core.Command.IsCommandRegistered(command))
+                _core.Command.UnregisterCommand(command);
+        }
+
+        foreach (var command in _config.Commands.QueueList)
         {
             if (_core.Command.IsCommandRegistered(command))
                 _core.Command.UnregisterCommand(command);
@@ -135,6 +147,25 @@ public sealed class GuardQueueManager
         player.SendMessage(MessageType.Chat, "guard_queue_not_queued", true);
     }
 
+    private void QueueListCommand(ICommandContext ctx)
+    {
+        if (ctx.Sender == null)
+            return;
+
+        var player = _players.SyncPlayer(ctx.Sender);
+        if (player == null)
+            return;
+
+        PruneQueue();
+
+        var targets = GetListTargets().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (targets.Contains("chat"))
+            SendChatQueueList(player);
+
+        if (targets.Contains("html"))
+            SendHtmlQueueList(player);
+    }
+
     private HookResult OnPlayerTeam(EventPlayerTeam e)
     {
         if (e.UserIdPlayer == null)
@@ -159,6 +190,8 @@ public sealed class GuardQueueManager
 
     private void TryPromoteNext()
     {
+        PruneQueue();
+
         foreach (var entry in _queue.ToList())
         {
             var player = FindPlayer(entry);
@@ -174,6 +207,78 @@ public sealed class GuardQueueManager
             _queue.Remove(entry);
             player.SendMessage(MessageType.Chat, "guard_queue_promoted", true);
             return;
+        }
+    }
+
+    private void SendChatQueueList(IJBPlayer player)
+    {
+        player.SendMessage(MessageType.Chat, "guard_queue_list_chat.header", false);
+
+        if (_queue.Count == 0)
+        {
+            player.SendMessage(MessageType.Chat, "guard_queue_list_chat.empty", false);
+        }
+        else
+        {
+            for (var i = 0; i < _queue.Count; i++)
+            {
+                var entry = _queue[i];
+                var key = entry.Premium
+                    ? "guard_queue_list_chat.row_premium"
+                    : "guard_queue_list_chat.row";
+
+                player.SendMessage(MessageType.Chat, key, false, args: [i + 1, GetDisplayName(entry)]);
+            }
+        }
+
+        player.SendMessage(MessageType.Chat, "guard_queue_list_chat.footer", false);
+    }
+
+    private void SendHtmlQueueList(IJBPlayer player)
+    {
+        var lines = new List<string>
+        {
+            player.Localizer["guard_queue_list_html.header"]
+        };
+
+        if (_queue.Count == 0)
+        {
+            lines.Add(player.Localizer["guard_queue_list_html.empty"]);
+        }
+        else
+        {
+            for (var i = 0; i < _queue.Count; i++)
+            {
+                var entry = _queue[i];
+                var key = entry.Premium
+                    ? "guard_queue_list_html.row_premium"
+                    : "guard_queue_list_html.row";
+
+                lines.Add(player.Localizer[key, i + 1, GetDisplayName(entry)]);
+            }
+        }
+
+        lines.Add(player.Localizer["guard_queue_list_html.footer"]);
+        player.Player.SendCenterHTML(string.Join("<br>", lines), 8000);
+    }
+
+    private IEnumerable<string> GetListTargets()
+    {
+        var configured = _config.ShowListTo
+            .Split([',', ' ', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(target => _config.ShowListToOptions.Contains(target, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+
+        return configured.Count > 0 ? configured : ["html"];
+    }
+
+    private void PruneQueue()
+    {
+        foreach (var entry in _queue.ToList())
+        {
+            var player = FindPlayer(entry);
+            if (player == null || player.Team != JBTeam.Prisoner)
+                _queue.Remove(entry);
         }
     }
 
@@ -229,6 +334,11 @@ public sealed class GuardQueueManager
     private IJBPlayer? FindPlayer(QueueEntry entry)
     {
         return _players.GetAllPlayers().FirstOrDefault(player => PlayerIdentity.GetKey(player.Player) == entry.PlayerKey);
+    }
+
+    private string GetDisplayName(QueueEntry entry)
+    {
+        return FindPlayer(entry)?.Player.Name ?? entry.Name;
     }
 
     private void Unhook(ref Guid? hookId)
