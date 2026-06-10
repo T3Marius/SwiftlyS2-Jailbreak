@@ -27,6 +27,7 @@ namespace Jailbreak.Contract
         bool AllowFriendlyFire { get; }
 
         bool CanStart();
+        void PreStart();
         void OnCountdownTick(int secondsRemaining);
         void Start();
         void End();
@@ -61,6 +62,10 @@ namespace Jailbreak.Contract
         public virtual bool CanStart()
         {
             return true;
+        }
+
+        public virtual void PreStart()
+        {
         }
 
         public virtual void OnCountdownTick(int secondsRemaining)

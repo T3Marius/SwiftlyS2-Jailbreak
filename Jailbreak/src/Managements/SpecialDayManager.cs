@@ -26,6 +26,7 @@ public sealed class SpecialDayManager
     private readonly JBStatsDB _statsDB;
     private readonly Dictionary<string, ISpecialDay> _specialDays = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<ulong, string> _participants = [];
+    private readonly HashSet<ulong> _frozenPlayerKeys = [];
     private readonly IConVar<bool>? _teammatesAreEnemies;
 
     private Guid? _roundStartHookId;
@@ -64,7 +65,6 @@ public sealed class SpecialDayManager
         _roundEndHookId = _core.GameEvent.HookPost<EventRoundEnd>(OnRoundEnd);
         _core.Event.OnItemServicesCanAcquireHook += OnItemServicesCanAcquire;
         _core.Event.OnMapUnload += OnMapUnload;
-        _core.Event.OnTick += OnTick;
 
         foreach (var command in _config.GunsCommands)
         {
@@ -79,7 +79,6 @@ public sealed class SpecialDayManager
         Unhook(ref _roundEndHookId);
         _core.Event.OnItemServicesCanAcquireHook -= OnItemServicesCanAcquire;
         _core.Event.OnMapUnload -= OnMapUnload;
-        _core.Event.OnTick -= OnTick;
 
         foreach (var command in _config.GunsCommands)
         {
@@ -286,6 +285,7 @@ public sealed class SpecialDayManager
             return;
         }
 
+        specialDay.PreStart();
         _countdownFreezeActive = true;
         FreezePlayers(specialDay, new Color(80, 170, 255, 255));
         var remaining = specialDay.StartCountdown;
@@ -318,11 +318,15 @@ public sealed class SpecialDayManager
         _countdownFreezeActive = false;
         CaptureParticipants();
         ApplySpecialDayConvars(specialDay);
-        ApplyStartLoadout(specialDay);
-        specialDay.Start();
-        _currentDayStarted = true;
-        StartActiveHud(specialDay);
-        _log.LogInformation("Started special day. Id={Id}, Name={Name}", specialDay.Id, specialDay.Name);
+
+        _core.Scheduler.NextWorldUpdate(() =>
+        {
+            ApplyStartLoadout(specialDay);
+            specialDay.Start();
+            _currentDayStarted = true;
+            StartActiveHud(specialDay);
+            _log.LogInformation("Started special day. Id={Id}, Name={Name}", specialDay.Id, specialDay.Name);
+        });
     }
 
     private void ApplySpecialDayConvars(ISpecialDay specialDay)
@@ -496,20 +500,25 @@ public sealed class SpecialDayManager
     private void FreezePlayers(ISpecialDay specialDay, Color? color = null)
     {
         foreach (var player in GetFreezePlayers(specialDay))
-            PlayerUtils.FreezeVelocity(player.Player, color);
+            FreezePlayer(player, color);
     }
 
     private void UnfreezePlayers()
     {
         _countdownFreezeActive = false;
 
-        var specialDay = CurrentSpecialDay;
-        var players = specialDay == null
-            ? _players.GetAllPlayers()
-            : GetFreezePlayers(specialDay);
+        foreach (var playerKey in _frozenPlayerKeys.ToList())
+        {
+            var player = FindPlayerByKey(playerKey);
+            if (player == null)
+            {
+                _frozenPlayerKeys.Remove(playerKey);
+                continue;
+            }
 
-        foreach (var player in players)
             PlayerUtils.UnfreezeVelocity(player.Player, new Color(255, 255, 255, 255));
+            _frozenPlayerKeys.Remove(playerKey);
+        }
     }
 
     private void StopCountdown()
@@ -524,16 +533,18 @@ public sealed class SpecialDayManager
         _activeHudCts = null;
     }
 
-    private void OnTick()
+    private void FreezePlayer(IJBPlayer player, Color? color = null)
     {
-        if (!_countdownFreezeActive)
+        if (!player.Player.IsValid || !player.Player.IsAlive)
             return;
 
-        var specialDay = CurrentSpecialDay;
-        if (specialDay == null)
-            return;
+        PlayerUtils.FreezeVelocity(player.Player, color);
+        _frozenPlayerKeys.Add(PlayerIdentity.GetKey(player.Player));
+    }
 
-        FreezePlayers(specialDay);
+    private IJBPlayer? FindPlayerByKey(ulong playerKey)
+    {
+        return _players.GetAllPlayers().FirstOrDefault(player => PlayerIdentity.GetKey(player.Player) == playerKey);
     }
 
     private IEnumerable<IJBPlayer> GetFreezePlayers(ISpecialDay specialDay)
@@ -549,20 +560,17 @@ public sealed class SpecialDayManager
 
     private void ApplyStartLoadout(ISpecialDay specialDay)
     {
-        _core.Scheduler.NextWorldUpdate(() =>
+        foreach (var player in _players.GetAllPlayers())
         {
-            foreach (var player in _players.GetAllPlayers())
-            {
-                if (!player.Player.IsValid || !player.Player.IsAlive)
-                    continue;
+            if (!player.Player.IsValid || !player.Player.IsAlive)
+                continue;
 
-                if (specialDay.StripWeaponsOnStart)
-                    StripWeapons(player.Player);
+            if (specialDay.StripWeaponsOnStart)
+                StripWeapons(player.Player);
 
-                foreach (var weaponName in specialDay.GiveWeaponsOnStart)
-                    GiveWeapon(player.Player, weaponName);
-            }
-        });
+            foreach (var weaponName in specialDay.GiveWeaponsOnStart)
+                GiveWeapon(player.Player, weaponName);
+        }
     }
 
     private void GiveSelectedGuns(IPlayer player, ItemDefinitionIndex primaryWeapon, ItemDefinitionIndex secondaryWeapon)

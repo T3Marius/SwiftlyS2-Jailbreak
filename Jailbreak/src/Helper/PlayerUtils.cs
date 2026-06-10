@@ -73,48 +73,56 @@ public static class PlayerUtils
         });
     }
     /// <summary>
-    /// Freees player velocity (can still fall if froze mid-air)
+    /// Freezes player movement by switching movement type to obsolete.
     /// </summary>
     /// <param name="player"></param>
-    /// <param name="color">Color player will get while being freezed, default none</param>
+    /// <param name="color">Color player will get while being frozen, default none</param>
     public static void FreezeVelocity(IPlayer player, Color? color = null)
     {
-        var playerPawn = player.PlayerPawn;
-        if (playerPawn == null)
-            return;
-
-        playerPawn.VelocityModifier = 0;
-        playerPawn.VelocityModifierUpdated();
-
-        if (color != null)
-        {
-            playerPawn.RenderMode = RenderMode_t.kRenderTransAlpha;
-            playerPawn.Render = color.Value;
-            playerPawn.RenderModeUpdated();
-            playerPawn.RenderUpdated();
-        }
+        SetFreezeState(player, MoveType_t.MOVETYPE_OBSOLETE, color);
     }
     /// <summary>
-    /// Unfreezes player velocity
+    /// Unfreezes player movement by switching movement type back to walk.
     /// </summary>
     /// <param name="player"></param>
-    /// <param name="color">Color player will get while being unfreezed, default none</param>
+    /// <param name="color">Color player will get while being unfrozen, default none</param>
     public static void UnfreezeVelocity(IPlayer player, Color? color = null)
     {
+        SetFreezeState(player, MoveType_t.MOVETYPE_WALK, color);
+    }
+
+    private static void SetFreezeState(IPlayer player, MoveType_t moveType, Color? color = null)
+    {
         var playerPawn = player.PlayerPawn;
-        if (playerPawn == null)
+        if (playerPawn == null || !playerPawn.IsValid)
             return;
 
-        playerPawn.VelocityModifier = 1;
-        playerPawn.VelocityModifierUpdated();
-
+        if (playerPawn.MoveType != moveType || playerPawn.ActualMoveType != moveType)
+        {
+            playerPawn.MoveType = moveType;
+            playerPawn.ActualMoveType = moveType;
+            playerPawn.MoveTypeUpdated();
+        }
+        
         if (color != null)
         {
-            playerPawn.RenderMode = RenderMode_t.kRenderTransAlpha;
-            playerPawn.Render = color.Value;
-            playerPawn.RenderModeUpdated();
-            playerPawn.RenderUpdated();
+            var current = playerPawn.Render;
+            if (playerPawn.RenderMode != RenderMode_t.kRenderTransAlpha || !ColorsEqual(current, color.Value))
+            {
+                playerPawn.RenderMode = RenderMode_t.kRenderTransAlpha;
+                playerPawn.Render = color.Value;
+                playerPawn.RenderModeUpdated();
+                playerPawn.RenderUpdated();
+            }
         }
+    }
+
+    private static bool ColorsEqual(Color left, Color right)
+    {
+        return left.R == right.R
+            && left.G == right.G
+            && left.B == right.B
+            && left.A == right.A;
     }
 
     /// <summary>
