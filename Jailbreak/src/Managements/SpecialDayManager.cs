@@ -21,6 +21,7 @@ public sealed class SpecialDayManager
 {
     private readonly ISwiftlyCore _core;
     private readonly IJBPlayerManagement _players;
+    private readonly CellManager _cellsManager;
     private readonly ILogger<SpecialDayManager> _log;
     private readonly SpecialDayConfig _config;
     private readonly JBStatsDB _statsDB;
@@ -40,12 +41,14 @@ public sealed class SpecialDayManager
     public SpecialDayManager(
         ISwiftlyCore core,
         IJBPlayerManagement players,
+        CellManager cellManager,
         IOptions<SpecialDayConfig> config,
         JBStatsDB statsDB,
         ILogger<SpecialDayManager> log)
     {
         _core = core;
         _players = players;
+        _cellsManager = cellManager;
         _config = config.Value;
         _statsDB = statsDB;
         _log = log;
@@ -148,6 +151,10 @@ public sealed class SpecialDayManager
         }
 
         BeginSpecialDay(specialDay);
+
+        if (!_cellsManager.CellsOpen)   // cells should always be open when a sd starts, prisoners can get stuck in them.
+            _cellsManager.OpenCells();
+
         return true;
     }
 
