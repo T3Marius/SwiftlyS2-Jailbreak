@@ -6,6 +6,7 @@ public sealed class SDConfig
     public FreeForAllConfig  FreeForAll  { get; set; }    = new();
     public TeleportConfig    Teleport    { get; set; }    = new();
     public HideAndSeekConfig HideAndSeek { get; set; }    = new();
+    public WarConfig         War         { get; set; }    = new();
 }
 public sealed class KnifeFightConfig
 {
@@ -25,5 +26,10 @@ public sealed class TeleportConfig
 public sealed class HideAndSeekConfig
 {
     public bool Enabled { get; set; } = true;
-    public int StartCountdown { get; set; } = 60;
+    public int HideTime { get; set; } = 60;
+}
+public sealed class WarConfig
+{
+    public bool Enabled { get; set; } = true;
+    public int PrepareTime { get; set; } = 30;
 }

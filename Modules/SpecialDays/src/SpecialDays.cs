@@ -19,7 +19,7 @@ namespace SpecialDays;
     Author = "T3Marius",
     Name = "[JB Core] SpecialDays",
     Id = "SpecialDays",
-    Version = "0.1.2"
+    Version = "0.1.3"
 )]
 public sealed class Main : BasePlugin
 {
@@ -45,6 +45,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.HideAndSeek.Enabled)
             _jail.RegisterSpecialDay(new HideAndSeekDay(Core, _jail));
+
+        if (GlobalConfig.War.Enabled)
+            _jail.RegisterSpecialDay(new WarDay(Core, _jail));
     }
     public override void Load(bool hotReload)
     {
@@ -72,6 +75,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.HideAndSeek.Enabled)
             _jail?.UnregisterSpecialDay("sd_hide_and_seek");
+        
+        if (GlobalConfig.War.Enabled)
+            _jail?.RegisterSpecialDay(new WarDay(Core, _jail));
     }
 }
 public sealed class KnifeFightDay : SpecialDayBase
@@ -183,7 +189,7 @@ public sealed class HideAndSeekDay : SpecialDayBase
     public override string Id => "sd_hide_and_seek";
     public override string Name => Core.Localizer["hide_and_seek.name"];
     public override string Description => Core.Localizer["hide_and_seek.description"];
-    public override int StartCountdown => Config.StartCountdown;
+    public override int StartCountdown => Config.HideTime;
     public override SpecialDayFreezeTeam FreezeTeamOnCountdown => SpecialDayFreezeTeam.Guards;
     public override bool AllowAllWeapons => false;
     public override IReadOnlySet<ItemDefinitionIndex> AllowedWeapons => SpecialDayWeapons.AllKnives;
@@ -247,5 +253,33 @@ public sealed class HideAndSeekDay : SpecialDayBase
                 return player;
         }
         return null;
+    }
+}
+
+public sealed class WarDay : SpecialDayBase
+{
+    // it's so easy to make special days like hns and war with this base :))
+    public WarDay(ISwiftlyCore core, IJailbreak jail)
+        : base(core, jail) { }
+    public WarConfig Config => Main.GlobalConfig.War;
+    public override string Id => "sd_war";
+    public override string Name => Core.Localizer["war.name"];
+    public override string Description => Core.Localizer["war.description"];
+    public override int StartCountdown => Config.PrepareTime;
+    public override SpecialDayFreezeTeam FreezeTeamOnCountdown => SpecialDayFreezeTeam.Prisoners;
+    public override bool AllowAllWeapons => true;
+    public override bool EnableGunsMenu => true;
+    public override bool StripWeaponsOnStart => false;
+    public override bool AllowFriendlyFire => false;
+
+    public override void PreStart()
+    {
+        
+    }
+    public override void Start()
+    {
+    }
+    public override void End()
+    {
     }
 }

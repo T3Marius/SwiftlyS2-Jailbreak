@@ -9,5 +9,8 @@
     "teleport.description": "You change positions with the one you shoot at.",
 
     "hide_and_seek.name": "Hide And Seek",
-    "hide_and_seek.description": "Find a place to hide before CT's gets released!"
+    "hide_and_seek.description": "Find a place to hide before CT's gets released!",
+
+    "war.name": "War",
+    "war.description": "Find a place to withstand the prisoners revolt! Use <font color='yellow'>!sguns</font> to select your desire weapons."
 }
