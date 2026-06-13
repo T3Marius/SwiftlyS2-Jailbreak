@@ -19,7 +19,7 @@ namespace SpecialDays;
     Author = "T3Marius",
     Name = "[JB Core] SpecialDays",
     Id = "SpecialDays",
-    Version = "0.1.3"
+    Version = "0.1.4"
 )]
 public sealed class Main : BasePlugin
 {
@@ -48,6 +48,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.War.Enabled)
             _jail.RegisterSpecialDay(new WarDay(Core, _jail));
+
+        if (GlobalConfig.NoScope.Enabled)
+            _jail.RegisterSpecialDay(new NoScopeDay(Core, _jail));
     }
     public override void Load(bool hotReload)
     {
@@ -77,7 +80,11 @@ public sealed class Main : BasePlugin
             _jail?.UnregisterSpecialDay("sd_hide_and_seek");
         
         if (GlobalConfig.War.Enabled)
-            _jail?.RegisterSpecialDay(new WarDay(Core, _jail));
+            _jail?.UnregisterSpecialDay("sd_war");
+
+        if (GlobalConfig.NoScope.Enabled)
+            _jail?.UnregisterSpecialDay("sd_no_scope");
+
     }
 }
 public sealed class KnifeFightDay : SpecialDayBase
@@ -282,4 +289,56 @@ public sealed class WarDay : SpecialDayBase
     public override void End()
     {
     }
+}
+public sealed class NoScopeDay : SpecialDayBase
+{
+    public NoScopeDay(ISwiftlyCore core, IJailbreak jail)
+        : base(core, jail) { }
+    public NoScopeConfig Config => Main.GlobalConfig.NoScope;
+    public override string Id => "sd_no_scope";
+    public override string Name => Core.Localizer["no_scope.name"];
+    public override string Description => Core.Localizer["no_scope.description"];
+    public override int StartCountdown => Config.StartCountdown;
+    public override SpecialDayFreezeTeam FreezeTeamOnCountdown => SpecialDayFreezeTeam.None;
+    public override IReadOnlySet<ItemDefinitionIndex> AllowedWeapons => SpecialDayWeapons.Snipers;
+    public override bool StripWeaponsOnStart => true;
+    public override bool AllowFriendlyFire => true;
+    public List<string> Snipers { get; set; } = ["weapon_awp", "weapon_ssg08", "weapon_scar20", "weapon_g3sg1"];
+    public override void PreStart()
+    {
+        Core.Event.OnTick += OnTick;
+    }
+    public override void Start()
+    {
+        foreach (var player in Core.PlayerManager.GetAllPlayers())
+        {
+            if (player == null || !player.IsValid)
+                continue;
+
+            var randomIndex = new Random().Next(Snipers.Count);
+            player.Pawn?.ItemServices?.GiveItem<CBaseEntity>(Snipers[randomIndex]);
+        }
+    }
+    public override void End()
+    {
+        Core.Event.OnTick -= OnTick;
+    }
+    private void OnTick()
+    {
+        foreach (var player in Core.PlayerManager.GetAllPlayers())
+        {
+            if (player == null || !player.IsValid)
+                continue;
+            
+            var activeWeapon = player.Pawn?.WeaponServices?.ActiveWeapon.Value;
+            if (activeWeapon == null || !activeWeapon.IsValid)
+                continue;
+
+            activeWeapon.NextPrimaryAttackTick.Value = 999;
+            activeWeapon.NextPrimaryAttackTickRatio  = 999;
+            activeWeapon.NextPrimaryAttackTickUpdated();
+            activeWeapon.NextPrimaryAttackTickRatioUpdated();
+        }
+    }
+        
 }

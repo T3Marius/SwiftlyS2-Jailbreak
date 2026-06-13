@@ -7,6 +7,7 @@ public sealed class SDConfig
     public TeleportConfig    Teleport    { get; set; }    = new();
     public HideAndSeekConfig HideAndSeek { get; set; }    = new();
     public WarConfig         War         { get; set; }    = new();
+    public NoScopeConfig     NoScope     { get; set; }    = new();
 }
 public sealed class KnifeFightConfig
 {
@@ -32,4 +33,9 @@ public sealed class WarConfig
 {
     public bool Enabled { get; set; } = true;
     public int PrepareTime { get; set; } = 30;
+}
+public sealed class NoScopeConfig
+{
+    public bool Enabled { get; set; } = true;
+    public int StartCountdown { get; set; } = 15;
 }
