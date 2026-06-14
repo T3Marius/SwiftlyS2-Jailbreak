@@ -258,7 +258,7 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [X] Add HideAndSeek     day.
 - [X] Add War             day.
 - [X] Add NoScope         day.
-- [ ] Add Scout           day.
+- [X] Add Scout           day.
 - [ ] Add Taser           day.
 - [ ] Add OneInTheChamber day.
 - [ ] Add OnlyHeadshot    day.

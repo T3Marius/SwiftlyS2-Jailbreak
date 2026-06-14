@@ -19,7 +19,7 @@ namespace SpecialDays;
     Author = "T3Marius",
     Name = "[JB Core] SpecialDays",
     Id = "SpecialDays",
-    Version = "0.1.4"
+    Version = "0.1.5"
 )]
 public sealed class Main : BasePlugin
 {
@@ -51,6 +51,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.NoScope.Enabled)
             _jail.RegisterSpecialDay(new NoScopeDay(Core, _jail));
+
+        if (GlobalConfig.Scout.Enabled)
+            _jail.RegisterSpecialDay(new ScoutDay(Core, _jail));
     }
     public override void Load(bool hotReload)
     {
@@ -84,6 +87,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.NoScope.Enabled)
             _jail?.UnregisterSpecialDay("sd_no_scope");
+
+        if (GlobalConfig.Scout.Enabled)
+            _jail?.UnregisterSpecialDay("sd_scout");
 
     }
 }
@@ -370,6 +376,53 @@ public sealed class NoScopeDay : SpecialDayBase
 
             activeWeapon.NextSecondaryAttackTick.Value = Core.Engine.GlobalVars.TickCount + 500;
             activeWeapon.NextSecondaryAttackTickUpdated();
+        }
+    }
+}
+
+public sealed class ScoutDay : SpecialDayBase
+{
+    private const string ScoutClassname = "weapon_ssg08";
+
+    public ScoutDay(ISwiftlyCore core, IJailbreak jail)
+        : base(core, jail) { }
+
+    public ScoutConfig Config => Main.GlobalConfig.Scout;
+    public override string Id => "sd_scout";
+    public override string Name => Core.Localizer["scout.name"];
+    public override string Description => Core.Localizer["scout.description", Config.Gravity];
+    public override int StartCountdown => Config.StartCountdown;
+    public override SpecialDayFreezeTeam FreezeTeamOnCountdown => SpecialDayFreezeTeam.None;
+    public override IReadOnlySet<ItemDefinitionIndex> AllowedWeapons => SpecialDayWeapons.Snipers;
+    public override IReadOnlyList<ItemDefinitionIndex> GunsMenuWeapons => [ItemDefinitionIndex.Ssg08];
+    public override bool StripWeaponsOnStart => true;
+    public override IReadOnlyList<string> GiveWeaponsOnStart => [ScoutClassname];
+    public override bool AllowFriendlyFire => true;
+
+    public override void Start()
+    {
+        SetPlayersGravity(Config.Gravity);
+    }
+
+    public override void End()
+    {
+        SetPlayersGravity(1f);
+    }
+
+    private void SetPlayersGravity(float gravity)
+    {
+        foreach (var player in Core.PlayerManager.GetAllPlayers())
+        {
+            if (player == null || !player.IsValid || !player.IsAlive)
+                continue;
+
+            var pawn = player.PlayerPawn;
+            if (pawn == null || !pawn.IsValid)
+                continue;
+
+            pawn.GravityScale = gravity;
+            pawn.ActualGravityScale = gravity;
+            pawn.GravityScaleUpdated();
         }
     }
 }

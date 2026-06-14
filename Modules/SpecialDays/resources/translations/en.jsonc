@@ -15,5 +15,8 @@
     "war.description": "Find a place to withstand the prisoners revolt! Use <font color='yellow'>!sguns</font> to select your desire weapons.",
 
     "no_scope.name": "No Scope",
-    "no_scope.description": "Fight with sniper rifles only. Pick your shots carefully."
+    "no_scope.description": "Fight with sniper rifles only. Pick your shots carefully.",
+
+    "scout.name": "Scout",
+    "scout.description": "Everyone gets a scout and low gravity. Gravity: <font color='yellow'>{0}</font>."
 }
