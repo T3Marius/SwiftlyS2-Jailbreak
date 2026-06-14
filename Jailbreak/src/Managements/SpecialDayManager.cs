@@ -60,6 +60,7 @@ public sealed class SpecialDayManager
     public ISpecialDay? QueuedSpecialDay { get; private set; }
     public int CooldownRoundsRemaining { get; private set; }
     public bool IsSpecialDayActive => CurrentSpecialDay != null;
+    public bool IsSpecialDayCountdownActive => _countdownFreezeActive;
     public bool HasQueuedOrActiveSpecialDay => QueuedSpecialDay != null || CurrentSpecialDay != null;
 
     public void Register()

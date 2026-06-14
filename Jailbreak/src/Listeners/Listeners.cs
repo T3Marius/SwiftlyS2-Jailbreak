@@ -2,6 +2,8 @@ using Jailbreak.Contract;
 using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Events;
+using SwiftlyS2.Shared.GameEvents;
+using SwiftlyS2.Shared.Misc;
 using SwiftlyS2.Shared.Players;
 
 namespace Jailbreak;
@@ -54,6 +56,15 @@ public sealed class Listeners
 
     private void OnEntityTakeDamage(IOnEntityTakeDamageEvent e)
     {
+        if (_specialDayManager.IsSpecialDayCountdownActive)
+        {
+            e.Info.Damage = 0;
+            e.Info.TotalledDamage = 0;
+            e.DamageResult.DamageDealt = 0;
+            e.Result = HookResult.Stop;
+            return;
+        }
+
         if (_specialDayManager.IsSpecialDayActive)
             return;
 
