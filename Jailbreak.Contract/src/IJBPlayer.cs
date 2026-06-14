@@ -49,7 +49,7 @@ namespace Jailbreak.Contract
 
         /// <param name="killerName">Used for the 'killed' off-reason to fill the {1} placeholder in the translation.</param>
         void SetWarden(bool state, string? offReason = null, string? killerName = null, bool silent = false);
-        void SetDeputy(bool state, string? offReason = null);
+        void SetDeputy(bool state, string? offReason = null, bool silent = false);
         void SetRebel(bool state, string? offReason = null);
         void SetFreeday(bool state, string? offReason = null);
 

@@ -100,7 +100,7 @@ public sealed class JBPlayer : IJBPlayer
         ApplyTeamDefaults();
     }
 
-    public void SetDeputy(bool state, string? offReason = null)
+    public void SetDeputy(bool state, string? offReason = null, bool silent = false)
     {
         if (state)
         {
@@ -120,7 +120,8 @@ public sealed class JBPlayer : IJBPlayer
             if (!string.IsNullOrEmpty(_modelsConfig.DeputyModel))
                 PlayerUtils.SetModel(livePlayer, _modelsConfig.DeputyModel, _core.Scheduler);
 
-            _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["new_deputy_alert", Player.Name]);
+            if (!silent)
+                _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["new_deputy_alert", Player.Name]);
 
             return;
         }
@@ -128,7 +129,8 @@ public sealed class JBPlayer : IJBPlayer
         if (Role == JBRole.Deputy)
             Role = JBRole.None;
         
-        _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["no_deputy_alert"]);
+        if (!silent)
+            _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["no_deputy_alert"]);
 
         SyncTeam();
         ApplyTeamDefaults();

@@ -334,10 +334,13 @@ public sealed class Events
         if (currentWarden != null)
         {
             _cuffsManager.OnWardenRemove(currentWarden);
-            currentWarden.SetWarden(false);
-            _wardenTagManager.RefreshNow();
+            currentWarden.SetWarden(false, silent: true);
         }
 
+        var currentDeputy = _players.GetDeputy();
+        currentDeputy?.SetDeputy(false, silent: true);
+
+        _wardenTagManager.RefreshNow();
         _cuffsManager.CleanupAll();
 
         foreach (var player in _players.GetAllPlayers())
