@@ -12,5 +12,8 @@
     "hide_and_seek.description": "Find a place to hide before CT's gets released!",
 
     "war.name": "War",
-    "war.description": "Find a place to withstand the prisoners revolt! Use <font color='yellow'>!sguns</font> to select your desire weapons."
+    "war.description": "Find a place to withstand the prisoners revolt! Use <font color='yellow'>!sguns</font> to select your desire weapons.",
+
+    "no_scope.name": "No Scope",
+    "no_scope.description": "Fight with sniper rifles only. Pick your shots carefully."
 }

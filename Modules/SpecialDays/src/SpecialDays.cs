@@ -162,6 +162,7 @@ public sealed class TeleportDay : SpecialDayBase
         if (_playerHurtId.HasValue)
         {
             Core.GameEvent.Unhook(_playerHurtId.Value);
+            _playerHurtId = null;
         }
     }
 
@@ -204,19 +205,34 @@ public sealed class HideAndSeekDay : SpecialDayBase
     public override IReadOnlyList<string> GiveWeaponsOnStart => ["weapon_knife"];
     public override bool StripWeaponsOnStart => true;
     public override bool AllowFriendlyFire => false;
+
+    private bool _damageHooked;
+
     public override void PreStart()
     {
+        if (_damageHooked)
+            return;
+
         Core.Event.OnEntityTakeDamage += OnTakeDamage;
+        _damageHooked = true;
     }
+
     public override void Start()
     {
         SetPrisonersMoveType(MoveType_t.MOVETYPE_OBSOLETE);
     }
+
     public override void End()
     {
         SetPrisonersMoveType(MoveType_t.MOVETYPE_WALK);
-        Core.Event.OnEntityTakeDamage -= OnTakeDamage;
+
+        if (_damageHooked)
+        {
+            Core.Event.OnEntityTakeDamage -= OnTakeDamage;
+            _damageHooked = false;
+        }
     }
+
     private void OnTakeDamage(IOnEntityTakeDamageEvent e)
     {
         var rawVictim = GetPlayerFromEntity(e.Entity);
@@ -228,8 +244,11 @@ public sealed class HideAndSeekDay : SpecialDayBase
             return;
 
         e.Info.Damage = 0;
+        e.Info.TotalledDamage = 0;
+        e.DamageResult.DamageDealt = 0;
         e.Result = HookResult.Stop;
     }
+
     private void SetPrisonersMoveType(MoveType_t moveType)
     {
         foreach (var prisoner in Jailbreak.Players.GetPlayersByTeam(JBTeam.Prisoner))
@@ -246,6 +265,7 @@ public sealed class HideAndSeekDay : SpecialDayBase
             pawn.MoveTypeUpdated();
         }
     }
+
     private IPlayer? GetPlayerFromEntity(CEntityInstance entity)
     {
         var pawn = entity.As<CCSPlayerPawn>();
@@ -265,9 +285,9 @@ public sealed class HideAndSeekDay : SpecialDayBase
 
 public sealed class WarDay : SpecialDayBase
 {
-    // it's so easy to make special days like hns and war with this base :))
     public WarDay(ISwiftlyCore core, IJailbreak jail)
         : base(core, jail) { }
+
     public WarConfig Config => Main.GlobalConfig.War;
     public override string Id => "sd_war";
     public override string Name => Core.Localizer["war.name"];
@@ -279,21 +299,22 @@ public sealed class WarDay : SpecialDayBase
     public override bool StripWeaponsOnStart => false;
     public override bool AllowFriendlyFire => false;
 
-    public override void PreStart()
-    {
-        
-    }
     public override void Start()
     {
     }
+
     public override void End()
     {
     }
 }
+
 public sealed class NoScopeDay : SpecialDayBase
 {
+    private static readonly ItemDefinitionIndex[] SniperWeapons = SpecialDayWeapons.Snipers.ToArray();
+
     public NoScopeDay(ISwiftlyCore core, IJailbreak jail)
         : base(core, jail) { }
+
     public NoScopeConfig Config => Main.GlobalConfig.NoScope;
     public override string Id => "sd_no_scope";
     public override string Name => Core.Localizer["no_scope.name"];
@@ -301,44 +322,54 @@ public sealed class NoScopeDay : SpecialDayBase
     public override int StartCountdown => Config.StartCountdown;
     public override SpecialDayFreezeTeam FreezeTeamOnCountdown => SpecialDayFreezeTeam.None;
     public override IReadOnlySet<ItemDefinitionIndex> AllowedWeapons => SpecialDayWeapons.Snipers;
+    public override IReadOnlyList<ItemDefinitionIndex> GunsMenuWeapons => SniperWeapons;
     public override bool StripWeaponsOnStart => true;
     public override bool AllowFriendlyFire => true;
-    public List<string> Snipers { get; set; } = ["weapon_awp", "weapon_ssg08", "weapon_scar20", "weapon_g3sg1"];
-    public override void PreStart()
-    {
-        Core.Event.OnTick += OnTick;
-    }
+
     public override void Start()
     {
+        Core.Event.OnTick += OnTick;
+
         foreach (var player in Core.PlayerManager.GetAllPlayers())
         {
-            if (player == null || !player.IsValid)
+            if (player == null || !player.IsValid || !player.IsAlive)
                 continue;
 
-            var randomIndex = new Random().Next(Snipers.Count);
-            player.Pawn?.ItemServices?.GiveItem<CBaseEntity>(Snipers[randomIndex]);
+            GiveRandomSniper(player);
         }
     }
+
     public override void End()
     {
         Core.Event.OnTick -= OnTick;
     }
+
+    private void GiveRandomSniper(IPlayer player)
+    {
+        if (SniperWeapons.Length == 0)
+            return;
+
+        var weapon = SniperWeapons[Random.Shared.Next(SniperWeapons.Length)];
+        var classname = Core.Helpers.GetClassnameByDefinitionIndex(weapon);
+        if (string.IsNullOrEmpty(classname))
+            return;
+
+        player.Pawn?.ItemServices?.GiveItem<CBaseEntity>(classname);
+    }
+
     private void OnTick()
     {
         foreach (var player in Core.PlayerManager.GetAllPlayers())
         {
-            if (player == null || !player.IsValid)
+            if (player == null || !player.IsValid || !player.IsAlive)
                 continue;
-            
+
             var activeWeapon = player.Pawn?.WeaponServices?.ActiveWeapon.Value;
             if (activeWeapon == null || !activeWeapon.IsValid)
                 continue;
 
-            activeWeapon.NextPrimaryAttackTick.Value = 999;
-            activeWeapon.NextPrimaryAttackTickRatio  = 999;
-            activeWeapon.NextPrimaryAttackTickUpdated();
-            activeWeapon.NextPrimaryAttackTickRatioUpdated();
+            activeWeapon.NextSecondaryAttackTick.Value = Core.Engine.GlobalVars.TickCount + 500;
+            activeWeapon.NextSecondaryAttackTickUpdated();
         }
     }
-        
 }
