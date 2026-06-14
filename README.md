@@ -78,7 +78,12 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 | Day | Module | Settings |
 | --- | --- | --- |
 | Knife Fight | `Modules/SpecialDays` | Knives only, no guns menu, no countdown freeze, friendly fire enabled. |
-| Free For All | `Modules/SpecialDays` | Everyone is on his own. Player uses !sguns to select their desier guns. |
+| Free For All | `Modules/SpecialDays` | Everyone is on their own. Players use `!sguns` to select their desired guns. |
+| Teleport | `Modules/SpecialDays` | Players swap positions with the target they shoot. |
+| Hide And Seek | `Modules/SpecialDays` | Guards are frozen during hide time, then prisoners are frozen while guards hunt. |
+| War | `Modules/SpecialDays` | Prisoners are frozen during preparation, guards can prepare with `!sguns`. |
+| No Scope | `Modules/SpecialDays` | Sniper-only FFA with secondary attack blocked to prevent scoping. |
+| Scout | `Modules/SpecialDays` | Scout-only FFA with configurable low gravity. |
 
 ### Current Last Requests
 
