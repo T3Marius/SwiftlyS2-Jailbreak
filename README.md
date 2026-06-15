@@ -84,6 +84,7 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 | War | `Modules/SpecialDays` | Prisoners are frozen during preparation, guards can prepare with `!sguns`. |
 | No Scope | `Modules/SpecialDays` | Sniper-only FFA with secondary attack blocked to prevent scoping. |
 | Scout | `Modules/SpecialDays` | Scout-only FFA with configurable low gravity. |
+| Taser | `Modules/SpecialDays` | Taser-only FFA. |
 
 ### Current Last Requests
 
@@ -264,7 +265,7 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [X] Add War             day.
 - [X] Add NoScope         day.
 - [X] Add Scout           day.
-- [ ] Add Taser           day.
+- [X] Add Taser           day.
 - [ ] Add OneInTheChamber day.
 - [ ] Add OnlyHeadshot    day.
 

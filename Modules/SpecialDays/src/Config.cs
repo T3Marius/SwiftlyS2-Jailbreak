@@ -9,6 +9,7 @@ public sealed class SDConfig
     public WarConfig         War         { get; set; }    = new();
     public NoScopeConfig     NoScope     { get; set; }    = new();
     public ScoutConfig       Scout       { get; set; }    = new();
+    public TaserConfig       Taser       { get; set; }    = new();
 }
 public sealed class KnifeFightConfig
 {
@@ -45,4 +46,9 @@ public sealed class ScoutConfig
     public bool Enabled { get; set; } = true;
     public int StartCountdown { get; set; } = 15;
     public float Gravity { get; set; } = 0.4f;
+}
+public sealed class TaserConfig
+{
+    public bool Enabled { get; set; } = true;
+    public int StartCountdown { get; set; } = 15;
 }

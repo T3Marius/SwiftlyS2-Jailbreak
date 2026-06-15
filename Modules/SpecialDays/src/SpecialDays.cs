@@ -19,7 +19,7 @@ namespace SpecialDays;
     Author = "T3Marius",
     Name = "[JB Core] SpecialDays",
     Id = "SpecialDays",
-    Version = "0.1.5"
+    Version = "0.1.6"
 )]
 public sealed class Main : BasePlugin
 {
@@ -54,6 +54,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.Scout.Enabled)
             _jail.RegisterSpecialDay(new ScoutDay(Core, _jail));
+
+        if (GlobalConfig.Taser.Enabled)
+            _jail.RegisterSpecialDay(new TaserDay(Core, _jail));
     }
     public override void Load(bool hotReload)
     {
@@ -90,6 +93,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.Scout.Enabled)
             _jail?.UnregisterSpecialDay("sd_scout");
+
+        if (GlobalConfig.Taser.Enabled)
+            _jail?.UnregisterSpecialDay("sd_taser");
 
     }
 }
@@ -425,4 +431,29 @@ public sealed class ScoutDay : SpecialDayBase
             pawn.GravityScaleUpdated();
         }
     }
+}
+public sealed class TaserDay : SpecialDayBase
+{
+    public TaserDay(ISwiftlyCore core, IJailbreak jail)
+        : base(core, jail) { }
+
+    public override string Id => "sd_taser";
+    public override string Name => Core.Localizer["taser.name"];
+    public override string Description => Core.Localizer["taser.description"];
+    public override int StartCountdown => Main.GlobalConfig.Taser.StartCountdown;
+
+    public override SpecialDayFreezeTeam FreezeTeamOnCountdown => SpecialDayFreezeTeam.None;
+    public override bool AllowAllWeapons => false;
+    public override IReadOnlySet<ItemDefinitionIndex> AllowedWeapons => new HashSet<ItemDefinitionIndex>
+    {
+        ItemDefinitionIndex.Taser
+    };
+
+    public override bool EnableGunsMenu => false;
+    public override bool StripWeaponsOnStart => true;
+    public override IReadOnlyList<string> GiveWeaponsOnStart => ["weapon_taser"];
+    public override bool AllowFriendlyFire => true;
+
+    public override void Start() { }
+    public override void End() { }
 }
