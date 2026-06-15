@@ -270,7 +270,7 @@ Releases are created from tags through `.github/workflows/release.yml`.
 
 - [ ] Add more TODO items.
 
-## ☕ If you'd like to support me! Any donation is deeply appreciated.
+## ☕ If you'd like to support me, any donation is deeply appreciated!
 
 <a href="https://buymeacoffee.com/t3marius" target="_blank">
   <img
