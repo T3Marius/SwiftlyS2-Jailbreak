@@ -16,11 +16,11 @@ public sealed class CellManager(ISwiftlyCore core)
     {
         CellsOpen = true;
 
-        Utils.ForceEntInput("func_door",          "Open", core.EntitySystem, core.Scheduler);
-        Utils.ForceEntInput("func_door_rotating", "Open", core.EntitySystem, core.Scheduler);
-        Utils.ForceEntInput("func_movelinear",    "Open", core.EntitySystem, core.Scheduler);
+        Utils.ForceEntInput("func_door",          "Open",  core.EntitySystem, core.Scheduler);
+        Utils.ForceEntInput("func_door_rotating", "Open",  core.EntitySystem, core.Scheduler);
+        Utils.ForceEntInput("func_movelinear",    "Open",  core.EntitySystem, core.Scheduler);
         Utils.ForceEntInput("func_breakable",     "Break", core.EntitySystem, core.Scheduler);
-        Utils.ForceEntInput("prop_door_rotating", "Open", core.EntitySystem, core.Scheduler);
+        Utils.ForceEntInput("prop_door_rotating", "Open",  core.EntitySystem, core.Scheduler);
 
     }
 
@@ -28,10 +28,10 @@ public sealed class CellManager(ISwiftlyCore core)
     {
         CellsOpen = false;
 
-        Utils.ForceEntInput("func_door",          "Close", core.EntitySystem, core.Scheduler);
-        Utils.ForceEntInput("func_door_rotating", "Close", core.EntitySystem, core.Scheduler);
-        Utils.ForceEntInput("func_movelinear",    "Close", core.EntitySystem, core.Scheduler);
+        Utils.ForceEntInput("func_door",          "Close",  core.EntitySystem, core.Scheduler);
+        Utils.ForceEntInput("func_door_rotating", "Close",  core.EntitySystem, core.Scheduler);
+        Utils.ForceEntInput("func_movelinear",    "Close",  core.EntitySystem, core.Scheduler);
         Utils.ForceEntInput("func_breakable",     "Repair", core.EntitySystem, core.Scheduler);     // idk if it works, need to find a way to reset breakables.
-        Utils.ForceEntInput("prop_door_rotating", "Close", core.EntitySystem, core.Scheduler);
+        Utils.ForceEntInput("prop_door_rotating", "Close",  core.EntitySystem, core.Scheduler);
     }
 }
