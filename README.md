@@ -86,7 +86,7 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 | Scout | `Modules/SpecialDays` | Scout-only FFA with configurable low gravity. |
 | Taser | `Modules/SpecialDays` | Taser-only FFA. |
 | OneInTheChamber | `Modules/SpecialDays` | Classic OITC mode, weapon configurable from config. |
-
+| OnlyHeadshot | `Modules/SpecialDays` | Onlyheadshot day, all weapons allowed. |
 ### Current Last Requests
 
 | LR | Module | Settings |
@@ -268,7 +268,7 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [X] Add Scout           day.
 - [X] Add Taser           day.
 - [X] Add OneInTheChamber day.
-- [ ] Add OnlyHeadshot    day.
+- [X] Add OnlyHeadshot    day.
 
 - [ ] Add more TODO items.
 

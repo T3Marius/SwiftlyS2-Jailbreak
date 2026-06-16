@@ -19,7 +19,7 @@ namespace SpecialDays;
     Author = "T3Marius",
     Name = "[JB Core] SpecialDays",
     Id = "SpecialDays",
-    Version = "0.1.7"
+    Version = "0.1.8"
 )]
 public sealed class Main : BasePlugin
 {
@@ -60,6 +60,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.OneInTheChamber.Enabled)
             _jail.RegisterSpecialDay(new OneInTheChamberDay(Core, _jail));
+
+        if (GlobalConfig.Onlyheadshot.Enabled)
+            _jail.RegisterSpecialDay(new OnlyheadshotDay(Core, _jail));
     }
     public override void Load(bool hotReload)
     {
@@ -102,6 +105,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.OneInTheChamber.Enabled)
             _jail?.UnregisterSpecialDay("sd_one_in_the_chamber");
+
+        if (GlobalConfig.Onlyheadshot.Enabled)
+            _jail?.UnregisterSpecialDay("sd_only_headshot");
 
     }
 }
@@ -633,3 +639,38 @@ public sealed class OneInTheChamberDay : SpecialDayBase
         }
     }
 }
+public sealed class OnlyheadshotDay : SpecialDayBase
+{
+    public OnlyheadshotDay(ISwiftlyCore core, IJailbreak jail)
+        : base(core, jail) { }
+    public override string Id => "sd_headshot_only";
+    public override string Name => Core.Localizer["headshot_only.name"];
+    public override string Description => Core.Localizer["headshot_only.description"];
+    public override int StartCountdown => Main.GlobalConfig.Onlyheadshot.StartCountdown;
+    public override SpecialDayFreezeTeam FreezeTeamOnCountdown => SpecialDayFreezeTeam.None;
+    public override bool AllowAllWeapons => true;
+    public override bool EnableGunsMenu => true;
+    public override bool StripWeaponsOnStart => false;
+    public override bool AllowFriendlyFire => true;
+
+    public override void Start()
+    {
+        Core.Event.OnEntityTakeDamage += OnTakeDamage;
+    }
+    public override void End()
+    {
+        Core.Event.OnEntityTakeDamage -= OnTakeDamage;
+    }
+    private void OnTakeDamage(IOnEntityTakeDamageEvent e)
+    {
+        if (!e.Entity.DesignerName.Contains("player"))
+            return;
+
+        if (e.Info.ActualHitGroup != HitGroup_t.HITGROUP_HEAD)
+        {
+            e.Info.Damage = 0;
+            e.Result = HookResult.Stop;
+        }
+    }
+}
+
