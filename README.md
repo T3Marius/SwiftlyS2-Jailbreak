@@ -85,6 +85,7 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 | No Scope | `Modules/SpecialDays` | Sniper-only FFA with secondary attack blocked to prevent scoping. |
 | Scout | `Modules/SpecialDays` | Scout-only FFA with configurable low gravity. |
 | Taser | `Modules/SpecialDays` | Taser-only FFA. |
+| OneInTheChamber | `Modules/SpecialDays` | Classic OITC mode, weapon configurable from config. |
 
 ### Current Last Requests
 
