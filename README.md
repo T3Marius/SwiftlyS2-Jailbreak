@@ -221,7 +221,7 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [x] Build the SpecialDays interface system and wire it into core.
 - [X] Create LastRequest modules.
 - [x] Create first SpecialDays module.
-- [ ] Add more SpecialDays modules.
+- [x] Add more SpecialDays modules.
 - [ ] Add more LastRequests modules.
 - [x] Save Last Request wins and losses in database.
 - [x] Save Special Day wins and losses in database.
