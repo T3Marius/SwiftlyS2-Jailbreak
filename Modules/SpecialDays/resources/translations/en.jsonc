@@ -21,5 +21,8 @@
     "scout.description": "Everyone gets a scout and low gravity. Gravity: <font color='yellow'>{0}</font>.",
 
     "taser.name": "Taser",
-    "taser.description": "Fight with taser only. Pick your tase carefully."
+    "taser.description": "Fight with taser only. Pick your tase carefully.",
+
+    "one_in_the_chamber.name": "One In The Chamber",
+    "one_in_the_chamber.description": "Each bullet is insta kill! You get one bullet per kill. You can use knife too and it will refill."
 }

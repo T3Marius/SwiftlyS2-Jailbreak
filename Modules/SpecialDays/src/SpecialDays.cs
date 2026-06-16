@@ -19,7 +19,7 @@ namespace SpecialDays;
     Author = "T3Marius",
     Name = "[JB Core] SpecialDays",
     Id = "SpecialDays",
-    Version = "0.1.6"
+    Version = "0.1.7"
 )]
 public sealed class Main : BasePlugin
 {
@@ -57,6 +57,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.Taser.Enabled)
             _jail.RegisterSpecialDay(new TaserDay(Core, _jail));
+
+        if (GlobalConfig.OneInTheChamber.Enabled)
+            _jail.RegisterSpecialDay(new OneInTheChamberDay(Core, _jail));
     }
     public override void Load(bool hotReload)
     {
@@ -96,6 +99,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.Taser.Enabled)
             _jail?.UnregisterSpecialDay("sd_taser");
+
+        if (GlobalConfig.OneInTheChamber.Enabled)
+            _jail?.UnregisterSpecialDay("sd_one_in_the_chamber");
 
     }
 }
@@ -456,4 +462,174 @@ public sealed class TaserDay : SpecialDayBase
 
     public override void Start() { }
     public override void End() { }
+}
+public sealed class OneInTheChamberDay : SpecialDayBase
+{
+    public OneInTheChamberDay(ISwiftlyCore core, IJailbreak jail)
+        : base(core, jail) { }
+
+    public override string Id => "sd_one_in_the_chamber";
+    public override string Name => Core.Localizer["one_in_the_chamber.name"];
+    public override string Description => Core.Localizer["one_in_the_chamber.description"];
+    public override int StartCountdown => Main.GlobalConfig.OneInTheChamber.StartCountdown;
+    public override SpecialDayFreezeTeam FreezeTeamOnCountdown => SpecialDayFreezeTeam.None;
+    public override bool AllowAllWeapons => false;
+    private ItemDefinitionIndex? GetConfiguredOitcWeapon()
+    {
+        foreach (var weapon in SpecialDayWeapons.GunsMenuWeapons)
+        {
+            var classname = Core.Helpers.GetClassnameByDefinitionIndex(weapon);
+
+            if (string.Equals(classname, Main.GlobalConfig.OneInTheChamber.OitcGun, StringComparison.OrdinalIgnoreCase))
+                return weapon;
+        }
+        return null;
+    }
+    public override IReadOnlySet<ItemDefinitionIndex> AllowedWeapons
+    {
+        get
+        {
+            var allowed = SpecialDayWeapons.AllKnives.ToHashSet();
+
+            var weapon = GetConfiguredOitcWeapon();
+            if (weapon.HasValue)
+                allowed.Add(weapon.Value);
+
+            return allowed;
+        }
+    }
+    public override bool StripWeaponsOnStart => true;
+    public override IReadOnlyList<string> GiveWeaponsOnStart => [""];
+    public override bool EnableGunsMenu => false;
+    public override bool AllowFriendlyFire => true;
+
+    private Guid? _playerDeathId;
+
+    public override void Start()
+    {
+        foreach (var player in Core.PlayerManager.GetAllPlayers())
+        {
+            if (player == null || !player.IsValid)
+                continue;
+            GiveWeapon(player, Main.GlobalConfig.OneInTheChamber.OitcGun);
+            Core.Scheduler.NextWorldUpdate(() =>
+            {
+                SetAmmo(player, 1, 0); 
+            });
+        }
+
+        Core.Event.OnEntityTakeDamage += OnTakeDamage;
+        _playerDeathId = Core.GameEvent.HookPost<EventPlayerDeath>(OnPlayerDeath);
+    }
+    public override void End()
+    {
+        Core.Event.OnEntityTakeDamage -= OnTakeDamage;
+        if (_playerDeathId.HasValue)
+        {
+            Core.GameEvent.Unhook(_playerDeathId.Value);
+        }
+    }
+    private void OnTakeDamage(IOnEntityTakeDamageEvent e)
+    {
+        if (!e.Entity.DesignerName.Contains("player"))
+            return;
+
+        CCSPlayerPawn? attackerPawn;
+        try
+        {
+            attackerPawn = e.Info.AttackerInfo.AttackerPawn.Value;
+        }
+        catch (NullReferenceException)
+        {
+            return;
+        }
+
+        if (attackerPawn == null || !attackerPawn.IsValid)
+            return;
+
+        if (attackerPawn.WeaponServices == null)
+            return;
+
+        CBasePlayerWeapon? activeWeapon;
+        try
+        {
+            activeWeapon = attackerPawn.WeaponServices.ActiveWeapon.Value;
+        }
+        catch (NullReferenceException)
+        {
+            return;
+        }
+
+        if (activeWeapon == null)
+            return;
+
+        var player = attackerPawn.ToPlayer();
+        if (player == null)
+            return;
+
+        if (activeWeapon.DesignerName == Main.GlobalConfig.OneInTheChamber.OitcGun)
+        {
+            IncrementPlayerAmmo(player);
+            e.Info.Damage = 9999;
+        }
+    }
+    private HookResult OnPlayerDeath(EventPlayerDeath e)
+    {
+        if (e.AttackerPlayer is not IPlayer player)
+            return HookResult.Continue;
+
+        if (!e.Weapon.Contains("knife")) // only check this event for knife deaths
+        {
+            return HookResult.Continue;
+        }
+        IncrementPlayerAmmo(player);
+
+        return HookResult.Continue;
+    }
+    private void SetAmmo(IPlayer player, int ammo, int reserve)
+    {
+        var pawn = player.Pawn;
+        if (pawn == null || !pawn.IsValid)
+            return;
+
+        if (pawn.WeaponServices == null)
+            return;
+
+        // set ammo for all weapons
+        foreach (var weapon in pawn.WeaponServices.MyValidWeapons)
+        {
+            weapon.Clip1          = ammo;
+            weapon.Clip2          = reserve;
+            weapon.ReserveAmmo[0] = reserve;
+
+            weapon.Clip1Updated();
+            weapon.Clip2Updated();
+            weapon.ReserveAmmoUpdated();
+        }
+    }
+    private void GiveWeapon(IPlayer player, string weapon_name)
+    {
+        if (player.Pawn == null)
+            return;
+
+        if (player.Pawn.ItemServices == null)
+            return;
+
+        player.Pawn.ItemServices.GiveItem<CBaseEntity>(weapon_name);
+        player.Pawn.ItemServices.GiveItem<CBaseEntity>(player.Controller.Team == Team.T ? "weapon_knife_t" : "weapon_knife");
+    }
+    private void IncrementPlayerAmmo(IPlayer player)
+    {
+        var pawn = player.Pawn;
+        if (pawn == null || pawn.WeaponServices == null)
+            return;
+
+        foreach (var weapon in pawn.WeaponServices.MyValidWeapons)
+        {
+            weapon.Clip1 += 1;
+            weapon.Clip2 += 1;
+            weapon.Clip1Updated();
+            weapon.Clip2Updated();
+        }
+    }
 }

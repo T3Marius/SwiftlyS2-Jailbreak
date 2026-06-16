@@ -2,14 +2,15 @@ namespace SpecialDays;
 
 public sealed class SDConfig
 {
-    public KnifeFightConfig  KnifeFight  { get; set; }    = new();
-    public FreeForAllConfig  FreeForAll  { get; set; }    = new();
-    public TeleportConfig    Teleport    { get; set; }    = new();
-    public HideAndSeekConfig HideAndSeek { get; set; }    = new();
-    public WarConfig         War         { get; set; }    = new();
-    public NoScopeConfig     NoScope     { get; set; }    = new();
-    public ScoutConfig       Scout       { get; set; }    = new();
-    public TaserConfig       Taser       { get; set; }    = new();
+    public OneInTheChamberConfig OneInTheChamber { get; set; } = new();
+    public KnifeFightConfig      KnifeFight  { get; set; }    = new();
+    public FreeForAllConfig      FreeForAll  { get; set; }    = new();
+    public TeleportConfig        Teleport    { get; set; }    = new();
+    public HideAndSeekConfig     HideAndSeek { get; set; }    = new();
+    public WarConfig             War         { get; set; }    = new();
+    public NoScopeConfig         NoScope     { get; set; }    = new();
+    public ScoutConfig           Scout       { get; set; }    = new();
+    public TaserConfig           Taser       { get; set; }    = new();
 }
 public sealed class KnifeFightConfig
 {
@@ -51,4 +52,10 @@ public sealed class TaserConfig
 {
     public bool Enabled { get; set; } = true;
     public int StartCountdown { get; set; } = 15;
+}
+public sealed class OneInTheChamberConfig
+{
+    public bool Enabled { get; set; } = true;
+    public int StartCountdown { get; set; } = 15;
+    public string OitcGun { get; set; } = "weapon_deagle";
 }
