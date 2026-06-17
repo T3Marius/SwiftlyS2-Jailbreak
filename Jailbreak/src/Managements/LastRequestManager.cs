@@ -335,18 +335,19 @@ public sealed class LastRequestManager
             return;
 
         var rawVictim = GetPlayerFromEntity(e.Entity);
-        if (rawVictim == null)
-            return;
-
-        var victim = _players.SyncPlayer(rawVictim);
-        if (victim == null || !IsParticipant(lastRequest, _currentContext, victim))
-            return;
+        var victim = rawVictim == null ? null : _players.SyncPlayer(rawVictim);
 
         var attackerPawn = e.Info.AttackerInfo.AttackerPawn.Value;
         var rawAttacker = attackerPawn?.ToPlayer();
         var attacker = rawAttacker == null ? null : _players.SyncPlayer(rawAttacker);
 
-        if (_countdownActive || attacker == null || !IsParticipant(lastRequest, _currentContext, attacker))
+        var victimIsParticipant = victim != null && IsParticipant(lastRequest, _currentContext, victim);
+        var attackerIsParticipant = attacker != null && IsParticipant(lastRequest, _currentContext, attacker);
+
+        if (!victimIsParticipant && !attackerIsParticipant)
+            return;
+
+        if (_countdownActive || !victimIsParticipant || !attackerIsParticipant)
             BlockDamage(e);
     }
 
