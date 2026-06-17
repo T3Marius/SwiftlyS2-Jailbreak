@@ -3,5 +3,8 @@
     "knife_fight.description": "Fight the <font color='blue'>guard</font> with a knife.",
 
     "shot_for_shot.name": "Shot For Shot",
-    "shot_for_shot.description": "A random player will be chosen to have the first bullet!<br>"
+    "shot_for_shot.description": "A random player will be chosen to have the first bullet!<br>",
+
+    "mag_for_mag.name": "Mag For Mag",
+    "mag_for_mag.description": "A random player starts with a full magazine. Empty it before the other player gets their turn."
 }

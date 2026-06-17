@@ -93,6 +93,7 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 | --- | --- | --- |
 | Knife Fight   | `Modules/LastRequests` | Knives only, different knife types. |
 | Shot For Shot | `Modules/LastRequests` | Classic shot for shot mode. |
+| Mag For Mag   | `Modules/LastRequests` | Players alternate full magazines with the selected weapon. |
 
 ### Visuals
 
@@ -272,7 +273,7 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [X] Add OnlyHeadshot    day.
 
 - [X] Add ShotForShot LastRequest
-- [ ] Add MagForMag   LastRequest
+- [X] Add MagForMag   LastRequest
 
 - [ ] Add more TODO items.
 
