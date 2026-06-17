@@ -236,7 +236,7 @@ public sealed class LastRequestManager
         if (lastRequest == null)
             return;
 
-        if (winner != null)
+        if (winner != null && winner.Team == JBTeam.Prisoner)
         {
             StripWeapons(winner.Player);
             _core.Scheduler.NextWorldUpdate(() => GiveWeapon(winner.Player, winner.Team == JBTeam.Prisoner ? "weapon_knife_t" : "weapon_knife"));
