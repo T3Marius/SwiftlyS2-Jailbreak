@@ -270,6 +270,9 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [X] Add OneInTheChamber day.
 - [X] Add OnlyHeadshot    day.
 
+- [X] Add ShotForShot LastRequest
+- [ ] Add MagForMag   LastRequest
+
 - [ ] Add more TODO items.
 
 ## ☕ If you'd like to support me, any donation is deeply appreciated!
