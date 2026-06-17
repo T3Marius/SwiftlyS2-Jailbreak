@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Events;
+using SwiftlyS2.Shared.GameEventDefinitions;
 using SwiftlyS2.Shared.Helpers;
 using SwiftlyS2.Shared.Misc;
 using SwiftlyS2.Shared.Natives;
@@ -39,6 +40,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.KnifeFight.Enabled)
             _jail.RegisterLastRequest(new KnifeFightLastRequest(Core, _jail));
+        
+        if (GlobalConfig.ShotForShot.Enabled)
+            _jail.RegisterLastRequest(new ShotForShotLastRequest(Core, _jail));
     }
 
     public override void Load(bool hotReload)
@@ -57,13 +61,17 @@ public sealed class Main : BasePlugin
 
     public override void Unload()
     {
-        _jail?.UnregisterLastRequest("lr_knife_fight");
+        if (GlobalConfig.KnifeFight.Enabled)
+            _jail?.UnregisterLastRequest("lr_knife_fight");
+            
+        if (GlobalConfig.ShotForShot.Enabled)
+            _jail?.UnregisterLastRequest("lr_shot_for_shot");
     }
 }
 
 public sealed class KnifeFightLastRequest : LastRequestBase
 {
-    private  KnifeFightConfig Config => Main.GlobalConfig.KnifeFight;
+    private KnifeFightConfig Config => Main.GlobalConfig.KnifeFight;
     private const string NormalVariant = "normal";
     private const string GravityVariant = "gravity";
     private const string SpeedVariant = "speed";
@@ -256,5 +264,101 @@ public sealed class KnifeFightLastRequest : LastRequestBase
             return Core.PlayerManager.GetPlayerFromPawn(pawn) ?? pawn.ToPlayer();
 
         return null;
+    }
+}
+public sealed class ShotForShotLastRequest : LastRequestBase
+{
+    public ShotForShotLastRequest(ISwiftlyCore core, IJailbreak jail)
+        : base(core, jail) { }
+
+    public override string Id => "lr_shot_for_shot";
+    public override string Name => Core.Localizer["shot_for_shot.name"];
+    public override string Description => Core.Localizer["shot_for_shot.description"];
+    public override bool AllowAllWeapons => true;
+    public override LastRequestOpponentMode OpponentMode => LastRequestOpponentMode.Duel;
+    public override int StartCountdown => Main.GlobalConfig.ShotForShot.StartCountdown;
+    public override bool RequiresWeaponSelection => true;
+    public override bool RequiresVariantSelection => false;
+    public override LastRequestWeaponSelection WeaponSelection => LastRequestWeaponSelection.Required;
+    
+    private IJBPlayer? _prisoner;
+    private IJBPlayer? _guard;
+
+    private Guid? _weaponFire;
+    private Random _random = new();
+
+    public override void Start(LastRequestStartContext context)
+    {
+        if (context.Guard == null)
+            return;
+
+        _guard      = context.Guard;
+        _prisoner   = context.Prisoner;
+        
+        _weaponFire = Core.GameEvent.HookPost<EventWeaponFire>(OnWeaponFire);
+
+        int random  = _random.Next(0, 2);
+
+        Core.Scheduler.NextWorldUpdate(() =>
+        {            
+            if (random == 0)
+            {
+                SetAmmo(context.Prisoner, 1);
+                SetAmmo(context.Guard, 0);
+            }
+            else if (random == 1)
+            {
+                SetAmmo(context.Guard, 1);
+                SetAmmo(context.Prisoner, 0);
+            }
+        });
+    }
+    public override void End(IJBPlayer? winner, IJBPlayer? loser)
+    {
+        if (_weaponFire.HasValue)
+        {
+            Core.GameEvent.Unhook(_weaponFire.Value);
+        }
+    }
+    private HookResult OnWeaponFire(EventWeaponFire e)
+    {
+        if (e.UserIdPlayer is not IPlayer shooterSender)
+            return HookResult.Continue;
+
+        var shooter = Jailbreak.Players.SyncPlayer(shooterSender);
+        if (shooter == null || !shooter.Player.IsValid)
+            return HookResult.Continue;
+
+        if (_guard == null || _prisoner == null)
+            return HookResult.Continue;
+
+        if (shooter == _guard)
+        {
+            SetAmmo(_prisoner, 1);
+        }
+        else if (shooter == _prisoner)
+        {
+            SetAmmo(_guard, 1);
+        }
+
+        return HookResult.Continue;
+    }
+
+    private void SetAmmo(IJBPlayer player, int ammo)
+    {
+        var pawn = player.Player.Pawn;
+        if (pawn == null || !pawn.IsValid || pawn.WeaponServices == null)
+            return;
+
+        foreach (var weapon in pawn.WeaponServices.MyValidWeapons)
+        {
+            if (!weapon.IsValid)
+                continue;
+
+            weapon.Clip1 = ammo;
+            weapon.ReserveAmmo[0] = 0;
+            weapon.Clip1Updated();
+            weapon.ReserveAmmoUpdated();
+        }
     }
 }

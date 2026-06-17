@@ -1,4 +1,7 @@
 {
     "knife_fight.name": "Knife Fight",
-    "knife_fight.description": "Fight the <font color='blue'>guard</font> with a knife."
+    "knife_fight.description": "Fight the <font color='blue'>guard</font> with a knife.",
+
+    "shot_for_shot.name": "Shot For Shot",
+    "shot_for_shot.description": "A random player will be chosen to have the first bullet!<br>"
 }

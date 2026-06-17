@@ -2,7 +2,8 @@ namespace LastRequests;
 
 public sealed class LRConfig
 {
-    public KnifeFightConfig KnifeFight { get; set; } = new();
+    public KnifeFightConfig  KnifeFight  { get; set; } = new();
+    public ShotForShotConfig ShotForShot { get; set; } = new();
 }
 public sealed class KnifeFightConfig
 {
@@ -11,4 +12,9 @@ public sealed class KnifeFightConfig
     public float GravityTypeValue { get; set; } = 0.5f;
     public int Countdown { get; set; } = 10;
 
+}
+public sealed class ShotForShotConfig
+{
+    public bool Enabled { get; set; } = true;
+    public int StartCountdown { get; set; } = 15;
 }
