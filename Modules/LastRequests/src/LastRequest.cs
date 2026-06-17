@@ -19,7 +19,7 @@ namespace LastRequests;
     Author = "T3Marius",
     Name = "[JB Core] LastRequests",
     Id = "LastRequests",
-    Version = "0.1.0"
+    Version = "0.1.1"
 )]
 public sealed class Main : BasePlugin
 {
@@ -63,7 +63,7 @@ public sealed class Main : BasePlugin
     {
         if (GlobalConfig.KnifeFight.Enabled)
             _jail?.UnregisterLastRequest("lr_knife_fight");
-            
+
         if (GlobalConfig.ShotForShot.Enabled)
             _jail?.UnregisterLastRequest("lr_shot_for_shot");
     }
