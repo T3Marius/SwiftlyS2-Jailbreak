@@ -224,7 +224,7 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [X] Create LastRequest modules.
 - [x] Create first SpecialDays module.
 - [x] Add more SpecialDays modules.
-- [ ] Add more LastRequests modules.
+- [x] Add more LastRequests modules.
 - [x] Save Last Request wins and losses in database.
 - [x] Save Special Day wins and losses in database.
 - [x] Add Jailbreak stats command and menu.
@@ -262,20 +262,6 @@ Releases are created from tags through `.github/workflows/release.yml`.
 - [x] Add queue system for the guardians team if full. (!q, !queue, !uq, !unqueue)
 - [x] Add premium flag to queue system (automaticly in front of the list unlike normal players)
 - [x] Add queue list command with chat and HTML output.
-
-- [X] Add Teleport        day.
-- [X] Add HideAndSeek     day.
-- [X] Add War             day.
-- [X] Add NoScope         day.
-- [X] Add Scout           day.
-- [X] Add Taser           day.
-- [X] Add OneInTheChamber day.
-- [X] Add OnlyHeadshot    day.
-
-- [X] Add ShotForShot LastRequest
-- [X] Add MagForMag   LastRequest
-
-- [ ] Add more TODO items.
 
 ## ☕ If you'd like to support me, any donation is deeply appreciated!
 
