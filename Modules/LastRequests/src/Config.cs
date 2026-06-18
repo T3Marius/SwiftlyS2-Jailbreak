@@ -5,6 +5,7 @@ public sealed class LRConfig
     public KnifeFightConfig  KnifeFight  { get; set; } = new();
     public ShotForShotConfig ShotForShot { get; set; } = new();
     public MagForMagConfig   MagForMag   { get; set; } = new();
+    public NoScopeConfig     NoScope     { get; set; } = new();
 }
 public sealed class KnifeFightConfig
 {
@@ -20,6 +21,11 @@ public sealed class ShotForShotConfig
     public int StartCountdown { get; set; } = 10;
 }
 public sealed class MagForMagConfig
+{
+    public bool Enabled { get; set; } = true;
+    public int StartCountdown { get; set; } = 10;
+}
+public sealed class NoScopeConfig
 {
     public bool Enabled { get; set; } = true;
     public int StartCountdown { get; set; } = 10;

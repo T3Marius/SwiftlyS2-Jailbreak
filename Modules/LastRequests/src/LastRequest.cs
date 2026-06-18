@@ -19,7 +19,7 @@ namespace LastRequests;
     Author = "T3Marius",
     Name = "[JB Core] LastRequests",
     Id = "LastRequests",
-    Version = "0.1.2"
+    Version = "0.1.3"
 )]
 public sealed class Main : BasePlugin
 {
@@ -46,6 +46,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.MagForMag.Enabled)
             _jail.RegisterLastRequest(new MagForMagLastRequest(Core, _jail));
+
+        if (GlobalConfig.NoScope.Enabled)
+            _jail.RegisterLastRequest(new NoScopeLastRequest(Core, _jail));
     }
 
     public override void Load(bool hotReload)
@@ -72,6 +75,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.MagForMag.Enabled)
             _jail?.UnregisterLastRequest("lr_mag_for_mag");
+        
+        if (GlobalConfig.NoScope.Enabled)
+            _jail?.UnregisterLastRequest("lr_no_scope");
     }
 }
 
@@ -554,5 +560,77 @@ public sealed class MagForMagLastRequest : LastRequestBase
     private static int GetMagazineSize(ItemDefinitionIndex weapon)
     {
         return MagazineSizes.GetValueOrDefault(weapon, 1);
+    }
+}
+public sealed class NoScopeLastRequest : LastRequestBase
+{
+    private static readonly ItemDefinitionIndex[] SniperWeapons = LastRequestWeapons.Snipers.ToArray();
+    public NoScopeLastRequest(ISwiftlyCore core, IJailbreak jail)
+        : base(core, jail) { }
+
+    public override string Id => "lr_no_scope";
+    public override string Name => Core.Localizer["no_scope.name"];
+    public override string Description => Core.Localizer["no_scope.description"];
+    public override bool AllowAllWeapons => false;
+    public override LastRequestOpponentMode OpponentMode => LastRequestOpponentMode.Duel;
+    public override int StartCountdown => Main.GlobalConfig.NoScope.StartCountdown;
+    public override bool RequiresWeaponSelection => true;
+    public override bool RequiresVariantSelection => false;
+    public override LastRequestWeaponSelection WeaponSelection => LastRequestWeaponSelection.Required;
+    public override IReadOnlyList<ItemDefinitionIndex> WeaponMenuWeapons => SniperWeapons;
+
+    public override IReadOnlySet<ItemDefinitionIndex> AllowedWeapons => LastRequestWeapons.Snipers;
+
+    
+    private IJBPlayer? _prisoner;
+    private IJBPlayer? _guard;
+
+    public override void Start(LastRequestStartContext context)
+    {
+        _prisoner = context.Prisoner;
+        _guard = context.Guard;
+
+        if (_prisoner == null || _guard == null)
+            return;
+
+        GiveRandomSniper(_prisoner.Player);
+        GiveRandomSniper(_guard.Player);
+
+        Core.Event.OnTick += OnTick;
+    }
+    public override void End(IJBPlayer? winner, IJBPlayer? loser)
+    {
+        _prisoner = null;
+        _guard = null;
+
+        Core.Event.OnTick -= OnTick;
+    }
+    private void OnTick()
+    {
+        if (_guard == null || _prisoner == null)
+            return;
+
+        var pActiveWeapon = _prisoner.Player.Pawn?.WeaponServices?.ActiveWeapon.Value;
+        var gActiveWeapon = _guard.Player.Pawn?.WeaponServices?.ActiveWeapon.Value;
+
+        if (pActiveWeapon == null || gActiveWeapon == null)
+            return;
+
+        pActiveWeapon.NextSecondaryAttackTick.Value = Core.Engine.GlobalVars.TickCount + 500;
+        gActiveWeapon.NextSecondaryAttackTick.Value = Core.Engine.GlobalVars.TickCount + 500;
+        pActiveWeapon.NextSecondaryAttackTickUpdated();
+        gActiveWeapon.NextSecondaryAttackTickUpdated();
+    }
+    private void GiveRandomSniper(IPlayer player)
+    {
+        if (SniperWeapons.Length == 0)
+            return;
+
+        var weapon = SniperWeapons[Random.Shared.Next(SniperWeapons.Length)];
+        var classname = Core.Helpers.GetClassnameByDefinitionIndex(weapon);
+        if (string.IsNullOrEmpty(classname))
+            return;
+
+        player.Pawn?.ItemServices?.GiveItem<CBaseEntity>(classname);
     }
 }
