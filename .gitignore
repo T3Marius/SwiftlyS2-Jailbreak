@@ -9,6 +9,7 @@ build/
 
 # Dependency / vendor
 swiftlys2/
+Economy/
 
 # OS
 Thumbs.db
