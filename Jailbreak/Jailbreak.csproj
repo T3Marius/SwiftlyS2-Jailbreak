@@ -27,6 +27,17 @@
 	</ItemGroup>
 
   <ItemGroup>
+    <Reference Include="Economy.Contract">
+      <HintPath>resources/exports/Economy.Contract.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Content Include="resources/exports/Economy.Contract.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>resources/exports/Economy.Contract.dll</TargetPath>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="resources/translations/**/*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

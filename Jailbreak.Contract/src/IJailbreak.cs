@@ -4,6 +4,7 @@ namespace Jailbreak.Contract
     {
         public static string Key => "JB_API";
         IJBPlayerManagement Players { get; }
+        IJBShop Shop { get; }
         IReadOnlyCollection<ISpecialDay> SpecialDays { get; }
         ISpecialDay? CurrentSpecialDay { get; }
         ISpecialDay? QueuedSpecialDay { get; }

@@ -1,3 +1,5 @@
+using Economy.Contract;
+using Microsoft.Extensions.Logging;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Plugins;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +28,20 @@ public sealed class Main : BasePlugin
 
         var api = _provider.GetRequiredService<Api>();
         interfaceManager.AddSharedInterface<IJailbreak, Api>(IJailbreak.Key, api);
+    }
+
+    public override void UseSharedInterface(IInterfaceManager interfaceManager)
+    {
+        if (_provider == null)
+            return;
+
+        if (interfaceManager.TryGetSharedInterface<IEconomyAPIv1>(ShopManager.EconomyInterfaceKey, out var economy))
+        {
+            _provider.GetRequiredService<ShopManager>().AttachEconomy(economy);
+            return;
+        }
+
+        Core.Logger.LogInformation("Economy API was not found. Optional Jailbreak shop purchases remain disabled.");
     }
     public override void Load(bool hotReload)
     {
@@ -60,6 +76,9 @@ public sealed class Main : BasePlugin
                   .AddSingleton<IJBPlayerManagement, JBPlayerManagement>()
                   .AddSingleton<TeamManager>()
                   .AddSingleton<GuardQueueManager>()
+                  .AddSingleton<ShopManager>()
+                  .AddSingleton<ShopItemModuleManager>()
+                  .AddSingleton<IJBShop>(provider => provider.GetRequiredService<ShopManager>())
                   .AddSingleton<RebelManager>()
                   .AddSingleton<BeaconManager>()
                   .AddSingleton<LaserManager>()
@@ -73,6 +92,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<WardenDatabase>()
                   .AddSingleton<GuardGunsDatabase>()
                   .AddSingleton<JBStatsDB>()
+                  .AddSingleton<ShopDatabase>()
                   .AddSingleton<Api>()
                   .AddSingleton<Events>()
                   .AddSingleton<Listeners>()
@@ -121,6 +141,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<WardenDatabase>().Initialize();
         _provider.GetRequiredService<GuardGunsDatabase>().Initialize();
         _provider.GetRequiredService<JBStatsDB>().Initialize();
+        _provider.GetRequiredService<ShopDatabase>().Initialize();
         _provider.GetRequiredService<GameConfig>().Register(hotReload);
 
         if (hotReload)
@@ -143,6 +164,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<RebelManager>().Register();
         _provider.GetRequiredService<TeamManager>().Register();
         _provider.GetRequiredService<GuardQueueManager>().Register();
+        _provider.GetRequiredService<ShopManager>().Register();
         _provider.GetRequiredService<BoxManager>().Register();
         _provider.GetRequiredService<CuffsManager>().Register();
         _provider.GetRequiredService<LaserManager>().Register();
@@ -172,6 +194,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<BeaconManager>().Unregister();
         _provider.GetRequiredService<RebelManager>().Unregister();
         _provider.GetRequiredService<GuardQueueManager>().Unregister();
+        _provider.GetRequiredService<ShopManager>().Unregister();
         _provider.GetRequiredService<TeamManager>().Unregister();
         _provider.GetRequiredService<BoxManager>().Unregister();
         _provider.GetRequiredService<CuffsManager>().Unregister();

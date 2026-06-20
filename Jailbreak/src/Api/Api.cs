@@ -5,6 +5,7 @@ namespace Jailbreak;
 public sealed class Api : IJailbreak
 {
     public IJBPlayerManagement Players { get; }
+    public IJBShop Shop { get; }
     public IReadOnlyCollection<ISpecialDay> SpecialDays => _specialDayManager.SpecialDays;
     public ISpecialDay? CurrentSpecialDay => _specialDayManager.CurrentSpecialDay;
     public ISpecialDay? QueuedSpecialDay => _specialDayManager.QueuedSpecialDay;
@@ -15,9 +16,14 @@ public sealed class Api : IJailbreak
     private readonly SpecialDayManager _specialDayManager;
     private readonly LastRequestManager _lastRequestManager;
 
-    public Api(IJBPlayerManagement playerManagement, SpecialDayManager specialDayManager, LastRequestManager lastRequestManager)
+    public Api(
+        IJBPlayerManagement playerManagement,
+        IJBShop shop,
+        SpecialDayManager specialDayManager,
+        LastRequestManager lastRequestManager)
     {
         Players = playerManagement;
+        Shop = shop;
         _specialDayManager = specialDayManager;
         _lastRequestManager = lastRequestManager;
     }
