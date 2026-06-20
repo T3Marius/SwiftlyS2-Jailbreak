@@ -96,6 +96,18 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 | Mag For Mag   | `Modules/LastRequests` | Players alternate full magazines with the selected weapon. |
 | No Scope      | `Modules/LastRequests` | Players are unable to use snipers scope.                   |
 
+### Optional JBShop Module
+
+`Modules/JBShop` is optional. JailbreakCore only provides the typed shop API, Economy integration, purchase validation, ownership, equipment persistence, and caching. Server owners can omit the `JBShop` plugin folder and install or build a different shop UI against `IJBShop`.
+
+The default `!jbshop` menu registers three `credits` categories:
+
+- **Global** - available to both prisoners and guards.
+- **Prisoners** - purchases are restricted to prisoners. Includes the configurable consumable Taser item.
+- **Guards** - purchases are restricted to guards.
+
+The optional module requires [SwiftlyS2-Plugins/Economy](https://github.com/SwiftlyS2-Plugins/Economy) for wallet balances and multi-currency purchases. The shop design was inspired by [btnrv/BetterStore](https://github.com/btnrv/BetterStore), while using Jailbreak-specific typed contracts and lifecycle rules.
+
 ### Visuals
 
 - Warden ping creates a CBeam circle at the ping location.
@@ -132,6 +144,7 @@ Command aliases are configurable in their matching config files.
 | SpecialGuns | `!sguns` | Open the active Special Day guns menu when enabled. |
 | Surrender | `!s`, `!surrender` | Request rebel surrender from the warden. |
 | JailbreakStats | `!jbstats`, `!jstats`, `!stats` | Open Last Request and Special Day stats. |
+| JBShop | `!jbshop` | Open the optional Jailbreak shop module. |
 
 ## Warden Menu
 
@@ -173,6 +186,10 @@ The plugin can run with custom paths, but the built-in model and sound defaults 
 | `voice.toml` | Voice | Prisoner mute behavior. |
 | `sounds.toml` | Sounds | Gameplay sounds, sound event files, and muted sound reasons. Built-in defaults use the Jailbreak Workshop addon. |
 | `queue.toml` | GuardQueue | Queue command aliases, list output targets, and premium permission flags. |
+| `config.toml` under `JBShop` | JBShop | Shop command aliases and Global/Prisoners/Guards category names, IDs, currencies, and ordering. |
+| `global_items.toml` under `JBShop` | JBShop | Items available to both teams. |
+| `prisoners_items.toml` under `JBShop` | JBShop | Prisoner item settings, including the Taser price and presentation. |
+| `guards_items.toml` under `JBShop` | JBShop | Guard-only item settings. |
 | `jailbreak.cfg` | Game cvars | Generated in the plugin directory and applied on map start or hot reload. |
 
 ## Database
@@ -202,13 +219,78 @@ Stored and cached per guard:
 - Preferred primary weapon
 - Preferred secondary weapon
 
+`ShopDatabase` uses `Utils.DatabaseConnection` and creates `jb_shop_owned_items` and `jb_shop_equipped_items`.
+
+- Permanent and equippable ownership is persisted.
+- Equipped item slots are persisted and reapplied on spawn.
+- Consumable and temporary items are repeatable and are not stored as ownership.
+
 ## Public API
 
 Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak`.
 
 - `IJBPlayerManagement Players` gives access to player tracking, warden/deputy lookup, role state, and team state.
+- `IJBShop Shop` registers categories, item modules, and items, then handles Economy-backed purchases, ownership, and equipment.
 - `RegisterSpecialDay(ISpecialDay specialDay)` registers a Special Day module.
 - `UnregisterSpecialDay(string id)` unregisters a Special Day module.
+
+JailbreakCore registers no categories, item modules, or items by default. Shop plugins own that presentation and content.
+
+### Registering Shop Items
+
+Reusable item behavior belongs in an `IItemModule`. Implement `IModuleInitializable` and register the module's item definitions from `Initialize`. Each item references its behavior through the module ID.
+
+```csharp
+public sealed class HealthBoostModule : ItemModuleBase, IModuleInitializable
+{
+    public const string ModuleId = "gang.health_boost";
+    public override string Id => ModuleId;
+
+    public void Initialize(IJBShop shop)
+    {
+        if (!shop.RegisterItem(new ModuleShopItemDefinition(
+                id: "gang.health_boost",
+                categoryId: "gang.upgrades",
+                moduleId: Id,
+                name: "Health Boost",
+                price: 25,
+                kind: ShopItemKind.Consumable,
+                description: "Receive 25 health.")))
+        {
+            throw new InvalidOperationException("Could not register Health Boost.");
+        }
+    }
+
+    public void Shutdown() { }
+
+    public override ShopActionResult OnPurchase(ShopContext context)
+    {
+        context.Player.Player.Pawn!.Health += 25;
+        return ShopActionResult.Succeeded();
+    }
+}
+
+var shop = jailbreak.Shop;
+
+shop.RegisterCategory(new ShopCategory(
+    "gang.upgrades",
+    "Gang Upgrades",
+    "gold"));
+
+shop.RegisterModule(new HealthBoostModule());
+```
+
+Concrete parameterless `IItemModule` classes inside the bundled JBShop assembly are discovered automatically. Modules from another plugin must call `shop.RegisterModule(...)` after their categories exist. Unregistering a module also removes every item linked to its module ID. For a single item with unique behavior, `ShopItemDefinition` supports inline callbacks without creating a module.
+
+### Shop Currencies
+
+- Every category declares its default currency, such as `credits` or `gold`.
+- An item with a null or empty currency inherits its category currency.
+- An item may set `currency: "gold"` to override the category for that item only.
+- Each currency is an independent Economy wallet; balances never mix between wallet kinds.
+- JailbreakCore creates missing wallet kinds through `Economy.API.v1` when categories or currency-overriding items are registered.
+
+The bundled Global, Prisoners, and Guards categories use `credits`. This lets a future gangs module register a separate `gold` category or use `gold` as an item-level override without changing JBShop internals.
 
 ## Releases
 
