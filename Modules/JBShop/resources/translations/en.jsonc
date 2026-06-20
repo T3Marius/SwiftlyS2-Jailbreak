@@ -1,0 +1,23 @@
+{
+    "shop.title": "Jailbreak Shop",
+    "shop.empty": "No shop categories are available.",
+    "shop.category_empty": "No items are registered in this category.",
+    "shop.category": "{0} | {1} {2}",
+    "shop.item": "{0} | {1} {2}",
+    "shop.item_owned": "[OWNED] {0}",
+    "shop.item_equipped": "[EQUIPPED] {0}",
+    "shop.item_description": "{0}",
+    "shop.buy": "Buy for {0} {1}",
+    "shop.equip": "Equip",
+    "shop.unequip": "Unequip",
+    "shop.purchase_success": "You purchased [lime]{0}[silver] for [gold]{1} {2}[silver].",
+    "shop.purchase_no_funds": "You do not have enough [gold]{0}[silver].",
+    "shop.purchase_owned": "You already own [lime]{0}[silver].",
+    "shop.purchase_restricted": "Your team cannot purchase from this category.",
+    "shop.purchase_unavailable": "[lime]{0}[silver] is not available right now.",
+    "shop.purchase_failed": "Could not purchase [lime]{0}[silver].",
+    "shop.equip_success": "You equipped [lime]{0}[silver].",
+    "shop.unequip_success": "You unequipped [lime]{0}[silver].",
+    "shop.action_failed": "That shop action could not be completed.",
+    "shop.economy_unavailable": "The economy service is currently unavailable."
+}

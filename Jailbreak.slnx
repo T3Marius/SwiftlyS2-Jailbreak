@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/Modules/">
+    <Project Path="Modules/JBShop/JBShop.csproj" />
     <Project Path="Modules/LastRequests/LastRequests.csproj" />
     <Project Path="Modules/SpecialDays/SpecialDays.csproj" />
   </Folder>
