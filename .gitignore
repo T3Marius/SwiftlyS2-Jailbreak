@@ -10,6 +10,7 @@ build/
 # Dependency / vendor
 swiftlys2/
 Economy/
+BetterStore/
 
 # OS
 Thumbs.db
