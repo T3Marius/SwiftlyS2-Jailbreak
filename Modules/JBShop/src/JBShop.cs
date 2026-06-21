@@ -210,7 +210,7 @@ public sealed class Main : BasePlugin
             builder.AddOption(new TextMenuOption(localizer["shop.item_description", item.Description])
             {
                 Enabled = false,
-                TextSize = MenuOptionTextSize.Small,
+                TextSize = MenuOptionTextSize.Medium,
                 TextStyle = MenuOptionTextStyle.ScrollLeftLoop
             });
         }
@@ -268,6 +268,7 @@ public sealed class Main : BasePlugin
         };
 
         SendMessage(player, message, args);
+        Core.MenusAPI.CloseActiveMenu(player.Player);
     }
 
     private ILocalizer GetLocalizer(IJBPlayer player) =>
