@@ -1,5 +1,6 @@
 using Jailbreak.Contract;
 using Microsoft.Extensions.Logging;
+using SwiftlyS2.Shared.Events;
 
 namespace Jailbreak;
 
@@ -84,6 +85,21 @@ public sealed class ShopItemModuleManager
     public ShopActionResult Unequip(ShopContext context)
     {
         return Invoke(context, "unequip", module => module.OnUnequip(context), () => context.Item.OnUnequip(context));
+    }
+
+    public void PrecacheResources(IOnPrecacheResourceEvent e)
+    {
+        foreach (var module in _modules.Values.ToArray())
+        {
+            try
+            {
+                module.OnPrecacheResources(e);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Shop item module resource precache failed. Module={ModuleId}", module.Id);
+            }
+        }
     }
 
     public void Clear()

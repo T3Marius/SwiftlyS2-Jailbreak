@@ -62,6 +62,7 @@ public sealed class ShopManager : IJBShop
     {
         _playerSpawnHookId = _core.GameEvent.HookPost<EventPlayerSpawn>(OnPlayerSpawn);
         _core.Event.OnClientDisconnected += OnClientDisconnected;
+        _core.Event.OnPrecacheResource += OnPrecacheResource;
     }
 
     public void Unregister()
@@ -73,6 +74,7 @@ public sealed class ShopManager : IJBShop
         }
 
         _core.Event.OnClientDisconnected -= OnClientDisconnected;
+        _core.Event.OnPrecacheResource -= OnPrecacheResource;
 
         foreach (var player in _players.GetAllPlayers())
             UnequipRuntimeItems(player);
@@ -485,6 +487,9 @@ public sealed class ShopManager : IJBShop
         _core.Scheduler.NextWorldUpdate(() => ReapplyEquippedItems(player));
         return HookResult.Continue;
     }
+
+    private void OnPrecacheResource(IOnPrecacheResourceEvent e) =>
+        _moduleManager.OnPrecacheResources(e);
 
     private void OnClientDisconnected(IOnClientDisconnectedEvent e)
     {
