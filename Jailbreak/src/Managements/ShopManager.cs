@@ -489,7 +489,7 @@ public sealed class ShopManager : IJBShop
     }
 
     private void OnPrecacheResource(IOnPrecacheResourceEvent e) =>
-        _moduleManager.OnPrecacheResources(e);
+        _moduleManager.PrecacheResources(e);
 
     private void OnClientDisconnected(IOnClientDisconnectedEvent e)
     {
