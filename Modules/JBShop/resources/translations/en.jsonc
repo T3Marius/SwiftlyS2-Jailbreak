@@ -1,5 +1,5 @@
 {
-    "shop.prefix": "[gold]JBShop [silver]| ",
+    "shop.prefix": "[silver]▶ [gold]JBShop [silver]| ",
     "shop.title": "Jailbreak Shop",
     "shop.empty": "No shop categories are available.",
     "shop.category_empty": "No items are registered in this category.",
