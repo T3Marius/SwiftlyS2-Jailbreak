@@ -1,17 +1,17 @@
 using Jailbreak.Contract;
-using SwiftlyS2.Shared.SchemaDefinitions;
+using SwiftlyS2.Shared.Events;
 
 namespace JBShop.Items;
 
-public sealed class TaserItemModule : ItemModuleBase, IModuleInitializable
+public sealed class DisguiseItemModule : ItemModuleBase, IModuleInitializable
 {
-    public const string ModuleId = "jbshop.taser";
+    public const string ModuleId = "jbshop.disguise";
 
     public override string Id => ModuleId;
 
     public void Initialize(IJBShop shop)
     {
-        var config = Main.PrisonerItems.Taser;
+        var config = Main.PrisonerItems.Disguise;
         if (!config.Enabled)
             return;
 
@@ -32,20 +32,31 @@ public sealed class TaserItemModule : ItemModuleBase, IModuleInitializable
     public void Shutdown()
     {
     }
-    public override bool CanPurchase(ShopContext context) =>
-        context.Player.Player.IsValid && context.Player.Player.IsAlive;
+
+    public override void OnPrecacheResources(IOnPrecacheResourceEvent e)
+    {
+        var config = Main.PrisonerItems.Disguise;
+        if (!config.Enabled || string.IsNullOrWhiteSpace(config.Value))
+            return;
+
+        e.AddItem(config.Value.Trim().Replace('\\', '/'));
+    }
+
+    public override bool CanPurchase(ShopContext context)
+        => context.Player.Player.IsValid && context.Player.Player.IsAlive;
 
     public override ShopActionResult OnPurchase(ShopContext context)
     {
-        var config = Main.PrisonerItems.Taser;
+        var config = Main.PrisonerItems.Disguise;
 
         var pawn = context.Player.Player.Pawn;
         if (pawn == null || !pawn.IsValid)
             return ShopActionResult.Failed("Player is not alive.");
-        
-        var taser = pawn.ItemServices?.GiveItem<CBaseEntity>(config.Value);
-        return taser?.IsValid == true
-            ? ShopActionResult.Succeeded()
-            : ShopActionResult.Failed("The taser could not be given.");
+
+        if (string.IsNullOrWhiteSpace(config.Value))
+            return ShopActionResult.Failed("Disguise model is not configured.");
+
+        pawn.SetModel(config.Value);
+        return ShopActionResult.Succeeded();
     }
 }

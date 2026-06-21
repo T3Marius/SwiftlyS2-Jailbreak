@@ -10,6 +10,7 @@ public abstract class ShopItemConfig
 
     // Empty uses the currency configured by the item's category.
     public string Currency { get; set; } = "";
+    public string Value { get; set; } = "";
 }
 
 public sealed class GlobalItemsConfig
@@ -19,6 +20,7 @@ public sealed class GlobalItemsConfig
 public sealed class PrisonerItemsConfig
 {
     public TaserItemConfig Taser { get; set; } = new();
+    public DisguiseItemConfig Disguise { get; set; } = new();
 }
 
 public sealed class GuardItemsConfig
@@ -31,7 +33,19 @@ public sealed class TaserItemConfig : ShopItemConfig
     {
         Id = "jbshop.prisoners.taser";
         Name = "Taser";
+        Value = "weapon_taser";
         Description = "Receive a taser for the current life.";
         Price = 250;
+    }
+}
+public sealed class DisguiseItemConfig : ShopItemConfig
+{
+    public DisguiseItemConfig()
+    {
+        Id = "jbshop.prisoners.disguise";
+        Name = "Disguise";
+        Value = "agents/models/sunucukur/guards/g_variant_b/g_variant_b.vmdl";
+        Description = "Disguise yourself as a guard. Be careful, they can still identify you!";
+        Price = 500;
     }
 }
