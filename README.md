@@ -103,7 +103,7 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 The default `!jbshop` menu registers three `credits` categories:
 
 - **Global** - available to both prisoners and guards.
-- **Prisoners** - purchases are restricted to prisoners. Includes the configurable consumable Taser item.
+- **Prisoners** - purchases are restricted to prisoners.
 - **Guards** - purchases are restricted to guards.
 
 The optional module requires [SwiftlyS2-Plugins/Economy](https://github.com/SwiftlyS2-Plugins/Economy) for wallet balances and multi-currency purchases. The shop design was inspired by [btnrv/BetterStore](https://github.com/btnrv/BetterStore), while using Jailbreak-specific typed contracts and lifecycle rules.
