@@ -32,6 +32,18 @@ public enum ShopPurchaseStatus
     PersistenceFailed = 10
 }
 
+public enum ShopBalanceStatus
+{
+    Success = 0,
+    EconomyUnavailable = 1,
+    InvalidPlayer = 2,
+    InvalidCurrency = 3,
+    InvalidAmount = 4,
+    InsufficientFunds = 5,
+    SamePlayer = 6,
+    Failed = 7
+}
+
 public readonly record struct ShopActionResult(bool Success, string? Error = null)
 {
     public static ShopActionResult Succeeded() => new(true);
@@ -47,6 +59,11 @@ public sealed record ShopPurchaseResult(
     string? Error = null)
 {
     public bool Success => Status == ShopPurchaseStatus.Success;
+}
+
+public readonly record struct ShopBalanceResult(ShopBalanceStatus Status, decimal Balance = 0)
+{
+    public bool Success => Status == ShopBalanceStatus.Success;
 }
 
 public sealed record ShopCategory(
@@ -256,6 +273,7 @@ public interface IJBShop
     IReadOnlyCollection<ShopCategory> Categories { get; }
     IReadOnlyCollection<IShopItem> Items { get; }
     IReadOnlyCollection<IItemModule> Modules { get; }
+    IReadOnlyCollection<string> Currencies { get; }
 
     event Action<ShopContext, ShopPurchaseResult>? ItemPurchased;
     event Action<ShopContext>? ItemEquipped;
@@ -274,6 +292,10 @@ public interface IJBShop
     bool CanAccessCategory(IJBPlayer player, string categoryId);
 
     decimal GetBalance(IJBPlayer player, string currency);
+    ShopBalanceResult AddBalance(IJBPlayer player, string currency, decimal amount);
+    ShopBalanceResult SubtractBalance(IJBPlayer player, string currency, decimal amount);
+    ShopBalanceResult SetBalance(IJBPlayer player, string currency, decimal amount);
+    ShopBalanceResult TransferBalance(IJBPlayer sender, IJBPlayer recipient, string currency, decimal amount);
     ShopPurchaseResult Purchase(IJBPlayer player, string itemId);
 
     bool OwnsItem(IJBPlayer player, string itemId);

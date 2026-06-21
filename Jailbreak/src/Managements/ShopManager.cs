@@ -45,6 +45,14 @@ public sealed class ShopManager : IJBShop
     public IReadOnlyCollection<ShopCategory> Categories => _categories.Values.OrderBy(category => category.Order).ToArray();
     public IReadOnlyCollection<IShopItem> Items => _items.Values.ToArray();
     public IReadOnlyCollection<IItemModule> Modules => _moduleManager.Modules;
+    public IReadOnlyCollection<string> Currencies => _categories.Values
+        .Select(category => category.Currency)
+        .Concat(_items.Values.Select(item => item.Currency))
+        .Where(currency => !string.IsNullOrWhiteSpace(currency))
+        .Select(currency => currency!)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(currency => currency, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
 
     public event Action<ShopContext, ShopPurchaseResult>? ItemPurchased;
     public event Action<ShopContext>? ItemEquipped;
@@ -228,6 +236,46 @@ public sealed class ShopManager : IJBShop
 
         EnsureCurrency(currency);
         return _economy.GetPlayerBalance(player.Player, currency);
+    }
+
+    public ShopBalanceResult AddBalance(IJBPlayer player, string currency, decimal amount) =>
+        ChangeBalance(player, currency, amount, BalanceOperation.Add);
+
+    public ShopBalanceResult SubtractBalance(IJBPlayer player, string currency, decimal amount) =>
+        ChangeBalance(player, currency, amount, BalanceOperation.Subtract);
+
+    public ShopBalanceResult SetBalance(IJBPlayer player, string currency, decimal amount) =>
+        ChangeBalance(player, currency, amount, BalanceOperation.Set);
+
+    public ShopBalanceResult TransferBalance(IJBPlayer sender, IJBPlayer recipient, string currency, decimal amount)
+    {
+        var economy = _economy;
+        if (economy == null)
+            return new(ShopBalanceStatus.EconomyUnavailable);
+        if (!IsValidEconomyPlayer(sender) || !IsValidEconomyPlayer(recipient))
+            return new(ShopBalanceStatus.InvalidPlayer);
+        if (sender.SteamID == recipient.SteamID)
+            return new(ShopBalanceStatus.SamePlayer);
+        var registeredCurrency = ResolveRegisteredCurrency(currency);
+        if (registeredCurrency == null || !economy.WalletKindExists(registeredCurrency))
+            return new(ShopBalanceStatus.InvalidCurrency);
+        if (amount <= 0)
+            return new(ShopBalanceStatus.InvalidAmount);
+        if (!economy.HasSufficientFunds(sender.Player, registeredCurrency, amount))
+            return new(ShopBalanceStatus.InsufficientFunds, GetBalance(sender, registeredCurrency));
+
+        try
+        {
+            economy.TransferFunds(sender.Player, recipient.Player, registeredCurrency, amount);
+            return new(ShopBalanceStatus.Success, GetBalance(sender, registeredCurrency));
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex,
+                "Shop balance transfer failed. Sender={Sender}, Recipient={Recipient}, Currency={Currency}, Amount={Amount}",
+                sender.SteamID, recipient.SteamID, currency, amount);
+            return new(ShopBalanceStatus.Failed, GetBalance(sender, registeredCurrency));
+        }
     }
 
     public ShopPurchaseResult Purchase(IJBPlayer player, string itemId)
@@ -559,6 +607,57 @@ public sealed class ShopManager : IJBShop
         }
     }
 
+    private ShopBalanceResult ChangeBalance(
+        IJBPlayer player,
+        string currency,
+        decimal amount,
+        BalanceOperation operation)
+    {
+        var economy = _economy;
+        if (economy == null)
+            return new(ShopBalanceStatus.EconomyUnavailable);
+        if (!IsValidEconomyPlayer(player))
+            return new(ShopBalanceStatus.InvalidPlayer);
+        var registeredCurrency = ResolveRegisteredCurrency(currency);
+        if (registeredCurrency == null || !economy.WalletKindExists(registeredCurrency))
+            return new(ShopBalanceStatus.InvalidCurrency);
+        if (amount < 0 || operation != BalanceOperation.Set && amount == 0)
+            return new(ShopBalanceStatus.InvalidAmount);
+
+        try
+        {
+            switch (operation)
+            {
+                case BalanceOperation.Add:
+                    economy.AddPlayerBalance(player.Player, registeredCurrency, amount);
+                    break;
+                case BalanceOperation.Subtract:
+                    economy.SubtractPlayerBalance(player.Player, registeredCurrency, amount);
+                    break;
+                case BalanceOperation.Set:
+                    economy.SetPlayerBalance(player.Player, registeredCurrency, amount);
+                    break;
+            }
+
+            return new(ShopBalanceStatus.Success, GetBalance(player, registeredCurrency));
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex,
+                "Shop balance operation failed. Player={SteamId}, Currency={Currency}, Amount={Amount}, Operation={Operation}",
+                player.SteamID, currency, amount, operation);
+            return new(ShopBalanceStatus.Failed, GetBalance(player, registeredCurrency));
+        }
+    }
+
+    private string? ResolveRegisteredCurrency(string currency) =>
+        string.IsNullOrWhiteSpace(currency)
+            ? null
+            : Currencies.FirstOrDefault(registered => registered.Equals(currency, StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsValidEconomyPlayer(IJBPlayer player) =>
+        player.Player.IsValid && !player.Player.IsFakeClient && player.SteamID != 0;
+
     private static bool StoresOwnership(ShopItemKind kind) =>
         kind is ShopItemKind.Permanent or ShopItemKind.Equippable;
 
@@ -583,4 +682,11 @@ public sealed class ShopManager : IJBShop
     private sealed record CachedPlayerState(
         HashSet<string> OwnedItemIds,
         Dictionary<string, string> EquippedItems);
+
+    private enum BalanceOperation
+    {
+        Add,
+        Subtract,
+        Set
+    }
 }

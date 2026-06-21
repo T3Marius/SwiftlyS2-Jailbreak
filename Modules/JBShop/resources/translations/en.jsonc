@@ -1,4 +1,5 @@
 {
+    "shop.prefix": "[gold]JBShop [silver]| ",
     "shop.title": "Jailbreak Shop",
     "shop.empty": "No shop categories are available.",
     "shop.category_empty": "No items are registered in this category.",
@@ -19,5 +20,24 @@
     "shop.equip_success": "You equipped [lime]{0}[silver].",
     "shop.unequip_success": "You unequipped [lime]{0}[silver].",
     "shop.action_failed": "That shop action could not be completed.",
-    "shop.economy_unavailable": "The economy service is currently unavailable."
+    "shop.economy_unavailable": "The economy service is currently unavailable.",
+
+    "shop.balance_header": "[blue]Your balances:",
+    "shop.balance_item": "[silver]{0} = [gold]{1}",
+    "shop.balance_empty": "No shop currencies are registered.",
+    "shop.currency_invalid": "Currency [gold]{0}[silver] does not exist.",
+    "shop.amount_invalid": "Enter a valid positive amount.",
+    "shop.target_invalid": "Player not found or multiple players matched.",
+    "shop.no_permission": "You do not have permission to use this command.",
+    "shop.balance_action_failed": "The balance operation failed.",
+
+    "shop.gift_usage": "Usage: [gold]!{0} <player> <amount> <currency>",
+    "shop.gift_self": "You cannot gift balance to yourself.",
+    "shop.gift_no_funds": "You do not have enough [gold]{0}[silver].",
+    "shop.gift_sent": "Gifted [gold]{0} {1}[silver] to [lime]{2}[silver].",
+    "shop.gift_received": "You received [gold]{0} {1}[silver] from [lime]{2}[silver].",
+
+    "shop.admin_usage": "Usage: [gold]!{0} <player> <amount> <currency>",
+    "shop.admin_success": "{0} completed for [lime]{1}[silver]. [gold]{2}[silver] balance: [gold]{3}[silver].",
+    "shop.admin_target_updated": "Your [gold]{0}[silver] balance is now [gold]{1}[silver]."
 }

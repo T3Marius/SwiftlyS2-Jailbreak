@@ -2,7 +2,6 @@ namespace JBShop;
 
 public sealed class ShopConfig
 {
-    public List<string> Commands { get; set; } = ["jbshop"];
     public ShopCategoryConfig Global { get; set; } = new()
     {
         Id = "jbshop.global",
@@ -24,6 +23,17 @@ public sealed class ShopConfig
         Currency = "credits",
         Order = 20
     };
+}
+
+public sealed class ShopCommandsConfig
+{
+    public List<string> ShopCommands { get; set; } = ["jbshop"];
+    public List<string> BalanceCommands { get; set; } = ["balance", "bal"];
+    public List<string> GiftCommands { get; set; } = ["gift"];
+    public List<string> AddBalanceCommands { get; set; } = ["addbalance"];
+    public List<string> SubtractBalanceCommands { get; set; } = ["subtractbalance", "subbalance"];
+    public List<string> SetBalanceCommands { get; set; } = ["setbalance"];
+    public List<string> AdminPermissions { get; set; } = ["jbshop.admin"];
 }
 
 public sealed class ShopCategoryConfig

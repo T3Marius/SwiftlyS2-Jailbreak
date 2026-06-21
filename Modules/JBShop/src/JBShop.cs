@@ -6,10 +6,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SwiftlyS2.Core.Menus.OptionsBase;
 using SwiftlyS2.Shared;
-using SwiftlyS2.Shared.Commands;
 using SwiftlyS2.Shared.Menus;
-using SwiftlyS2.Shared.Players;
 using SwiftlyS2.Shared.Plugins;
+using SwiftlyS2.Shared.Translation;
 using Tomlyn.Extensions.Configuration;
 using System.Reflection;
 
@@ -24,12 +23,14 @@ namespace JBShop;
 public sealed class Main : BasePlugin
 {
     internal static ShopConfig GlobalConfig { get; private set; } = new();
+    internal static ShopCommandsConfig CommandsConfig { get; private set; } = new();
     internal static GlobalItemsConfig GlobalItems { get; private set; } = new();
     internal static PrisonerItemsConfig PrisonerItems { get; private set; } = new();
     internal static GuardItemsConfig GuardItems { get; private set; } = new();
 
     private ShopConfig _config = new();
     private IJailbreak? _jailbreak;
+    private ShopCommandManager? _commandManager;
     private IReadOnlyCollection<string> _registeredModuleIds = [];
 
     public Main(ISwiftlyCore core) : base(core)
@@ -40,6 +41,8 @@ public sealed class Main : BasePlugin
     {
         Core.Configuration.InitializeTomlWithModel<ShopConfig>("config.toml", "JBShop")
             .Configure(builder => builder.AddTomlFile("config.toml", false, true));
+        Core.Configuration.InitializeTomlWithModel<ShopCommandsConfig>("commands.toml", "Commands")
+            .Configure(builder => builder.AddTomlFile("commands.toml", false, true));
         Core.Configuration.InitializeTomlWithModel<GlobalItemsConfig>("global_items.toml", "GlobalItems")
             .Configure(builder => builder.AddTomlFile("global_items.toml", false, true));
         Core.Configuration.InitializeTomlWithModel<PrisonerItemsConfig>("prisoners_items.toml", "PrisonerItems")
@@ -53,6 +56,8 @@ public sealed class Main : BasePlugin
             .BindConfiguration("JBShop");
         services.AddOptionsWithValidateOnStart<GlobalItemsConfig>()
             .BindConfiguration("GlobalItems");
+        services.AddOptionsWithValidateOnStart<ShopCommandsConfig>()
+            .BindConfiguration("Commands");
         services.AddOptionsWithValidateOnStart<PrisonerItemsConfig>()
             .BindConfiguration("PrisonerItems");
         services.AddOptionsWithValidateOnStart<GuardItemsConfig>()
@@ -60,10 +65,12 @@ public sealed class Main : BasePlugin
 
         using var provider = services.BuildServiceProvider();
         GlobalConfig = provider.GetRequiredService<IOptions<ShopConfig>>().Value;
+        CommandsConfig = provider.GetRequiredService<IOptions<ShopCommandsConfig>>().Value;
         GlobalItems = provider.GetRequiredService<IOptions<GlobalItemsConfig>>().Value;
         PrisonerItems = provider.GetRequiredService<IOptions<PrisonerItemsConfig>>().Value;
         GuardItems = provider.GetRequiredService<IOptions<GuardItemsConfig>>().Value;
         _config = GlobalConfig;
+        _commandManager = new ShopCommandManager(Core, CommandsConfig);
     }
 
     public override void OnSharedInterfaceInjected(IInterfaceManager interfaceManager)
@@ -81,20 +88,12 @@ public sealed class Main : BasePlugin
             Assembly.GetExecutingAssembly(),
             Core.Logger);
 
-        foreach (var command in _config.Commands)
-        {
-            if (!Core.Command.IsCommandRegistered(command))
-                Core.Command.RegisterCommand(command, OpenShopCommand);
-        }
+        _commandManager?.Register(jailbreak, OpenMainMenu);
     }
 
     public override void Unload()
     {
-        foreach (var command in _config.Commands)
-        {
-            if (Core.Command.IsCommandRegistered(command))
-                Core.Command.UnregisterCommand(command);
-        }
+        _commandManager?.Unregister();
 
         if (_jailbreak != null)
         {
@@ -129,32 +128,21 @@ public sealed class Main : BasePlugin
         yield return (_config.Guards, ShopCategoryScope.Guards);
     }
 
-    private void OpenShopCommand(ICommandContext context)
-    {
-        if (context.Sender == null || _jailbreak == null)
-            return;
-
-        var player = _jailbreak.Players.SyncPlayer(context.Sender);
-        if (player == null)
-            return;
-
-        OpenMainMenu(player);
-    }
-
     private void OpenMainMenu(IJBPlayer player)
     {
         if (_jailbreak == null)
             return;
 
+        var localizer = GetLocalizer(player);
         var builder = Core.MenusAPI.CreateBuilder();
-        builder.Design.SetMenuTitle(player.Localizer["shop.title"]);
+        builder.Design.SetMenuTitle(localizer["shop.title"]);
 
         var categories = _jailbreak.Shop.Categories
             .Where(category => _jailbreak.Shop.CanAccessCategory(player, category.Id))
             .ToArray();
         if (categories.Length == 0)
         {
-            builder.AddOption(new TextMenuOption(player.Localizer["shop.empty"]) { Enabled = false });
+            builder.AddOption(new TextMenuOption(localizer["shop.empty"]) { Enabled = false });
         }
         else
         {
@@ -162,26 +150,28 @@ public sealed class Main : BasePlugin
             {
                 var captured = category;
                 var balance = _jailbreak.Shop.GetBalance(player, category.Currency);
-                AddButton(builder, player.Localizer["shop.category", category.Name, balance, category.Currency], () =>
-                    OpenCategoryMenu(player, captured));
+                builder.AddOption(new SubmenuMenuOption(
+                    localizer["shop.category", category.Name, balance, category.Currency],
+                    () => BuildCategoryMenu(player, captured)));
             }
         }
 
         Core.MenusAPI.OpenMenuForPlayer(player.Player, builder.Build());
     }
 
-    private void OpenCategoryMenu(IJBPlayer player, ShopCategory category)
+    private IMenuAPI BuildCategoryMenu(IJBPlayer player, ShopCategory category)
     {
         if (_jailbreak == null)
-            return;
+            throw new InvalidOperationException("Jailbreak API is unavailable.");
 
+        var localizer = GetLocalizer(player);
         var builder = Core.MenusAPI.CreateBuilder();
         builder.Design.SetMenuTitle(category.Name);
 
         var items = _jailbreak.Shop.GetItems(category.Id);
         if (items.Count == 0)
         {
-            builder.AddOption(new TextMenuOption(player.Localizer["shop.category_empty"]) { Enabled = false });
+            builder.AddOption(new TextMenuOption(localizer["shop.category_empty"]) { Enabled = false });
         }
         else
         {
@@ -190,30 +180,40 @@ public sealed class Main : BasePlugin
             {
                 var captured = item;
                 var currency = string.IsNullOrWhiteSpace(item.Currency) ? category.Currency : item.Currency!;
-                var label = player.Localizer["shop.item", item.Name, item.Price, currency];
+                var label = localizer["shop.item", item.Name, item.Price, currency];
 
                 if (equipped.Values.Contains(item.Id, StringComparer.OrdinalIgnoreCase))
-                    label = player.Localizer["shop.item_equipped", label];
+                    label = localizer["shop.item_equipped", label];
                 else if (_jailbreak.Shop.OwnsItem(player, item.Id))
-                    label = player.Localizer["shop.item_owned", label];
+                    label = localizer["shop.item_owned", label];
 
-                AddButton(builder, label, () => OpenItemMenu(player, category, captured));
+                builder.AddOption(new SubmenuMenuOption(
+                    label,
+                    () => BuildItemMenu(player, category, captured)));
             }
         }
 
-        Core.MenusAPI.OpenMenuForPlayer(player.Player, builder.Build());
+        return builder.Build();
     }
 
-    private void OpenItemMenu(IJBPlayer player, ShopCategory category, IShopItem item)
+    private IMenuAPI BuildItemMenu(IJBPlayer player, ShopCategory category, IShopItem item)
     {
         if (_jailbreak == null)
-            return;
+            throw new InvalidOperationException("Jailbreak API is unavailable.");
 
+        var localizer = GetLocalizer(player);
         var builder = Core.MenusAPI.CreateBuilder();
         builder.Design.SetMenuTitle(item.Name);
 
         if (!string.IsNullOrWhiteSpace(item.Description))
-            builder.AddOption(new TextMenuOption(player.Localizer["shop.item_description", item.Description]) { Enabled = false });
+        {
+            builder.AddOption(new TextMenuOption(localizer["shop.item_description", item.Description])
+            {
+                Enabled = false,
+                TextSize = MenuOptionTextSize.Small,
+                TextStyle = MenuOptionTextStyle.ScrollLeftLoop
+            });
+        }
 
         var currency = string.IsNullOrWhiteSpace(item.Currency) ? category.Currency : item.Currency!;
         var owns = _jailbreak.Shop.OwnsItem(player, item.Id);
@@ -221,27 +221,25 @@ public sealed class Main : BasePlugin
 
         if (!owns || item.Kind is ShopItemKind.Consumable or ShopItemKind.Temporary)
         {
-            AddButton(builder, player.Localizer["shop.buy", item.Price, currency], () => Purchase(player, item));
+            AddButton(builder, localizer["shop.buy", item.Price, currency], () => Purchase(player, item));
         }
 
         if (item.Kind == ShopItemKind.Equippable && owns)
         {
-            AddButton(builder, player.Localizer[equipped ? "shop.unequip" : "shop.equip"], () =>
+            AddButton(builder, localizer[equipped ? "shop.unequip" : "shop.equip"], () =>
             {
                 var result = equipped
                     ? _jailbreak.Shop.Unequip(player, item.Id)
                     : _jailbreak.Shop.Equip(player, item.Id);
 
-                player.SendMessage(
-                    MessageType.Chat,
+                SendMessage(
+                    player,
                     result.Success ? (equipped ? "shop.unequip_success" : "shop.equip_success") : "shop.action_failed",
-                    true,
-                    args: [item.Name]);
-                OpenCategoryMenu(player, category);
+                    item.Name);
             });
         }
 
-        Core.MenusAPI.OpenMenuForPlayer(player.Player, builder.Build());
+        return builder.Build();
     }
 
     private void Purchase(IJBPlayer player, IShopItem item)
@@ -269,7 +267,17 @@ public sealed class Main : BasePlugin
             _ => [item.Name]
         };
 
-        player.SendMessage(MessageType.Chat, message, true, args: args);
+        SendMessage(player, message, args);
+    }
+
+    private ILocalizer GetLocalizer(IJBPlayer player) =>
+        Core.Translation.GetPlayerLocalizer(player.Player);
+
+    private void SendMessage(IJBPlayer player, string key, params object[] args)
+    {
+        var localizer = GetLocalizer(player);
+        var message = args.Length == 0 ? localizer[key] : localizer[key, args];
+        player.Player.SendChat($"{localizer["shop.prefix"]}{message}");
     }
 
     private void AddButton(IMenuBuilderAPI builder, string label, Action action)
