@@ -38,11 +38,13 @@ public sealed class TaserItemModule : ItemModuleBase, IModuleInitializable
 
     public override ShopActionResult OnPurchase(ShopContext context)
     {
+        var config = Main.PrisonerItems;
+
         var pawn = context.Player.Player.Pawn;
         if (pawn == null || !pawn.IsValid)
             return ShopActionResult.Failed("Player is not alive.");
-
-        var taser = pawn.ItemServices?.GiveItem<CBaseEntity>("weapon_taser");
+        
+        var taser = pawn.ItemServices?.GiveItem<CBaseEntity>(config.Disguise.Value.ToString()! ?? string.Empty);
         return taser?.IsValid == true
             ? ShopActionResult.Succeeded()
             : ShopActionResult.Failed("The taser could not be given.");
