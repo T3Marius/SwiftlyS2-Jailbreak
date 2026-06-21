@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using SwiftlyS2.Shared.Events;
 
 namespace Jailbreak.Contract;
 
@@ -248,6 +249,9 @@ public interface IItemModule
     ShopActionResult OnPurchase(ShopContext context);
     ShopActionResult OnEquip(ShopContext context);
     ShopActionResult OnUnequip(ShopContext context);
+    void OnPrecacheResources(IOnPrecacheResourceEvent e)
+    {
+    }
 }
 
 public interface IModuleInitializable
@@ -265,6 +269,9 @@ public abstract class ItemModuleBase : IItemModule
     public abstract ShopActionResult OnPurchase(ShopContext context);
     public virtual ShopActionResult OnEquip(ShopContext context) => ShopActionResult.Succeeded();
     public virtual ShopActionResult OnUnequip(ShopContext context) => ShopActionResult.Succeeded();
+    public virtual void OnPrecacheResources(IOnPrecacheResourceEvent e)
+    {
+    }
 }
 
 public interface IJBShop
