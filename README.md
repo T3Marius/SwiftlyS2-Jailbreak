@@ -108,6 +108,8 @@ The default `!jbshop` menu registers three `credits` categories:
 
 The optional module requires [SwiftlyS2-Plugins/Economy](https://github.com/SwiftlyS2-Plugins/Economy) for wallet balances and multi-currency purchases. The shop design was inspired by [btnrv/BetterStore](https://github.com/btnrv/BetterStore), while using Jailbreak-specific typed contracts and lifecycle rules.
 
+Shop categories and items use real submenus, so the menu Back action returns through Item, Category, and Main views. Item descriptions use smaller scrolling text to keep longer descriptions readable.
+
 ### Visuals
 
 - Warden ping creates a CBeam circle at the ping location.
@@ -145,6 +147,11 @@ Command aliases are configurable in their matching config files.
 | Surrender | `!s`, `!surrender` | Request rebel surrender from the warden. |
 | JailbreakStats | `!jbstats`, `!jstats`, `!stats` | Open Last Request and Special Day stats. |
 | JBShop | `!jbshop` | Open the optional Jailbreak shop module. |
+| ShopBalance | `!balance`, `!bal` | Show every registered shop currency and your balance. |
+| GiftBalance | `!gift <player> <amount> <currency>` | Transfer one currency to another online player. |
+| AddBalance | `!addbalance <player> <amount> <currency>` | Add currency to a player. Requires the configured shop admin permission. |
+| SubtractBalance | `!subtractbalance`, `!subbalance` | Subtract currency from a player. Requires the configured shop admin permission. |
+| SetBalance | `!setbalance <player> <amount> <currency>` | Set a player's currency balance. Requires the configured shop admin permission. |
 
 ## Warden Menu
 
@@ -186,7 +193,8 @@ The plugin can run with custom paths, but the built-in model and sound defaults 
 | `voice.toml` | Voice | Prisoner mute behavior. |
 | `sounds.toml` | Sounds | Gameplay sounds, sound event files, and muted sound reasons. Built-in defaults use the Jailbreak Workshop addon. |
 | `queue.toml` | GuardQueue | Queue command aliases, list output targets, and premium permission flags. |
-| `config.toml` under `JBShop` | JBShop | Shop command aliases and Global/Prisoners/Guards category names, IDs, currencies, and ordering. |
+| `config.toml` under `JBShop` | JBShop | Global/Prisoners/Guards category names, IDs, currencies, and ordering. |
+| `commands.toml` under `JBShop` | JBShop | Shop, balance, gift, and admin command aliases plus the shop admin permissions. |
 | `global_items.toml` under `JBShop` | JBShop | Items available to both teams. |
 | `prisoners_items.toml` under `JBShop` | JBShop | Prisoner item settings, including the Taser price and presentation. |
 | `guards_items.toml` under `JBShop` | JBShop | Guard-only item settings. |
@@ -241,23 +249,23 @@ JailbreakCore registers no categories, item modules, or items by default. Shop p
 Reusable item behavior belongs in an `IItemModule`. Implement `IModuleInitializable` and register the module's item definitions from `Initialize`. Each item references its behavior through the module ID.
 
 ```csharp
-public sealed class HealthBoostModule : ItemModuleBase, IModuleInitializable
+public sealed class HealthshotItemModule : ItemModuleBase, IModuleInitializable
 {
-    public const string ModuleId = "gang.health_boost";
+    public const string ModuleId = "jbshop.healthshot";
     public override string Id => ModuleId;
 
     public void Initialize(IJBShop shop)
     {
         if (!shop.RegisterItem(new ModuleShopItemDefinition(
-                id: "gang.health_boost",
-                categoryId: "gang.upgrades",
+                id: "jbshop.prisoners.healthshot",
+                categoryId: "jbshop.prisoners",
                 moduleId: Id,
-                name: "Health Boost",
-                price: 25,
+                name: "Healthshot",
+                price: 100,
                 kind: ShopItemKind.Consumable,
-                description: "Receive 25 health.")))
+                description: "Receive one healthshot.")))
         {
-            throw new InvalidOperationException("Could not register Health Boost.");
+            throw new InvalidOperationException("Could not register Healthshot.");
         }
     }
 
@@ -265,19 +273,17 @@ public sealed class HealthBoostModule : ItemModuleBase, IModuleInitializable
 
     public override ShopActionResult OnPurchase(ShopContext context)
     {
-        context.Player.Player.Pawn!.Health += 25;
-        return ShopActionResult.Succeeded();
+        var healthshot = context.Player.Player.Pawn?.ItemServices?
+            .GiveItem<CBaseEntity>("weapon_healthshot");
+
+        return healthshot?.IsValid == true
+            ? ShopActionResult.Succeeded()
+            : ShopActionResult.Failed("The healthshot could not be given.");
     }
 }
 
 var shop = jailbreak.Shop;
-
-shop.RegisterCategory(new ShopCategory(
-    "gang.upgrades",
-    "Gang Upgrades",
-    "gold"));
-
-shop.RegisterModule(new HealthBoostModule());
+shop.RegisterModule(new HealthshotItemModule());
 ```
 
 Concrete parameterless `IItemModule` classes inside the bundled JBShop assembly are discovered automatically. Modules from another plugin must call `shop.RegisterModule(...)` after their categories exist. Unregistering a module also removes every item linked to its module ID. For a single item with unique behavior, `ShopItemDefinition` supports inline callbacks without creating a module.
@@ -290,7 +296,7 @@ Concrete parameterless `IItemModule` classes inside the bundled JBShop assembly 
 - Each currency is an independent Economy wallet; balances never mix between wallet kinds.
 - JailbreakCore creates missing wallet kinds through `Economy.API.v1` when categories or currency-overriding items are registered.
 
-The bundled Global, Prisoners, and Guards categories use `credits`. This lets a future gangs module register a separate `gold` category or use `gold` as an item-level override without changing JBShop internals.
+The bundled Global, Prisoners, and Guards categories use `credits`. Other shop modules can register categories with separate currencies or override the currency of individual items without changing JBShop internals.
 
 ## Releases
 
