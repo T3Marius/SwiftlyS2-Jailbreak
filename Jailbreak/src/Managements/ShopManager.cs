@@ -26,6 +26,7 @@ public sealed class ShopManager : IJBShop
 
     private IEconomyAPIv1? _economy;
     private Guid? _playerSpawnHookId;
+    private Guid? _roundStartHookId;
 
     public ShopManager(
         ISwiftlyCore core,
@@ -61,6 +62,7 @@ public sealed class ShopManager : IJBShop
     public void Register()
     {
         _playerSpawnHookId = _core.GameEvent.HookPost<EventPlayerSpawn>(OnPlayerSpawn);
+        _roundStartHookId = _core.GameEvent.HookPost<EventRoundStart>(OnRoundStart);
         _core.Event.OnClientDisconnected += OnClientDisconnected;
         _core.Event.OnPrecacheResource += OnPrecacheResource;
     }
@@ -71,6 +73,12 @@ public sealed class ShopManager : IJBShop
         {
             _core.GameEvent.Unhook(_playerSpawnHookId.Value);
             _playerSpawnHookId = null;
+        }
+
+        if (_roundStartHookId.HasValue)
+        {
+            _core.GameEvent.Unhook(_roundStartHookId.Value);
+            _roundStartHookId = null;
         }
 
         _core.Event.OnClientDisconnected -= OnClientDisconnected;
@@ -485,6 +493,12 @@ public sealed class ShopManager : IJBShop
             return HookResult.Continue;
 
         _core.Scheduler.NextWorldUpdate(() => ReapplyEquippedItems(player));
+        return HookResult.Continue;
+    }
+
+    private HookResult OnRoundStart(EventRoundStart e)
+    {
+        _moduleManager.OnRoundStart();
         return HookResult.Continue;
     }
 

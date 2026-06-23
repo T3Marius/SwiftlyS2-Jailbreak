@@ -102,6 +102,21 @@ public sealed class ShopItemModuleManager
         }
     }
 
+    public void OnRoundStart()
+    {
+        foreach (var module in _modules.Values.ToArray())
+        {
+            try
+            {
+                module.OnRoundStart();
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Shop item module round-start callback failed. Module={ModuleId}", module.Id);
+            }
+        }
+    }
+
     public void Clear()
     {
         foreach (var moduleId in _modules.Keys.ToArray())
