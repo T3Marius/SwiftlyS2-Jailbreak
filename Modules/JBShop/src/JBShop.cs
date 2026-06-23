@@ -18,7 +18,7 @@ namespace JBShop;
     Author = "T3Marius",
     Name = "[JB Core] JBShop",
     Id = "JBShop",
-    Version = "0.1.2"
+    Version = "0.1.3"
 )]
 public sealed class Main : BasePlugin
 {
