@@ -103,7 +103,7 @@ A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys
 The default `!jbshop` menu registers three `credits` categories:
 
 - **Global** - available to both prisoners and guards.
-- **Prisoners** - purchases are restricted to prisoners.
+- **Prisoners** - purchases are restricted to prisoners. Includes Taser, Disguise, and once-per-round Break Cuffs items.
 - **Guards** - purchases are restricted to guards.
 
 The optional module requires [SwiftlyS2-Plugins/Economy](https://github.com/SwiftlyS2-Plugins/Economy) for wallet balances and multi-currency purchases. The shop design was inspired by [btnrv/BetterStore](https://github.com/btnrv/BetterStore), while using Jailbreak-specific typed contracts and lifecycle rules.
@@ -196,7 +196,7 @@ The plugin can run with custom paths, but the built-in model and sound defaults 
 | `config.toml` under `JBShop` | JBShop | Global/Prisoners/Guards category names, IDs, currencies, and ordering. |
 | `commands.toml` under `JBShop` | JBShop | Shop, balance, gift, and admin command aliases plus the shop admin permissions. |
 | `global_items.toml` under `JBShop` | JBShop | Items available to both teams. |
-| `prisoners_items.toml` under `JBShop` | JBShop | Prisoner item settings, including the Taser price and presentation. |
+| `prisoners_items.toml` under `JBShop` | JBShop | Prisoner item settings for Taser, Disguise, and Break Cuffs. |
 | `guards_items.toml` under `JBShop` | JBShop | Guard-only item settings. |
 | `jailbreak.cfg` | Game cvars | Generated in the plugin directory and applied on map start or hot reload. |
 
@@ -239,6 +239,7 @@ Other plugins can depend on `Jailbreak.Contract` and resolve `IJailbreak`.
 
 - `IJBPlayerManagement Players` gives access to player tracking, warden/deputy lookup, role state, and team state.
 - `IJBShop Shop` registers categories, item modules, and items, then handles Economy-backed purchases, ownership, and equipment.
+- `ICuffsManager Cuffs` checks cuff state and safely breaks a prisoner's cuffs.
 - `RegisterSpecialDay(ISpecialDay specialDay)` registers a Special Day module.
 - `UnregisterSpecialDay(string id)` unregisters a Special Day module.
 
@@ -287,6 +288,8 @@ shop.RegisterModule(new HealthshotItemModule());
 ```
 
 Concrete parameterless `IItemModule` classes inside the bundled JBShop assembly are discovered automatically. Modules from another plugin must call `shop.RegisterModule(...)` after their categories exist. Unregistering a module also removes every item linked to its module ID. For a single item with unique behavior, `ShopItemDefinition` supports inline callbacks without creating a module.
+
+Item modules can override `OnPrecacheResources` to add configured models, sounds, or particles to the map resource manifest. `OnRoundStart` is available for inexpensive round-scoped state such as purchase limits.
 
 ### Shop Currencies
 
