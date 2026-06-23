@@ -6,6 +6,7 @@ public sealed class Api : IJailbreak
 {
     public IJBPlayerManagement Players { get; }
     public IJBShop Shop { get; }
+    public ICuffsManager Cuffs { get; }
     public IReadOnlyCollection<ISpecialDay> SpecialDays => _specialDayManager.SpecialDays;
     public ISpecialDay? CurrentSpecialDay => _specialDayManager.CurrentSpecialDay;
     public ISpecialDay? QueuedSpecialDay => _specialDayManager.QueuedSpecialDay;
@@ -19,11 +20,13 @@ public sealed class Api : IJailbreak
     public Api(
         IJBPlayerManagement playerManagement,
         IJBShop shop,
+        ICuffsManager cuffsManager,
         SpecialDayManager specialDayManager,
         LastRequestManager lastRequestManager)
     {
         Players = playerManagement;
         Shop = shop;
+        Cuffs = cuffsManager;
         _specialDayManager = specialDayManager;
         _lastRequestManager = lastRequestManager;
     }

@@ -70,6 +70,7 @@ public sealed class Main : BasePlugin
 
         collection.AddSwiftly(Core)
                   .AddSingleton<CuffsManager>()
+                  .AddSingleton<ICuffsManager>(provider => provider.GetRequiredService<CuffsManager>())
                   .AddSingleton<IconManager>()
                   .AddSingleton<CellManager>()
                   .AddSingleton<JBPlayerManagement>()

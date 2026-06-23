@@ -12,7 +12,7 @@ using SwiftlyS2.Shared.Trace;
 
 namespace Jailbreak;
 
-public sealed class CuffsManager
+public sealed class CuffsManager : ICuffsManager
 {
     private readonly ISwiftlyCore        _core;
     private readonly IJBPlayerManagement _players;
@@ -163,6 +163,21 @@ public sealed class CuffsManager
         _grabDistances.Clear();
         _wardenTaserOwners.Clear();
         _mouse2HeldWardens.Clear();
+    }
+
+    public bool IsCuffed(IJBPlayer player) =>
+        player.IsCuffed;
+
+    public bool TryBreakCuffs(IJBPlayer prisoner)
+    {
+        if (prisoner.Team != JBTeam.Prisoner
+            || !prisoner.Player.IsValid
+            || !prisoner.Player.IsAlive
+            || !prisoner.IsCuffed)
+            return false;
+
+        Uncuff(prisoner);
+        return true;
     }
 
     private void OnClientKeyStateChanged(IOnClientKeyStateChangedEvent e)
