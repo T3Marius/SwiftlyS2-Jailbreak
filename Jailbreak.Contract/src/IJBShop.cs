@@ -252,6 +252,10 @@ public interface IItemModule
     void OnPrecacheResources(IOnPrecacheResourceEvent e)
     {
     }
+
+    void OnRoundStart()
+    {
+    }
 }
 
 public interface IModuleInitializable
@@ -270,6 +274,10 @@ public abstract class ItemModuleBase : IItemModule
     public virtual ShopActionResult OnEquip(ShopContext context) => ShopActionResult.Succeeded();
     public virtual ShopActionResult OnUnequip(ShopContext context) => ShopActionResult.Succeeded();
     public virtual void OnPrecacheResources(IOnPrecacheResourceEvent e)
+    {
+    }
+
+    public virtual void OnRoundStart()
     {
     }
 }
