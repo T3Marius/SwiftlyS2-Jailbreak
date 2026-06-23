@@ -27,6 +27,7 @@ public sealed class Main : BasePlugin
     internal static GlobalItemsConfig GlobalItems { get; private set; } = new();
     internal static PrisonerItemsConfig PrisonerItems { get; private set; } = new();
     internal static GuardItemsConfig GuardItems { get; private set; } = new();
+    internal static IJailbreak? JailbreakApi { get; private set; }
 
     private ShopConfig _config = new();
     private IJailbreak? _jailbreak;
@@ -82,6 +83,7 @@ public sealed class Main : BasePlugin
         }
 
         _jailbreak = jailbreak;
+        JailbreakApi = jailbreak;
         RegisterCategories(_jailbreak.Shop);
         _registeredModuleIds = ItemModuleRegistrar.RegisterFromAssembly(
             _jailbreak.Shop,
@@ -105,6 +107,7 @@ public sealed class Main : BasePlugin
         }
         _registeredModuleIds = [];
         _jailbreak = null;
+        JailbreakApi = null;
     }
 
     private void RegisterCategories(IJBShop shop)
