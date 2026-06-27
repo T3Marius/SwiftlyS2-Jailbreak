@@ -13,7 +13,7 @@ namespace Jailbreak;
     Name = "Jailbreak",
     Id = "Jailbreak",
     Author = "Marius",
-    Version = "0.1.3"
+    Version = "0.1.4"
 )]
 public sealed class Main : BasePlugin
 {
