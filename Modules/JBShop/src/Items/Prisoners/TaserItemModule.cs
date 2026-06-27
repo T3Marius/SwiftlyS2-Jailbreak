@@ -1,4 +1,7 @@
 using Jailbreak.Contract;
+using SwiftlyS2.Shared.GameEventDefinitions;
+using SwiftlyS2.Shared.Misc;
+using SwiftlyS2.Shared.Players;
 using SwiftlyS2.Shared.SchemaDefinitions;
 
 namespace JBShop.Items;
@@ -32,6 +35,7 @@ public sealed class TaserItemModule : ItemModuleBase, IModuleInitializable
     public void Shutdown()
     {
     }
+
     public override bool CanPurchase(ShopContext context) =>
         context.Player.Player.IsValid && context.Player.Player.IsAlive;
 
@@ -42,8 +46,9 @@ public sealed class TaserItemModule : ItemModuleBase, IModuleInitializable
         var pawn = context.Player.Player.Pawn;
         if (pawn == null || !pawn.IsValid)
             return ShopActionResult.Failed("Player is not alive.");
-        
+
         var taser = pawn.ItemServices?.GiveItem<CBaseEntity>(config.Value);
+
         return taser?.IsValid == true
             ? ShopActionResult.Succeeded()
             : ShopActionResult.Failed("The taser could not be given.");
