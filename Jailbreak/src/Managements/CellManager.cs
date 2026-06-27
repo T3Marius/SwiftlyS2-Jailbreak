@@ -1,3 +1,4 @@
+using Jailbreak.Contract;
 using SwiftlyS2.Shared;
 
 namespace Jailbreak;
@@ -5,7 +6,7 @@ namespace Jailbreak;
 /// <summary>
 /// Manages cell doors. Injected as a singleton so you can call OpenCells / CloseCells anywhere without passing services.
 /// </summary>
-public sealed class CellManager(ISwiftlyCore core)
+public sealed class CellManager(ISwiftlyCore core) : ICellsManager
 {
     /// <summary>
     /// Whether the cells are open or not. This is used to prevent spamming the open/close inputs when the cells are already in the desired state.

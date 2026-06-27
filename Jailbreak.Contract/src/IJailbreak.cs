@@ -6,6 +6,7 @@ namespace Jailbreak.Contract
         IJBPlayerManagement Players { get; }
         IJBShop Shop { get; }
         ICuffsManager Cuffs { get; }
+        ICellsManager Cells { get; }
         IReadOnlyCollection<ISpecialDay> SpecialDays { get; }
         ISpecialDay? CurrentSpecialDay { get; }
         ISpecialDay? QueuedSpecialDay { get; }

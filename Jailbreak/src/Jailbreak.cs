@@ -73,6 +73,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<ICuffsManager>(provider => provider.GetRequiredService<CuffsManager>())
                   .AddSingleton<IconManager>()
                   .AddSingleton<CellManager>()
+                  .AddSingleton<ICellsManager>(provider => provider.GetRequiredService<CellManager>())
                   .AddSingleton<JBPlayerManagement>()
                   .AddSingleton<IJBPlayerManagement, JBPlayerManagement>()
                   .AddSingleton<TeamManager>()
