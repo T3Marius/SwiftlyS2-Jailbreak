@@ -22,6 +22,7 @@ public sealed class PrisonerItemsConfig
     public TaserItemConfig Taser { get; set; } = new();
     public DisguiseItemConfig Disguise { get; set; } = new();
     public BreakCuffsItemConfig BreakCuffs { get; set; } = new();
+    public OpenCellsItemConfig OpenCells { get; set; } = new();
 }
 
 public sealed class GuardItemsConfig
@@ -35,8 +36,8 @@ public sealed class TaserItemConfig : ShopItemConfig
         Id = "jbshop.prisoners.taser";
         Name = "Taser";
         Value = "weapon_taser";
-        Description = "Receive a taser for the current life.";
-        Price = 250;
+        Description = "Receive a taser that only works once.";
+        Price = 500;
     }
 }
 public sealed class DisguiseItemConfig : ShopItemConfig
@@ -59,5 +60,16 @@ public sealed class BreakCuffsItemConfig : ShopItemConfig
         Name = "Break Cuffs";
         Description = "Break free from your cuffs. Can only be purchased once per round.";
         Price = 500;
+    }
+}
+
+public sealed class OpenCellsItemConfig : ShopItemConfig
+{
+    public OpenCellsItemConfig()
+    {
+        Id = "jbshop.prisoners.open_cells";
+        Name = "Open Cells";
+        Description = "Open all prisoners cells and start a revolt!";
+        Price = 1000;
     }
 }
