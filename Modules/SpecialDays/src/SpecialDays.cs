@@ -19,7 +19,7 @@ namespace SpecialDays;
     Author = "T3Marius",
     Name = "[JB Core] SpecialDays",
     Id = "SpecialDays",
-    Version = "0.1.8"
+    Version = "0.1.9"
 )]
 public sealed class Main : BasePlugin
 {
@@ -63,6 +63,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.Onlyheadshot.Enabled)
             _jail.RegisterSpecialDay(new OnlyheadshotDay(Core, _jail));
+
+        if (GlobalConfig.ChickenFight.Enabled)
+            _jail.RegisterSpecialDay(new ChickenFightDay(Core, _jail));
     }
     public override void Load(bool hotReload)
     {
@@ -108,6 +111,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.Onlyheadshot.Enabled)
             _jail?.UnregisterSpecialDay("sd_only_headshot");
+
+        if (GlobalConfig.ChickenFight.Enabled)
+            _jail?.UnregisterSpecialDay("sd_chicken_fight");
 
     }
 }
@@ -670,6 +676,170 @@ public sealed class OnlyheadshotDay : SpecialDayBase
         {
             e.Info.Damage = 0;
             e.Result = HookResult.Stop;
+        }
+    }
+}
+
+public sealed class ChickenFightDay : SpecialDayBase
+{
+    public ChickenFightDay(ISwiftlyCore core, IJailbreak jail)
+        : base(core, jail) { }
+
+    public override string Id => "sd_chicken_fight";
+    public override string Name => Core.Localizer["chicken_fight.name"];
+    public override string Description => Core.Localizer["chicken_fight.description"];
+    public override int StartCountdown => Main.GlobalConfig.ChickenFight.StartCountdown;
+    public override SpecialDayFreezeTeam FreezeTeamOnCountdown => SpecialDayFreezeTeam.None;
+    public override bool AllowAllWeapons => true;
+    public override bool EnableGunsMenu => false;
+    public override IReadOnlySet<ItemDefinitionIndex> AllowedWeapons => SpecialDayWeapons.AllKnives
+        .Concat([ItemDefinitionIndex.Xm1014])
+        .ToHashSet();
+    public override bool AllowFriendlyFire => false;
+    public override bool StripWeaponsOnStart => true;
+    public override IReadOnlyList<string> GiveWeaponsOnStart => ["weapon_xm1014", "weapon_knife"];
+
+    private readonly Dictionary<int, CPhysicsPropOverride?> _chickenPlayers = new();
+    public override void PreStart()
+    {
+        Core.Event.OnItemServicesCanAcquireHook += CanAcquire;
+        Core.Event.OnTick += OnTick;
+
+        foreach (var player in Core.PlayerManager.GetAllPlayers().Where(p => p.Controller.Team == Team.T))
+            CreateChicken(player);
+    }
+    public override void Start()
+    {
+    }
+    public override void End()
+    {
+        Core.Event.OnItemServicesCanAcquireHook -= CanAcquire;
+        Core.Event.OnTick -= OnTick;
+
+        foreach (var player in Core.PlayerManager.GetAllPlayers().Where(p => p.Controller.Team == Team.T))
+            RemoveChicken(player);
+    }
+    private void OnTick()
+    {
+        foreach (var (playerId, chicken) in _chickenPlayers)
+        {
+            var player = Core.PlayerManager.GetPlayer(playerId);
+            if (player == null || player.PlayerPawn == null)
+                continue;
+
+            if (chicken == null || !chicken.IsValid)
+                continue;
+
+            var eyeAngles = player.PlayerPawn.EyeAngles;
+            var chickRotation = chicken.AbsRotation!.Value;
+
+            chicken.Teleport(null, new QAngle(chickRotation.Pitch, eyeAngles.Yaw, chickRotation.Roll), null);
+        }
+    }
+    private void CreateChicken(IPlayer player)
+    {
+        if (player.PlayerPawn == null)
+            return;
+
+        var prop = Core.EntitySystem.CreateEntityByDesignerName<CPhysicsPropOverride>("prop_physics_override");
+        if (prop == null)  
+            return;
+            
+
+        var origin = player.PlayerPawn.AbsOrigin;
+        if (origin == null)
+            return;
+
+        prop.SetModel("models/chicken/chicken.vmdl");
+        prop.CBodyComponent?.SceneNode?.Owner?.Entity?.Flags &= ~(uint)(1 << 2);
+        prop.Teleport(origin.Value, QAngle.Zero, Vector.Zero);
+        prop.DispatchSpawn();
+        prop.AcceptInput("DisableMotion", "");
+        prop.AcceptInput("SetParent", "!activator", player.PlayerPawn, player.PlayerPawn);
+        prop.Collision.CollisionGroup = (byte)CollisionGroup.Trigger;
+        prop.Collision.CollisionAttribute.CollisionGroup = (byte)CollisionGroup.Trigger;
+        prop.Collision.CollisionGroupUpdated();
+        prop.Collision.CollisionAttributeUpdated();
+        prop.CollisionRulesChanged();
+        prop.FlagsUpdated();
+
+
+        player.PlayerPawn.RenderMode     = RenderMode_t.kRenderTransAlpha;
+        player.PlayerPawn.Render         = new Color(255, 255, 255, 0);
+        player.PlayerPawn.ShadowStrength = 0;
+        player.PlayerPawn.RenderModeUpdated();
+        player.PlayerPawn.RenderUpdated();
+        player.PlayerPawn.ShadowStrengthUpdated();
+
+        foreach (var weapon in player.PlayerPawn.WeaponServices?.MyValidWeapons!)
+        {
+            if (weapon == null || !weapon.IsValid)
+                continue;
+
+            weapon.RenderMode     = RenderMode_t.kRenderTransAlpha;
+            weapon.Render         = new Color(255, 255, 255, 0);
+            weapon.ShadowStrength = 0;
+            weapon.SetTransmitState(false);
+            weapon.SetTransmitState(true, player.PlayerID);
+        }
+
+        player.PlayerPawn.SetTransmitState(false);
+        player.PlayerPawn.SetTransmitState(true, player.PlayerID);
+
+        _chickenPlayers[player.PlayerID] = prop;
+    }
+    private void RemoveChicken(IPlayer player)
+    {        
+        if (player.PlayerPawn == null)
+            return;
+
+        if (_chickenPlayers.TryGetValue(player.PlayerID, out var chicken))
+        {
+            if (chicken == null || !chicken.IsValid)
+            {
+                _chickenPlayers.Remove(player.PlayerID);
+                return;
+            }
+
+            chicken.Despawn();
+            _chickenPlayers.Remove(player.PlayerID);
+        }
+
+        player.PlayerPawn.RenderMode     = RenderMode_t.kRenderTransAlpha;
+        player.PlayerPawn.Render         = new Color(255, 255, 255, 255);
+        player.PlayerPawn.ShadowStrength = 1.0f;
+        player.PlayerPawn.RenderModeUpdated();
+        player.PlayerPawn.RenderUpdated();
+        player.PlayerPawn.ShadowStrengthUpdated();
+
+        foreach (var weapon in player.PlayerPawn.WeaponServices?.MyValidWeapons!)
+        {
+            if (weapon == null || !weapon.IsValid)
+                continue;
+
+            weapon.RenderMode     = RenderMode_t.kRenderTransAlpha;
+            weapon.Render         = new Color(255, 255, 255, 255);
+            weapon.ShadowStrength = 0;
+            weapon.SetTransmitState(true);
+        }
+
+        player.PlayerPawn.SetTransmitState(true);
+
+    }
+    private void CanAcquire(IOnItemServicesCanAcquireHookEvent e)
+    {
+        var player = e.ItemServices.Pawn.ToPlayer();
+        if (player == null)
+            return;
+
+        if (player.Controller.Team != Team.T)
+            return;
+
+        var itemDefIndex = (ItemDefinitionIndex)e.EconItemView.ItemDefinitionIndex;
+
+        if (!SpecialDayWeapons.Knives.Contains(itemDefIndex))
+        {
+            e.SetAcquireResult(AcquireResult.NotAllowedByProhibition);
         }
     }
 }
