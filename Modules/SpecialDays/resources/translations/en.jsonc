@@ -27,5 +27,8 @@
     "one_in_the_chamber.description": "Each bullet is insta kill! You get one bullet per kill. You can use knife too and it will refill.",
 
     "headshot_only.name": "Headshot Only",
-    "headshot_only.description": "Headshot only. All weapons are allowed.<br>Use <font color='yellow'>!sguns</font> to choose your weapons!"
+    "headshot_only.description": "Headshot only. All weapons are allowed.<br>Use <font color='yellow'>!sguns</font> to choose your weapons!",
+
+    "chicken_fight.name": "Chicken Fight",
+    "chicken_fight.description": "Guards needs to hunt down the chickens!"
 }

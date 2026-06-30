@@ -34,6 +34,7 @@ public sealed class Main : BasePlugin
             Core.Logger.LogWarning("Jailbreak api is null, special days will not be registered");
             return;
         }
+        
         if (GlobalConfig.KnifeFight.Enabled)
             _jail.RegisterSpecialDay(new KnifeFightDay(Core, _jail));
 

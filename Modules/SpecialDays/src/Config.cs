@@ -12,6 +12,7 @@ public sealed class SDConfig
     public NoScopeConfig         NoScope         { get; set; }     = new();
     public ScoutConfig           Scout           { get; set; }     = new();
     public TaserConfig           Taser           { get; set; }     = new();
+    public ChickenFightConfig    ChickenFight    { get; set; }     = new();
 }
 public sealed class KnifeFightConfig
 {
@@ -61,6 +62,12 @@ public sealed class OneInTheChamberConfig
     public string OitcGun { get; set; } = "weapon_deagle";
 }
 public sealed class OnlyheadshotConfig
+{
+    public bool Enabled { get; set; } = true;
+    public int StartCountdown { get; set; } = 15;
+}
+
+public sealed class ChickenFightConfig
 {
     public bool Enabled { get; set; } = true;
     public int StartCountdown { get; set; } = 15;
