@@ -19,7 +19,7 @@ namespace SpecialDays;
     Author = "T3Marius",
     Name = "[JB Core] SpecialDays",
     Id = "SpecialDays",
-    Version = "0.1.9"
+    Version = "0.2.0"
 )]
 public sealed class Main : BasePlugin
 {
