@@ -701,6 +701,7 @@ public sealed class ChickenFightDay : SpecialDayBase
     public override IReadOnlyList<string> GiveWeaponsOnStart => ["weapon_xm1014", "weapon_knife"];
 
     private readonly Dictionary<int, CPhysicsPropOverride?> _chickenPlayers = new();
+    private Guid? _playerDeathHookId;
     public override void PreStart()
     {
         Core.Event.OnItemServicesCanAcquireHook += CanAcquire;
@@ -711,14 +712,34 @@ public sealed class ChickenFightDay : SpecialDayBase
     }
     public override void Start()
     {
+        _playerDeathHookId = Core.GameEvent.HookPost<EventPlayerDeath>(HandlePlayerDeath);
     }
     public override void End()
     {
         Core.Event.OnItemServicesCanAcquireHook -= CanAcquire;
         Core.Event.OnTick -= OnTick;
-
+        if (_playerDeathHookId.HasValue)
+        {
+            Core.GameEvent.Unhook(_playerDeathHookId.Value);
+        }
+        
         foreach (var player in Core.PlayerManager.GetAllPlayers().Where(p => p.Controller.Team == Team.T))
             RemoveChicken(player);
+    }
+    private HookResult HandlePlayerDeath(EventPlayerDeath e)
+    {
+        if (e.UserIdPlayer is not IPlayer player)
+            return HookResult.Continue;
+
+        if (_chickenPlayers.TryGetValue(player.PlayerID, out var chicken))
+        {
+            if (chicken != null && chicken.IsValid)
+                chicken.Despawn();
+
+            _chickenPlayers.Remove(player.PlayerID);
+        }
+
+        return HookResult.Continue;
     }
     private void OnTick()
     {
