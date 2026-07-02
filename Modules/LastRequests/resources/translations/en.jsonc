@@ -9,5 +9,8 @@
     "mag_for_mag.description": "A random player starts with a full magazine. Empty it before the other player gets their turn.",
 
     "no_scope.name": "No Scope",
-    "no_scope.description": "You can't use scope in this duel!"
+    "no_scope.description": "You can't use scope in this duel!",
+
+    "dodgeball.name": "Dodgeball",
+    "dodgeball.description": "Both of you have 1HP! Try hitting eachother with the decoy!"
 }

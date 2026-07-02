@@ -49,6 +49,9 @@ public sealed class Main : BasePlugin
 
         if (GlobalConfig.NoScope.Enabled)
             _jail.RegisterLastRequest(new NoScopeLastRequest(Core, _jail));
+
+        if (GlobalConfig.DodgeBall.Enabled)
+            _jail.RegisterLastRequest(new DodgeballLastRequest(Core, _jail));
     }
 
     public override void Load(bool hotReload)
@@ -78,6 +81,9 @@ public sealed class Main : BasePlugin
         
         if (GlobalConfig.NoScope.Enabled)
             _jail?.UnregisterLastRequest("lr_no_scope");
+
+        if (GlobalConfig.DodgeBall.Enabled)
+            _jail?.UnregisterLastRequest("lr_dodgeball");
     }
 }
 
@@ -633,4 +639,66 @@ public sealed class NoScopeLastRequest : LastRequestBase
 
         player.Pawn?.ItemServices?.GiveItem<CBaseEntity>(classname);
     }
+}
+public sealed class DodgeballLastRequest : LastRequestBase
+{
+    public DodgeballLastRequest(ISwiftlyCore core, IJailbreak jail)
+        :base (core, jail) { }
+
+    public override string Id => "lr_dodgeball";
+    public override string Name => Core.Localizer["dodgeball.name"];
+    public override string Description => Core.Localizer["dodgeball.description"];
+    public override int StartCountdown => Main.GlobalConfig.DodgeBall.StartCountdown;
+    public override LastRequestOpponentMode OpponentMode => LastRequestOpponentMode.Duel;
+    public override LastRequestWeaponSelection WeaponSelection => LastRequestWeaponSelection.None;
+    public override bool AllowAllWeapons => false;
+    public override IReadOnlyList<string> GiveWeaponsOnStart => ["weapon_decoy"];
+
+    public override IReadOnlySet<ItemDefinitionIndex> AllowedWeapons => new HashSet<ItemDefinitionIndex>
+    {
+        ItemDefinitionIndex.Decoy
+    };
+
+    private Guid? _grenadeThrownId;
+
+    public override void Start(LastRequestStartContext context)
+    {
+        SetHealth(Guard!, 1);
+        SetHealth(Prisoner, 1);
+
+        _grenadeThrownId = Core.GameEvent.HookPost<EventGrenadeThrown>(OnGrenadeThrown);
+    }
+    public override void End(IJBPlayer? winner, IJBPlayer? loser)
+    {
+        if (_grenadeThrownId.HasValue)
+        {
+            Core.GameEvent.Unhook(_grenadeThrownId.Value);
+        }
+    }
+    private HookResult OnGrenadeThrown(EventGrenadeThrown e)
+    {
+        if (e.UserIdPlayer is not IPlayer player)
+            return HookResult.Continue;
+
+        if (player.SteamID != Prisoner.SteamID || player.SteamID != Guard?.SteamID)
+            return HookResult.Continue;
+
+        player.Pawn?.ItemServices?.GiveItem<CBaseEntity>("weapon_decoy");
+
+        return HookResult.Continue;
+    }
+
+    private void SetHealth(IJBPlayer player, int health)
+    {
+        var pawn = player.Player.PlayerPawn;
+        if (pawn == null)
+            return;
+
+        pawn.Health = health;
+        pawn.MaxHealth = health;
+        pawn.HealthUpdated();
+        pawn.MaxHealthUpdated();
+    }
+
+
 }
