@@ -70,7 +70,7 @@ public sealed class JBPlayer : IJBPlayer
             _iconManager.SpawnCoin(livePlayer);
 
             if (!silent)
-                _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["new_warden_alert", livePlayer.Name]);
+                BroadcastLocalized(MessageType.Alert, "new_warden_alert", livePlayer.Name);
 
             if (!string.IsNullOrEmpty(_modelsConfig.WardenModel))
                 PlayerUtils.SetModel(livePlayer, _modelsConfig.WardenModel, _core.Scheduler);
@@ -92,8 +92,8 @@ public sealed class JBPlayer : IJBPlayer
 
         if (!silent)
         {
-            _core.PlayerManager.SendMessage(MessageType.Chat, _core.Localizer["prefix"] + _core.Localizer[key, args]);
-            _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["no_warden_alert"]);
+            BroadcastLocalizedWithPrefix(MessageType.Chat, key, args);
+            BroadcastLocalized(MessageType.Alert, "no_warden_alert");
         }
 
         SyncTeam();
@@ -121,7 +121,7 @@ public sealed class JBPlayer : IJBPlayer
                 PlayerUtils.SetModel(livePlayer, _modelsConfig.DeputyModel, _core.Scheduler);
 
             if (!silent)
-                _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["new_deputy_alert", Player.Name]);
+                BroadcastLocalized(MessageType.Alert, "new_deputy_alert", Player.Name);
 
             return;
         }
@@ -130,7 +130,7 @@ public sealed class JBPlayer : IJBPlayer
             Role = JBRole.None;
         
         if (!silent)
-            _core.PlayerManager.SendMessage(MessageType.Alert, _core.Localizer["no_deputy_alert"]);
+            BroadcastLocalized(MessageType.Alert, "no_deputy_alert");
 
         SyncTeam();
         ApplyTeamDefaults();
@@ -272,7 +272,30 @@ public sealed class JBPlayer : IJBPlayer
         livePlayer = player;
         return true;
     }
+    private void BroadcastLocalized(MessageType type, string key, params object[] args)
+    {
+        foreach (var recipient in _core.PlayerManager.GetAllPlayers())
+        {
+            if (recipient is not { IsValid: true })
+                continue;
 
+            var localizer = _core.Translation.GetPlayerLocalizer(recipient);
+            var message = args.Length > 0 ? localizer[key, args] : localizer[key];
+            recipient.SendMessage(type, message);
+        }
+    }
+    private void BroadcastLocalizedWithPrefix(MessageType type, string key, params object[] args)
+    {
+        foreach (var recipient in _core.PlayerManager.GetAllPlayers())
+        {
+            if (recipient is not { IsValid: true })
+                continue;
+
+            var localizer = _core.Translation.GetPlayerLocalizer(recipient);
+            var message = args.Length > 0 ? localizer[key, args] : localizer[key];
+            recipient.SendMessage(type, localizer["prefix"] + message);
+        }
+    }
     private void SetModelIfLive(string model)
     {
         if (TryGetLivePlayer(out var livePlayer))
