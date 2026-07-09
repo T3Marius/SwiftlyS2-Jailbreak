@@ -1,6 +1,15 @@
-# Jailbreak
+<div align="center">
+  <img src="https://pan.samyyc.dev/s/VYmMXE" />
+  <h2><strong>Jailbreak</strong></h2>
+  <h3>A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys2/swiftlys2).</h3>
+</div>
 
-A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys2/swiftlys2).
+<p align="center">
+  <img src="https://img.shields.io/badge/build-passing-brightgreen" alt="Build Status">
+  <img src="https://img.shields.io/github/downloads/T3Marius/SwiftlyS2-Jailbreak/total" alt="Downloads">
+  <img src="https://img.shields.io/github/stars/T3Marius/SwiftlyS2-Jailbreak?style=flat&logo=github" alt="Stars">
+  <img src="https://img.shields.io/github/license/T3Marius/SwiftlyS2-Jailbreak" alt="License">
+</p>
 
 ## Features
 
@@ -108,7 +117,7 @@ The default `!jbshop` menu registers three `credits` categories:
 - **Prisoners** - purchases are restricted to prisoners. Includes Taser, Disguise, and once-per-round Break Cuffs items.
 - **Guards** - purchases are restricted to guards.
 
-The optional module requires [SwiftlyS2-Plugins/Economy](https://github.com/SwiftlyS2-Plugins/Economy) for wallet balances and multi-currency purchases. The shop design was inspired by [btnrv/BetterStore](https://github.com/btnrv/BetterStore), while using Jailbreak-specific typed contracts and lifecycle rules.
+The optional module requires [T3Marius/Economy](https://github.com/T3Marius/Economy) for wallet balances and multi-currency purchases. The shop design was inspired by [btnrv/BetterStore](https://github.com/btnrv/BetterStore), while using Jailbreak-specific typed contracts and lifecycle rules.
 
 Shop categories and items use real submenus, so the menu Back action returns through Item, Category, and Main views. Item descriptions use smaller scrolling text to keep longer descriptions readable.
 
