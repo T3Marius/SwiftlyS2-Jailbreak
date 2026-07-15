@@ -246,7 +246,6 @@ public sealed class LaserManager
         beam.Amplitude = 0f;
         beam.Speed = 0f;
         beam.FrameRate = 0f;
-        beam.ClipStyle = BeamClipStyle_t.kNOCLIP;
         beam.TurnedOff = false;
         beam.RenderMode = RenderMode_t.kRenderTransAlpha;
         beam.RenderFX = RenderFx_t.kRenderFxNone;
@@ -261,7 +260,6 @@ public sealed class LaserManager
         beam.AmplitudeUpdated();
         beam.SpeedUpdated();
         beam.FrameRateUpdated();
-        beam.ClipStyleUpdated();
         beam.TurnedOffUpdated();
         beam.RenderModeUpdated();
         beam.RenderFXUpdated();

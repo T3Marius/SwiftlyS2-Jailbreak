@@ -4,6 +4,7 @@ using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Events;
 using SwiftlyS2.Shared.GameEventDefinitions;
 using SwiftlyS2.Shared.GameEvents;
+using SwiftlyS2.Shared.GameHooks;
 using SwiftlyS2.Shared.Helpers;
 using SwiftlyS2.Shared.Misc;
 using SwiftlyS2.Shared.Natives;
@@ -74,7 +75,7 @@ public sealed class LastRequestManager
         _playerDeathHookId = _core.GameEvent.HookPost<EventPlayerDeath>(OnPlayerDeath);
         _playerDisconnectHookId = _core.GameEvent.HookPost<EventPlayerDisconnect>(OnPlayerDisconnect);
         _roundEndHookId = _core.GameEvent.HookPost<EventRoundEnd>(OnRoundEnd);
-        _core.Event.OnEntityTakeDamage += OnEntityTakeDamage;
+        _core.GameHooks.Entities.TakeDamage.Post += OnEntityTakeDamage;
         _core.Event.OnMapUnload += OnMapUnload;
         _core.Event.OnTick += OnTick;
     }
@@ -84,7 +85,7 @@ public sealed class LastRequestManager
         Unhook(ref _playerDeathHookId);
         Unhook(ref _playerDisconnectHookId);
         Unhook(ref _roundEndHookId);
-        _core.Event.OnEntityTakeDamage -= OnEntityTakeDamage;
+        _core.GameHooks.Entities.TakeDamage.Post -= OnEntityTakeDamage;
         _core.Event.OnMapUnload -= OnMapUnload;
         _core.Event.OnTick -= OnTick;
 
@@ -328,8 +329,9 @@ public sealed class LastRequestManager
         EndLastRequest(null, null, announce: false);
     }
 
-    private void OnEntityTakeDamage(IOnEntityTakeDamageEvent e)
+    private void OnEntityTakeDamage(ref TakeDamageEntityPostContext ctx)
     {
+        var e = ctx.Params;
         var lastRequest = CurrentLastRequest;
         if (lastRequest == null || _currentContext == null)
             return;
@@ -348,7 +350,7 @@ public sealed class LastRequestManager
             return;
 
         if (_countdownActive || !victimIsParticipant || !attackerIsParticipant)
-            BlockDamage(e);
+            BlockDamage(ctx);
     }
 
     private void OnTick()
@@ -462,7 +464,6 @@ public sealed class LastRequestManager
         beam.Amplitude = 0f;
         beam.Speed = 0f;
         beam.FrameRate = 0f;
-        beam.ClipStyle = BeamClipStyle_t.kNOCLIP;
         beam.TurnedOff = false;
         beam.RenderMode = RenderMode_t.kRenderTransAlpha;
         beam.RenderFX = RenderFx_t.kRenderFxNone;
@@ -477,7 +478,6 @@ public sealed class LastRequestManager
         beam.AmplitudeUpdated();
         beam.SpeedUpdated();
         beam.FrameRateUpdated();
-        beam.ClipStyleUpdated();
         beam.TurnedOffUpdated();
         beam.RenderModeUpdated();
         beam.RenderFXUpdated();
@@ -685,12 +685,12 @@ public sealed class LastRequestManager
         return $"{color}{player.Player.Name}[silver]";
     }
 
-    private static void BlockDamage(IOnEntityTakeDamageEvent e)
+    private static void BlockDamage(TakeDamageEntityPostContext ctx)
     {
+        var e = ctx.Params;
         e.Info.Damage = 0;
         e.Info.TotalledDamage = 0;
-        e.DamageResult.DamageDealt = 0;
-        e.Result = HookResult.Stop;
+        ctx.SetHookResult(HookResult.Stop);
     }
 
     private IPlayer? GetPlayerFromEntity(CEntityInstance entity)

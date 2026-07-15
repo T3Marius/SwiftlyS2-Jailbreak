@@ -3,6 +3,7 @@ using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Events;
 using SwiftlyS2.Shared.GameEventDefinitions;
 using SwiftlyS2.Shared.GameEvents;
+using SwiftlyS2.Shared.GameHooks;
 using SwiftlyS2.Shared.Misc;
 using SwiftlyS2.Shared.Natives;
 using SwiftlyS2.Shared.Players;
@@ -52,7 +53,7 @@ public sealed class CuffsManager : ICuffsManager
     {
         _core.Event.OnClientKeyStateChanged += OnClientKeyStateChanged;
         _core.Event.OnTick += OnTick;
-        _core.Event.OnEntityTakeDamage += OnEntityTakeDamage;
+        _core.GameHooks.Entities.TakeDamage.Post += OnEntityTakeDamage;
         _weaponFireHookId = _core.GameEvent.HookPost<EventWeaponFire>(EventWeaponFire);
         _playerDeathHookId = _core.GameEvent.HookPost<EventPlayerDeath>(EventPlayerDeath);
     }
@@ -61,7 +62,7 @@ public sealed class CuffsManager : ICuffsManager
     {
         _core.Event.OnClientKeyStateChanged -= OnClientKeyStateChanged;
         _core.Event.OnTick -= OnTick;
-        _core.Event.OnEntityTakeDamage -= OnEntityTakeDamage;
+        _core.GameHooks.Entities.TakeDamage.Post -= OnEntityTakeDamage;
         Unhook(ref _weaponFireHookId);
         Unhook(ref _playerDeathHookId);
         CleanupAll();
@@ -297,8 +298,10 @@ public sealed class CuffsManager : ICuffsManager
         return HookResult.Continue;
     }
 
-    private void OnEntityTakeDamage(IOnEntityTakeDamageEvent e)
+    private void OnEntityTakeDamage(ref TakeDamageEntityPostContext ctx)
     {
+        var e = ctx.Params;
+
         if (_specialDayManager.IsSpecialDayActive)
             return;
 
@@ -329,14 +332,13 @@ public sealed class CuffsManager : ICuffsManager
 
         e.Info.Damage = 0;
         e.Info.TotalledDamage = 0;
-        e.DamageResult.DamageDealt = 0;
 
         if (victim.IsCuffed)
             Uncuff(victim);
         else
             Cuff(victim, attacker);
 
-        e.Result = HookResult.Stop;
+        ctx.SetHookResult(HookResult.Stop);
     }
 
     private void Cuff(IJBPlayer prisoner, IJBPlayer warden)

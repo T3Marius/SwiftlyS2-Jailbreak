@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Convars;
 using SwiftlyS2.Shared.Events;
+using SwiftlyS2.Shared.GameHooks;
 using SwiftlyS2.Shared.Misc;
 using SwiftlyS2.Shared.Players;
 using SwiftlyS2.Shared.Sounds;
@@ -29,12 +30,12 @@ public sealed class BoxManager
 
     public void Register()
     {
-        _core.Event.OnEntityTakeDamage += OnEntityTakeDamage;
+        _core.GameHooks.Entities.TakeDamage.Post += OnEntityTakeDamage;
     }
 
     public void Unregister()
     {
-        _core.Event.OnEntityTakeDamage -= OnEntityTakeDamage;
+        _core.GameHooks.Entities.TakeDamage.Post -= OnEntityTakeDamage;
         StopBox();
     }
 
@@ -73,8 +74,9 @@ public sealed class BoxManager
         }
     }
 
-    private void OnEntityTakeDamage(IOnEntityTakeDamageEvent e)
+    private void OnEntityTakeDamage(ref TakeDamageEntityPostContext ctx)
     {
+        var e = ctx.Params;
         if (!BoxEnabled) // completly skip the check if the box is not enabled to save performance, since this event is called very often.
             return;
     
@@ -96,7 +98,7 @@ public sealed class BoxManager
         if (attacker.Controller.Team != Team.T && victim.Controller.Team != Team.T) 
         {
             e.Info.Damage = 0;
-            e.Result = HookResult.Stop;
+            ctx.SetHookResult(HookResult.Stop);
         }
     }
     private IPlayer? GetPlayerFromEntity(SwiftlyS2.Shared.SchemaDefinitions.CEntityInstance entity)

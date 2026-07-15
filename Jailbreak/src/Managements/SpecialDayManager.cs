@@ -8,6 +8,7 @@ using SwiftlyS2.Shared.Convars;
 using SwiftlyS2.Shared.Events;
 using SwiftlyS2.Shared.GameEventDefinitions;
 using SwiftlyS2.Shared.GameEvents;
+using SwiftlyS2.Shared.GameHooks;
 using SwiftlyS2.Shared.Helpers;
 using SwiftlyS2.Shared.Menus;
 using SwiftlyS2.Shared.Misc;
@@ -67,7 +68,7 @@ public sealed class SpecialDayManager
     {
         _roundStartHookId = _core.GameEvent.HookPost<EventRoundStart>(OnRoundStart);
         _roundEndHookId = _core.GameEvent.HookPost<EventRoundEnd>(OnRoundEnd);
-        _core.Event.OnItemServicesCanAcquireHook += OnItemServicesCanAcquire;
+        _core.GameHooks.Items.CanAcquire.Post += OnItemServicesCanAcquire;
         _core.Event.OnMapUnload += OnMapUnload;
 
         foreach (var command in _config.GunsCommands)
@@ -81,7 +82,7 @@ public sealed class SpecialDayManager
     {
         Unhook(ref _roundStartHookId);
         Unhook(ref _roundEndHookId);
-        _core.Event.OnItemServicesCanAcquireHook -= OnItemServicesCanAcquire;
+        _core.GameHooks.Items.CanAcquire.Post -= OnItemServicesCanAcquire;
         _core.Event.OnMapUnload -= OnMapUnload;
 
         foreach (var command in _config.GunsCommands)
@@ -201,8 +202,9 @@ public sealed class SpecialDayManager
             reason);
     }
 
-    private void OnItemServicesCanAcquire(IOnItemServicesCanAcquireHookEvent e)
+    private void OnItemServicesCanAcquire(ref CanAcquireItemPostContext ctx)
     {
+        var e = ctx.Params;
         var specialDay = CurrentSpecialDay;
         if (specialDay == null || specialDay.AllowAllWeapons)
             return;
@@ -211,7 +213,7 @@ public sealed class SpecialDayManager
         if (specialDay.AllowedWeapons.Contains(itemDefinitionIndex))
             return;
 
-        e.SetAcquireResult(AcquireResult.NotAllowedByProhibition);
+        ctx.Return = AcquireResult.NotAllowedByProhibition;
     }
 
     private void SpecialGunsCommand(ICommandContext ctx)
