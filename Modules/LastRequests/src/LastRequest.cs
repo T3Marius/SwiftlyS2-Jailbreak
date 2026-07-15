@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Events;
 using SwiftlyS2.Shared.GameEventDefinitions;
+using SwiftlyS2.Shared.GameHooks;
 using SwiftlyS2.Shared.Helpers;
 using SwiftlyS2.Shared.Misc;
 using SwiftlyS2.Shared.Natives;
@@ -216,7 +217,7 @@ public sealed class KnifeFightLastRequest : LastRequestBase
         if (_oneHitHooked)
             return;
 
-        Core.Event.OnEntityTakeDamage += OnEntityTakeDamage;
+        Core.GameHooks.Entities.TakeDamage.Post += OnEntityTakeDamage;
         _oneHitHooked = true;
     }
 
@@ -225,21 +226,22 @@ public sealed class KnifeFightLastRequest : LastRequestBase
         if (!_oneHitHooked)
             return;
 
-        Core.Event.OnEntityTakeDamage -= OnEntityTakeDamage;
+        Core.GameHooks.Entities.TakeDamage.Post -= OnEntityTakeDamage;
         _oneHitHooked = false;
     }
 
-    private void OnEntityTakeDamage(IOnEntityTakeDamageEvent e)
+    private void OnEntityTakeDamage(ref TakeDamageEntityPostContext e)
     {
-        if (!e.Entity.DesignerName.StartsWith("player", StringComparison.OrdinalIgnoreCase))
+        var ctx = e.Params;
+        if (!ctx.Entity.DesignerName.StartsWith("player", StringComparison.OrdinalIgnoreCase))
             return;
 
-        var attackerPawn = e.Info.AttackerInfo.AttackerPawn.Value;
+        var attackerPawn = ctx.Info.AttackerInfo.AttackerPawn.Value;
         if (attackerPawn == null)
             return;
 
         var rawAttacker = attackerPawn.ToPlayer();
-        var rawVictim = GetPlayerFromEntity(e.Entity);
+        var rawVictim = GetPlayerFromEntity(ctx.Entity);
 
         if (rawAttacker == null || rawVictim == null)
             return;
@@ -250,12 +252,11 @@ public sealed class KnifeFightLastRequest : LastRequestBase
         if (attacker == null || victim == null || !IsParticipant(attacker) || !IsParticipant(victim))
             return;
 
-        if (!IsKnifeDamage(attacker, e.Info))
+        if (!IsKnifeDamage(attacker, ctx.Info))
             return;
 
-        e.Info.Damage = OneHitDamage;
-        e.Info.TotalledDamage = OneHitDamage;
-        e.DamageResult.DamageDealt = OneHitDamage;
+        ctx.Info.Damage = OneHitDamage;
+        ctx.Info.TotalledDamage = OneHitDamage;
     }
 
     private bool IsParticipant(IJBPlayer player)
