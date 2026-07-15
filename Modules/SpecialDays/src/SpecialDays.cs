@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Events;
 using SwiftlyS2.Shared.GameEventDefinitions;
+using SwiftlyS2.Shared.GameHooks;
 using SwiftlyS2.Shared.Helpers;
 using SwiftlyS2.Shared.Misc;
 using SwiftlyS2.Shared.Natives;
@@ -244,7 +245,7 @@ public sealed class HideAndSeekDay : SpecialDayBase
         if (_damageHooked)
             return;
 
-        Core.Event.OnEntityTakeDamage += OnTakeDamage;
+        Core.GameHooks.Entities.TakeDamage.Post += OnTakeDamage;
         _damageHooked = true;
     }
 
@@ -259,13 +260,15 @@ public sealed class HideAndSeekDay : SpecialDayBase
 
         if (_damageHooked)
         {
-            Core.Event.OnEntityTakeDamage -= OnTakeDamage;
+            Core.GameHooks.Entities.TakeDamage.Post -= OnTakeDamage;
             _damageHooked = false;
         }
     }
 
-    private void OnTakeDamage(IOnEntityTakeDamageEvent e)
+    private void OnTakeDamage(ref TakeDamageEntityPostContext ctx)
     {
+        var e = ctx.Params;
+
         var rawVictim = GetPlayerFromEntity(e.Entity);
         if (rawVictim == null)
             return;
@@ -276,8 +279,7 @@ public sealed class HideAndSeekDay : SpecialDayBase
 
         e.Info.Damage = 0;
         e.Info.TotalledDamage = 0;
-        e.DamageResult.DamageDealt = 0;
-        e.Result = HookResult.Stop;
+        ctx.SetHookResult(HookResult.Stop);
     }
 
     private void SetPrisonersMoveType(MoveType_t moveType)
@@ -531,19 +533,20 @@ public sealed class OneInTheChamberDay : SpecialDayBase
             });
         }
 
-        Core.Event.OnEntityTakeDamage += OnTakeDamage;
+        Core.GameHooks.Entities.TakeDamage.Post += OnTakeDamage;
         _playerDeathId = Core.GameEvent.HookPost<EventPlayerDeath>(OnPlayerDeath);
     }
     public override void End()
     {
-        Core.Event.OnEntityTakeDamage -= OnTakeDamage;
+        Core.GameHooks.Entities.TakeDamage.Post -= OnTakeDamage;
         if (_playerDeathId.HasValue)
         {
             Core.GameEvent.Unhook(_playerDeathId.Value);
         }
     }
-    private void OnTakeDamage(IOnEntityTakeDamageEvent e)
+    private void OnTakeDamage(ref TakeDamageEntityPostContext ctx)
     {
+        var e = ctx.Params;
         if (!e.Entity.DesignerName.Contains("player"))
             return;
 
@@ -662,21 +665,22 @@ public sealed class OnlyheadshotDay : SpecialDayBase
 
     public override void Start()
     {
-        Core.Event.OnEntityTakeDamage += OnTakeDamage;
+        Core.GameHooks.Entities.TakeDamage.Post += OnTakeDamage;
     }
     public override void End()
     {
-        Core.Event.OnEntityTakeDamage -= OnTakeDamage;
+        Core.GameHooks.Entities.TakeDamage.Post -= OnTakeDamage;
     }
-    private void OnTakeDamage(IOnEntityTakeDamageEvent e)
+    private void OnTakeDamage(ref TakeDamageEntityPostContext ctx)
     {
+        var e = ctx.Params;
         if (!e.Entity.DesignerName.Contains("player"))
             return;
 
         if (e.Info.ActualHitGroup != HitGroup_t.HITGROUP_HEAD)
         {
             e.Info.Damage = 0;
-            e.Result = HookResult.Stop;
+            ctx.SetHookResult(HookResult.Stop);
         }
     }
 }
@@ -704,7 +708,7 @@ public sealed class ChickenFightDay : SpecialDayBase
     private Guid? _playerDeathHookId;
     public override void PreStart()
     {
-        Core.Event.OnItemServicesCanAcquireHook += CanAcquire;
+        Core.GameHooks.Items.CanAcquire.Post += CanAcquire;
         Core.Event.OnTick += OnTick;
 
         foreach (var player in Core.PlayerManager.GetAllPlayers().Where(p => p.Controller.Team == Team.T))
@@ -716,7 +720,7 @@ public sealed class ChickenFightDay : SpecialDayBase
     }
     public override void End()
     {
-        Core.Event.OnItemServicesCanAcquireHook -= CanAcquire;
+        Core.GameHooks.Items.CanAcquire.Post -= CanAcquire;
         Core.Event.OnTick -= OnTick;
         if (_playerDeathHookId.HasValue)
         {
@@ -848,9 +852,10 @@ public sealed class ChickenFightDay : SpecialDayBase
         player.PlayerPawn.SetTransmitState(true);
 
     }
-    private void CanAcquire(IOnItemServicesCanAcquireHookEvent e)
+    private void CanAcquire(ref CanAcquireItemPostContext ctx)
     {
-        var player = e.ItemServices.Pawn.ToPlayer();
+        var e = ctx.Params;
+        var player = e.Player;
         if (player == null)
             return;
 
@@ -861,7 +866,7 @@ public sealed class ChickenFightDay : SpecialDayBase
 
         if (!SpecialDayWeapons.Knives.Contains(itemDefIndex))
         {
-            e.SetAcquireResult(AcquireResult.NotAllowedByProhibition);
+            ctx.Return = AcquireResult.NotAllowedByProhibition;
         }
     }
 }
