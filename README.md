@@ -1,7 +1,7 @@
 <div align="center">
   <img src="https://pan.samyyc.dev/s/VYmMXE" />
   <h2><strong>Jailbreak</strong></h2>
-  <h3>A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftlys2/swiftlys2).</h3>
+  <h3>A CS2 Jailbreak gamemode plugin built on [SwiftlyS2](https://github.com/swiftly-solution/swiftlys2).</h3>
 </div>
 
 <p align="center">
