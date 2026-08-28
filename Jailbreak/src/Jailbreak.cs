@@ -102,6 +102,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<WardenCommands>()
                   .AddSingleton<DeputyCommands>()
                   .AddSingleton<PrisonerCommands>()
+                  .AddSingleton<GuardCommands>()
                   .AddSingleton<JBStatsCommands>()
                   .AddSingleton<WardenMenu>()
                   .AddSingleton<JBStats>()
@@ -119,7 +120,7 @@ public sealed class Main : BasePlugin
 
         collection.AddOptionsWithValidateOnStart<VoiceConfig>()
                   .BindConfiguration("Voice");
-        
+
         collection.AddOptionsWithValidateOnStart<DeputyConfig>()
                   .BindConfiguration("Deputy");
 
@@ -138,6 +139,9 @@ public sealed class Main : BasePlugin
         collection.AddOptionsWithValidateOnStart<GuardQueueConfig>()
                   .BindConfiguration("GuardQueue");
 
+        collection.AddOptionsWithValidateOnStart<GuardConfig>()
+                  .BindConfiguration("GuardConfig");
+
         _provider = collection.BuildServiceProvider();
 
         _provider.GetRequiredService<WardenDatabase>().Initialize();
@@ -154,6 +158,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<WardenCommands>().Register();
         _provider.GetRequiredService<DeputyCommands>().Register();
         _provider.GetRequiredService<PrisonerCommands>().Register();
+        _provider.GetRequiredService<GuardCommands>().Register();
         _provider.GetRequiredService<JBStatsCommands>().Register();
         _provider.GetRequiredService<Events>().Register();
         _provider.GetRequiredService<Listeners>().Register();
@@ -184,6 +189,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<WardenCommands>().Unregister();
         _provider.GetRequiredService<DeputyCommands>().Unregister();
         _provider.GetRequiredService<PrisonerCommands>().Unregister();
+        _provider.GetRequiredService<GuardCommands>().Unregister();
         _provider.GetRequiredService<JBStatsCommands>().Unregister();
         _provider.GetRequiredService<Events>().Unregister();
         _provider.GetRequiredService<Listeners>().Unregister();

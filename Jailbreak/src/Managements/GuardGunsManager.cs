@@ -17,14 +17,14 @@ public sealed class GuardGunsManager
     private readonly IJBPlayerManagement _players;
     private readonly GuardGunsDatabase _database;
     private readonly SpecialDayManager _specialDayManager;
-    private readonly WardenConfig _config;
+    private readonly GuardConfig _config;
 
     public GuardGunsManager(
         ISwiftlyCore core,
         IJBPlayerManagement players,
         GuardGunsDatabase database,
         SpecialDayManager specialDayManager,
-        IOptions<WardenConfig> config)
+        IOptions<GuardConfig> config)
     {
         _core = core;
         _players = players;

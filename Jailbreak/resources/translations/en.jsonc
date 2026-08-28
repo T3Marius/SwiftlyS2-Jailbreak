@@ -248,5 +248,7 @@
     "you_are_not_warden": "You are not the [blue]Warden[silver].",
     "you_are_not_warden&deputy": "You need to be [blue]Warden[silver] or [gold]Deputy[silver] in order to use this command!",
     "bunnyhoop_disabled": "Bunnyhoop is [red]disabled[silver]. Enableing it in [gold]{0}[silver] seconds!",
-    "bunnyhoop_enabled": "Bunnyhoop is now [green]enabled[silver] for everyone!"
+    "bunnyhoop_enabled": "Bunnyhoop is now [green]enabled[silver] for everyone!",
+    "lg_not_alone": "You need to be alone in order to use [blue]last guard[silver]!",
+    "lg_min_prisoners": "There's need to be at least [orange]{0} prisoners[silver] in order to start [blue]last guard[silver]!"
 }
