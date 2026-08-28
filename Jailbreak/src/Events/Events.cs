@@ -1,3 +1,4 @@
+using HudText.Contract;
 using Jailbreak.Contract;
 using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
@@ -12,26 +13,29 @@ namespace Jailbreak;
 
 public sealed class Events
 {
-    private readonly ISwiftlyCore        _core;
+    private readonly ISwiftlyCore _core;
     private readonly IJBPlayerManagement _players;
-    private readonly CellManager         _cellManager;
-    private readonly BoxManager          _boxManager;
-    private readonly CuffsManager        _cuffsManager;
-    private readonly DrawManager         _drawManager;
-    private readonly SpecialDayManager   _specialDayManager;
-    private readonly LastRequestManager  _lastRequestManager;
-    private readonly GuardGunsManager    _guardGunsManager;
-    private readonly WardenTagManager    _wardenTagManager;
+    private readonly CellManager _cellManager;
+    private readonly BoxManager _boxManager;
+    private readonly CuffsManager _cuffsManager;
+    private readonly DrawManager _drawManager;
+    private readonly SpecialDayManager _specialDayManager;
+    private readonly LastRequestManager _lastRequestManager;
+    private readonly GuardGunsManager _guardGunsManager;
+    private readonly WardenTagManager _wardenTagManager;
     private readonly JailbreakSoundManager _soundManager;
 
-    /* ------------------- Configs ------------------- */
-    private readonly WardenConfig        _wardenConfig;
-    private readonly ModelsConfig        _modelsConfig;
-    private readonly UtilsConfig         _utilsConfig;
-    private readonly VoiceConfig         _voiceConfig;
-    /* ----------------------------------------------- */
+    /* -------------------   Hud   ------------------- */
+    private IHudTextService? _hudText;
+    private HudTextHandle? _currentWardenHud;
 
-    private readonly Dictionary<ulong, CancellationTokenSource> _centerTimers = [];
+    /* ------------------- Configs ------------------- */
+    private readonly WardenConfig _wardenConfig;
+    private readonly ModelsConfig _modelsConfig;
+    private readonly UtilsConfig _utilsConfig;
+    private readonly VoiceConfig _voiceConfig;
+    private readonly HudConfig _hudConfig;
+    /* ----------------------------------------------- */
 
     /* -------------- Game Events -------------- */
     private Guid? _playerSpawnHookId;
@@ -49,7 +53,7 @@ public sealed class Events
     private bool _isRoundEnding;
 
     public Events(
-        ISwiftlyCore core, 
+        ISwiftlyCore core,
         IJBPlayerManagement playerManagement,
         CellManager cellManager,
         BoxManager boxManager,
@@ -60,10 +64,11 @@ public sealed class Events
         GuardGunsManager guardGunsManager,
         WardenTagManager wardenTagManager,
         JailbreakSoundManager soundManager,
-        IOptions<WardenConfig> wardenConfig, 
-        IOptions<ModelsConfig> modelsConfig, 
+        IOptions<WardenConfig> wardenConfig,
+        IOptions<ModelsConfig> modelsConfig,
         IOptions<UtilsConfig> utilsConfig,
-        IOptions<VoiceConfig> voiceConfig)
+        IOptions<VoiceConfig> voiceConfig,
+        IOptions<HudConfig> hudConfig)
     {
         _core = core;
         _players = playerManagement;
@@ -80,19 +85,30 @@ public sealed class Events
         _modelsConfig = modelsConfig.Value;
         _utilsConfig = utilsConfig.Value;
         _voiceConfig = voiceConfig.Value;
+        _hudConfig = hudConfig.Value;
     }
-    
+
     public void Register()
     {
+        _players.CurrentCtRolesChanged += RefreshCurrentCtRolesDisplay;
+        _specialDayManager.StateChanged += RefreshCurrentCtRolesDisplay;
+        _lastRequestManager.StateChanged += RefreshCurrentCtRolesDisplay;
         _playerSpawnHookId = _core.GameEvent.HookPost<EventPlayerSpawn>(OnPlayerSpawn);
         _playerTeamChangeHookId = _core.GameEvent.HookPost<EventPlayerTeam>(OnPlayerTeamChange);
         _playerDisconnectHookId = _core.GameEvent.HookPost<EventPlayerDisconnect>(OnPlayerDisconnect);
         _roundStartHookId = _core.GameEvent.HookPost<EventRoundStart>(OnRoundStart);
         _roundEndHookId = _core.GameEvent.HookPost<EventRoundEnd>(OnRoundEnd);
         _playerDeathHookId = _core.GameEvent.HookPost<EventPlayerDeath>(OnPlayerDeath);
+
+        RefreshCurrentCtRolesDisplay();
     }
     public void Unregister()
     {
+        _players.CurrentCtRolesChanged -= RefreshCurrentCtRolesDisplay;
+        _specialDayManager.StateChanged -= RefreshCurrentCtRolesDisplay;
+        _lastRequestManager.StateChanged -= RefreshCurrentCtRolesDisplay;
+        if (_hudText != null && _currentWardenHud != null)
+            _hudText.RemoveHud(_currentWardenHud.Value);
         Unhook(ref _playerSpawnHookId);
         Unhook(ref _playerTeamChangeHookId);
         Unhook(ref _playerDisconnectHookId);
@@ -107,26 +123,104 @@ public sealed class Events
         _doorsCheckCts = null;
 
         StopCheckPrisonerVoiceTimer();
+    }
+    public void SetHudTextService(IHudTextService? hudText)
+    {
+        if (ReferenceEquals(_hudText, hudText))
+            return;
 
-        foreach (var cts in _centerTimers.Values)
-            cts.Cancel();
-        _centerTimers.Clear();
+        if (_hudText != null && _currentWardenHud != null)
+            _hudText.RemoveHud(_currentWardenHud.Value);
+
+        _hudText = hudText;
+        _currentWardenHud = null;
+
+        RefreshCurrentCtRolesDisplay();
+    }
+    private void RefreshCurrentCtRolesDisplay()
+    {
+        if (_specialDayManager.HasQueuedOrActiveSpecialDay || _lastRequestManager.IsLastRequestActive)
+        {
+            if (_hudText is not null && _currentWardenHud is not null)
+                _hudText.HideHud(_currentWardenHud.Value);
+
+            return;
+        }
+
+        var warden = _players.GetWarden()?.Player.Name ?? _core.Localizer["none"];
+        var deputy = _players.GetDeputy()?.Player.Name ?? _core.Localizer["none"];
+
+        if (string.Equals(_hudConfig.CurrentWardenAndDeputy, "center", StringComparison.OrdinalIgnoreCase))
+        {
+            _players.SendMessage(
+                MessageType.Center,
+                "current_ct_roles.center",
+                prefix: false,
+                args: [warden, deputy]);
+
+            return;
+        }
+
+        if (!string.Equals(_hudConfig.CurrentWardenAndDeputy, "hud", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (_hudText is null)
+            return;
+
+        // A global HudText handle has one string for everyone.
+        var text = _core.Localizer["current_ct_roles.hud", warden, deputy];
+
+        if (_currentWardenHud is null)
+        {
+            var style = _hudConfig.CurrentWardenAndDeputyHud;
+
+            _currentWardenHud = _hudText.CreateHud(text, new HudTextOptions
+            {
+                Position = style.Position,
+                Color = style.Color,
+                Size = style.Size,
+                Background = style.Background,
+                BackgroundOpacity = style.BackgroundOpacity,
+                DropShadow = style.DropShadow,
+                OutlineColor = style.OutlineColor
+            });
+
+            return;
+        }
+
+        _hudText.ShowHud(_currentWardenHud.Value);
+        _hudText.UpdateHud(_currentWardenHud.Value, text);
+    }
+    private void SendCurrentCtRolesTo(IJBPlayer player)
+    {
+        if (!string.Equals(_hudConfig.CurrentWardenAndDeputy, "center", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (_specialDayManager.HasQueuedOrActiveSpecialDay || _lastRequestManager.IsLastRequestActive)
+            return;
+
+        var warden = _players.GetWarden()?.Player.Name ?? _core.Localizer["none"];
+        var deputy = _players.GetDeputy()?.Player.Name ?? _core.Localizer["none"];
+
+        player.SendMessage(
+            MessageType.Center,
+            "current_ct_roles.center",
+            prefix: false,
+            args: [warden, deputy]);
     }
     private HookResult OnPlayerSpawn(EventPlayerSpawn e)
     {
         if (e.UserIdPlayer == null)
             return HookResult.Continue;
-        
+
         var player = _players.SyncPlayer(e.UserIdPlayer);
         if (player == null)
             return HookResult.Continue;
 
         ApplyTeamLoadout(player);
-
-        StartHudTimer(player);
+        SendCurrentCtRolesTo(player);
         return HookResult.Continue;
     }
-
     private HookResult OnPlayerTeamChange(EventPlayerTeam e)
     {
         var rawPlayer = e.UserIdPlayer;
@@ -154,8 +248,6 @@ public sealed class Events
         if (e.UserIdPlayer == null)
             return HookResult.Continue;
 
-        var steamId = e.UserIdPlayer.SteamID;
-        StopHudTimer(steamId);
         _drawManager.CleanupPlayer(e.UserIdPlayer);
         _cuffsManager.CleanupPlayer(e.UserIdPlayer);
         _players.RemovePlayer(e.UserIdPlayer);
@@ -172,7 +264,7 @@ public sealed class Events
 
         foreach (var p in _players.GetPlayersByRole(JBRole.Freeday))
             p.SetFreeday(false);
-        
+
         foreach (var p in _players.GetPlayersByRole(JBRole.Rebel))
             p.SetRebel(false);
 
@@ -211,7 +303,7 @@ public sealed class Events
                 {
                     if (_core.Permission.PlayerHasPermissions(p.SteamID, _voiceConfig.SkipVoicePenalties))
                         continue;
-                    
+
                     p.Unmute();
                     _players.SendMessage(MessageType.Chat, "prisoners_unmuted", true);
                 }
@@ -301,7 +393,7 @@ public sealed class Events
 
         return HookResult.Continue;
     }
-    
+
     private HookResult OnRoundEnd(EventRoundEnd e)
     {
         _isRoundEnding = true;
@@ -317,7 +409,7 @@ public sealed class Events
 
         foreach (var p in _players.GetPlayersByRole(JBRole.Freeday))
             p.SetFreeday(false);
-        
+
         foreach (var p in _players.GetPlayersByRole(JBRole.Rebel))
             p.SetRebel(false);
 
@@ -355,7 +447,7 @@ public sealed class Events
     {
         if (e.AttackerPlayer == null || e.UserIdPlayer == null)
             return HookResult.Continue;
-    
+
         var attacker = _players.SyncPlayer(e.AttackerPlayer);
         var victim = _players.SyncPlayer(e.UserIdPlayer);
 
@@ -374,31 +466,6 @@ public sealed class Events
         }
 
         return HookResult.Continue;
-    }
-    private void StartHudTimer(IJBPlayer player)
-    {
-        StopHudTimer(player.SteamID);
-
-        var cts = _core.Scheduler.RepeatBySeconds(3f, () =>
-        {
-            if (_specialDayManager.HasQueuedOrActiveSpecialDay || _lastRequestManager.IsLastRequestActive)
-                return;
-
-            var warden = _players.GetWarden()?.Player.Name ?? _core.Localizer["none"];
-            var deputy = _players.GetDeputy()?.Player.Name ?? _core.Localizer["none"];
-            player.SendMessage(MessageType.Center, "current_ct_roles.center", false, args: [warden, deputy]);
-        });
-
-        _centerTimers[player.SteamID] = cts;
-    }
-
-    private void StopHudTimer(ulong steamId)
-    {
-        if (_centerTimers.TryGetValue(steamId, out var cts))
-        {
-            cts.Cancel();
-            _centerTimers.Remove(steamId);
-        }
     }
 
     private void ApplyTeamLoadout(IJBPlayer player)
@@ -496,13 +563,13 @@ public sealed class Events
     private void StopCheckPrisonerVoiceTimer()
     {
         _checkPrisonersVoiceCts?.Cancel();
-        _checkPrisonersVoiceCts = null;   
-        
+        _checkPrisonersVoiceCts = null;
+
         foreach (var prisoner in _players.GetPlayersByTeam(JBTeam.Prisoner))
         {
             if (_core.Permission.PlayerHasPermissions(prisoner.SteamID, _voiceConfig.SkipVoicePenalties))
                 continue;
-            
+
             if (prisoner.IsMuted)
             {
                 prisoner.Unmute();

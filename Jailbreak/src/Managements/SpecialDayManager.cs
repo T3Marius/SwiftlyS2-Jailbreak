@@ -63,6 +63,7 @@ public sealed class SpecialDayManager
     public bool IsSpecialDayActive => CurrentSpecialDay != null;
     public bool IsSpecialDayCountdownActive => _countdownFreezeActive;
     public bool HasQueuedOrActiveSpecialDay => QueuedSpecialDay != null || CurrentSpecialDay != null;
+    public event Action? StateChanged;
 
     public void Register()
     {
@@ -133,6 +134,7 @@ public sealed class SpecialDayManager
             return false;
 
         QueuedSpecialDay = specialDay;
+        StateChanged?.Invoke();
         _players.SendMessage(MessageType.Chat, "special_day_queued", true, args: specialDay.Name);
         _log.LogInformation("Queued special day for next round. Id={Id}, Name={Name}", specialDay.Id, specialDay.Name);
         return true;
@@ -181,6 +183,7 @@ public sealed class SpecialDayManager
             return;
 
         CurrentSpecialDay = null;
+        StateChanged?.Invoke();
         if (_currentDayStarted)
         {
             specialDay.End();
@@ -287,6 +290,7 @@ public sealed class SpecialDayManager
     private void BeginSpecialDay(ISpecialDay specialDay)
     {
         CurrentSpecialDay = specialDay;
+        StateChanged?.Invoke();
         _currentDayStarted = false;
 
         if (specialDay.StartCountdown <= 0)

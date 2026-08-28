@@ -7,19 +7,28 @@ namespace Jailbreak;
 
 public sealed class JBPlayerManagement : IJBPlayerManagement
 {
-    private readonly ISwiftlyCore            _core;
-    private readonly IOptions<ModelsConfig>  _modelsConfig;
-    private readonly IconManager             _iconManager;
-    
+    private readonly ISwiftlyCore _core;
+    private readonly IOptions<ModelsConfig> _modelsConfig;
+    private readonly IconManager _iconManager;
+
     private readonly Dictionary<ulong, JBPlayer> _players = [];
+    public event Action? CurrentCtRolesChanged;
 
     public JBPlayerManagement(ISwiftlyCore core, IOptions<ModelsConfig> modelsConfig, IconManager iconManager)
     {
-        _core         = core;
+        _core = core;
         _modelsConfig = modelsConfig;
-        _iconManager  = iconManager;
+        _iconManager = iconManager;
     }
+    private void OnPlayerRoleChanged(JBPlayer player, JBRole previousRole, JBRole newRole)
+    {
+        var affectsCtRoleDisplay =
+            previousRole is JBRole.Warden or JBRole.Deputy ||
+            newRole is JBRole.Warden or JBRole.Deputy;
 
+        if (affectsCtRoleDisplay)
+            CurrentCtRolesChanged?.Invoke();
+    }
     public IJBPlayer? GetOrCreatePlayer(IPlayer player)
     {
         if (!player.IsValid)
@@ -34,6 +43,7 @@ public sealed class JBPlayerManagement : IJBPlayerManagement
         }
 
         jbPlayer = new JBPlayer(player, _core, _modelsConfig, _iconManager);
+        jbPlayer.RoleChanged += OnPlayerRoleChanged;
         _players[playerKey] = jbPlayer;
         return jbPlayer;
     }
@@ -48,7 +58,15 @@ public sealed class JBPlayerManagement : IJBPlayerManagement
         NormalizeTeamRole(jbPlayer);
         return jbPlayer;
     }
+    private void RemoveTrackedPlayer(ulong playerKey)
+    {
+        if (!_players.Remove(playerKey, out var player))
+            return;
 
+        player.RoleChanged -= OnPlayerRoleChanged;
+        if (player.IsWarden || player.IsDeputy)
+            CurrentCtRolesChanged?.Invoke();
+    }
     public void RemovePlayer(ulong steamId)
     {
         foreach (var playerKey in _players
@@ -56,13 +74,13 @@ public sealed class JBPlayerManagement : IJBPlayerManagement
                      .Select(x => x.Key)
                      .ToList())
         {
-            _players.Remove(playerKey);
+            RemoveTrackedPlayer(playerKey);
         }
     }
 
     public void RemovePlayer(IPlayer player)
     {
-        _players.Remove(PlayerIdentity.GetKey(player));
+        RemoveTrackedPlayer(PlayerIdentity.GetKey(player));
     }
 
     public void SyncTeams()
@@ -79,7 +97,9 @@ public sealed class JBPlayerManagement : IJBPlayerManagement
         }
 
         foreach (var playerKey in _players.Keys.Where(playerKey => !livePlayerKeys.Contains(playerKey)).ToList())
-            _players.Remove(playerKey);
+        {
+            RemoveTrackedPlayer(playerKey);
+        }
     }
 
     public IEnumerable<IJBPlayer> GetAllPlayers()

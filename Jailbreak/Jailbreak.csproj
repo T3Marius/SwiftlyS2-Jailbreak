@@ -31,6 +31,9 @@
       <HintPath>resources/exports/Economy.Contract.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="HudText.Contract">
+      <HintPath>resources/exports/HudText.Contract.dll</HintPath>
+    </Reference>
     <Content Include="resources/exports/Economy.Contract.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>resources/exports/Economy.Contract.dll</TargetPath>

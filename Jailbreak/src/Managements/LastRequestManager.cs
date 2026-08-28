@@ -69,6 +69,7 @@ public sealed class LastRequestManager
     public ILastRequest? CurrentLastRequest { get; private set; }
     public bool IsLastRequestActive => CurrentLastRequest != null;
     public bool IsCountdownActive => _countdownActive;
+    public event Action? StateChanged;
 
     public void Register()
     {
@@ -132,6 +133,7 @@ public sealed class LastRequestManager
             return false;
 
         CurrentLastRequest = lastRequest;
+        StateChanged?.Invoke();
         _currentContext = context;
         _currentStarted = false;
 
@@ -244,6 +246,7 @@ public sealed class LastRequestManager
         }
 
         CurrentLastRequest = null;
+        StateChanged?.Invoke();
         _countdownActive = false;
 
         if (_currentStarted)

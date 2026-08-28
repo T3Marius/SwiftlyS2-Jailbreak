@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Jailbreak.Contract;
 using Tomlyn.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using HudText.Contract;
 
 namespace Jailbreak;
 
@@ -34,6 +35,9 @@ public sealed class Main : BasePlugin
     {
         if (_provider == null)
             return;
+
+        if (interfaceManager.TryGetSharedInterface<IHudTextService>(IHudTextService.Key, out var hudText))
+            _provider.GetRequiredService<Events>().SetHudTextService(hudText);
 
         if (interfaceManager.TryGetSharedInterface<IEconomyAPIv1>(ShopManager.EconomyInterfaceKey, out var economy))
         {
@@ -67,6 +71,8 @@ public sealed class Main : BasePlugin
              .Configure(b => b.AddTomlFile("sounds.toml", false, true));
         Core.Configuration.InitializeTomlWithModel<GuardQueueConfig>("queue.toml", "GuardQueue")
              .Configure(b => b.AddTomlFile("queue.toml", false, true));
+        Core.Configuration.InitializeTomlWithModel<HudConfig>("hud.toml", "Hud")
+             .Configure(b => b.AddTomlFile("hud.toml", false, true));
 
         collection.AddSwiftly(Core)
                   .AddSingleton<CuffsManager>()
@@ -141,6 +147,9 @@ public sealed class Main : BasePlugin
 
         collection.AddOptionsWithValidateOnStart<GuardConfig>()
                   .BindConfiguration("GuardConfig");
+
+        collection.AddOptionsWithValidateOnStart<HudConfig>()
+                  .BindConfiguration("Hud");
 
         _provider = collection.BuildServiceProvider();
 

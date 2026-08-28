@@ -24,6 +24,7 @@
     "color_prisoners_submenu_option.no_prisoners": "No eligible prisoners.",
     "color_prisoners_target.all_prisoners": "All Prisoners",
     "current_ct_roles.center": "Current Warden: {0}\nCurrent Deputy: {1}",
+    "current_ct_roles.hud": "Current Warden: {0}\nCurrent Deputy: {1}",
     "deputy_already_exists": "A [gold]Deputy[silver] already exists.",
     "deputy_assigned_warden": "{0} has been assigned as Deputy Warden.",
     "deputy_no_warden": "There is not [blue]Warden[silver] to become [gold]Deputy[silver] to.",

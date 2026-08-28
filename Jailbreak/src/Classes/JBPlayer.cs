@@ -12,7 +12,7 @@ public sealed class JBPlayer : IJBPlayer
     private IPlayer _player;
     private readonly ISwiftlyCore _core;
     private readonly ModelsConfig _modelsConfig;
-    private readonly IconManager  _iconManager;
+    private readonly IconManager _iconManager;
     private bool _usesSteamLookup;
 
     public IPlayer Player => GetLivePlayer() ?? _player;
@@ -30,6 +30,8 @@ public sealed class JBPlayer : IJBPlayer
     public bool CanBecomeWarden { get; set; } = true;
     public bool IsMuted { get; set; }
     public bool WasUnmutedByWarden { get; set; }
+
+    internal event Action<JBPlayer, JBRole, JBRole>? RoleChanged;
 
     public ILocalizer Localizer => TryGetLivePlayer(out var livePlayer)
         ? _core.Translation.GetPlayerLocalizer(livePlayer)
@@ -50,7 +52,16 @@ public sealed class JBPlayer : IJBPlayer
         _player = player;
         _usesSteamLookup = PlayerIdentity.UsesSteamKey(player);
     }
+    private void ChangeRole(JBRole newRole)
+    {
+        if (Role == newRole)
+            return;
 
+        var previousRole = Role;
+        Role = newRole;
+
+        RoleChanged?.Invoke(this, previousRole, newRole);
+    }
     public void SetWarden(bool state, string? offReason = null, string? killerName = null, bool silent = false)
     {
         if (state)
@@ -65,7 +76,7 @@ public sealed class JBPlayer : IJBPlayer
                 return;
             }
 
-            Role = JBRole.Warden;
+            ChangeRole(JBRole.Warden);
             CanBecomeWarden = true;
             _iconManager.SpawnCoin(livePlayer);
 
@@ -80,8 +91,9 @@ public sealed class JBPlayer : IJBPlayer
             return;
         }
 
-        
-        Role = JBRole.None;
+
+        if (Role == JBRole.Warden)
+            ChangeRole(JBRole.None);
         _iconManager.DespawnCoin();
 
         var playerName = TryGetLivePlayer(out var demotedPlayer) ? demotedPlayer.Name : SteamID.ToString();
@@ -114,7 +126,7 @@ public sealed class JBPlayer : IJBPlayer
                 return;
             }
 
-            Role = JBRole.Deputy;
+            ChangeRole(JBRole.Deputy);
             CanBecomeWarden = true;
 
             if (!string.IsNullOrEmpty(_modelsConfig.DeputyModel))
@@ -127,8 +139,8 @@ public sealed class JBPlayer : IJBPlayer
         }
 
         if (Role == JBRole.Deputy)
-            Role = JBRole.None;
-        
+            ChangeRole(JBRole.None);
+
         if (!silent)
             BroadcastLocalized(MessageType.Alert, "no_deputy_alert");
 
