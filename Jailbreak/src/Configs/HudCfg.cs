@@ -4,17 +4,68 @@ namespace Jailbreak;
 
 public sealed class HudConfig
 {
-    public List<string> Options { get; set; } = ["hud", "center"];
-    public string CurrentWardenAndDeputy { get; set; } = "hud";
     public HudTextSettings CurrentWardenAndDeputyHud { get; set; } = new();
+    public HudTextSettings CurrentDayDescriptionHud { get; set; } = new()
+    {
+        // Persistent but unobtrusive: below CS2's top HUD, away from the crosshair,
+        // radar, kill feed, chat, and weapon/ammo areas.
+        Position = HudTextPosition.CenterTop,
+        TextAlignment = HudTextAlignment.Center,
+        Background = false,
+        DropShadow = true,
+        Color = HudTextColor.Green,
+        Font = HudTextFont.Stratum2,
+        FontWeight = FontWeight.Bold,
+        Size = HudTextSize.Small,
+    };
+    public HudTextSettings SpecialDayCountdownHud { get; set; } = new()
+    {
+        // The countdown is brief and important, so it can use the centre of the screen.
+        // It disappears the moment the special day begins.
+        Position = HudTextPosition.CenterBottom,
+        TextAlignment = HudTextAlignment.Center,
+        Background = false,
+        BackgroundOpacity = HudTextBackgroundOpacity.Light,
+        DropShadow = true,
+        Color = HudTextColor.Orange,
+        OutlineColor = HudTextColor.Black,
+        Font = HudTextFont.Stratum2,
+        FontWeight = FontWeight.Bold,
+        Size = HudTextSize.Normal,
+    };
+    public HudTextSettings WinnerTeamHud { get; set; } = new()
+    {
+        Position = HudTextPosition.CenterMiddle,
+        TextAlignment = HudTextAlignment.Center,
+        Background = false,
+        DropShadow = true,
+        Font = HudTextFont.CourierNew,
+        FontWeight = FontWeight.Bold,
+        Size = HudTextSize.ExtraLarge,
+    };
+    public HudTextSettings SpecialDayWinnerHud { get; set; } = new()
+    {
+        Position = HudTextPosition.CenterMiddle,
+        TextAlignment = HudTextAlignment.Center,
+        Background = false,
+        DropShadow = true,
+        Color = HudTextColor.Yellow,
+        Font = HudTextFont.CourierNew,
+        FontWeight = FontWeight.Bold,
+        Size = HudTextSize.ExtraLarge,
+    };
 }
 public sealed class HudTextSettings
 {
-    public HudTextPosition Position { get; set; } = HudTextPosition.TopCenter;
+    public HudTextPosition Position { get; set; } = HudTextPosition.CenterTop;
     public bool Background { get; set; } = false;
     public bool DropShadow { get; set; } = true;
-    public HudTextColor Color { get; set; } = HudTextColor.Olive;
+    public HudTextColor Color { get; set; } = HudTextColor.Green;
     public HudTextSize Size { get; set; } = HudTextSize.Normal;
+    /// <summary>Aligns the text inside the HUD panel.</summary>
+    public HudTextAlignment TextAlignment { get; set; } = HudTextAlignment.Center;
     public HudTextBackgroundOpacity BackgroundOpacity { get; set; } = HudTextBackgroundOpacity.Light;
     public HudTextColor OutlineColor { get; set; } = HudTextColor.White;
+    public HudTextFont Font { get; set; } = HudTextFont.Stratum2;
+    public FontWeight FontWeight { get; set; } = FontWeight.Bold;
 }

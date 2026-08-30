@@ -12,25 +12,26 @@ namespace Jailbreak;
 
 public sealed class WardenCommands
 {
-    private readonly ISwiftlyCore            _core;
-    private readonly WardenConfig            _config = new();
-    private readonly IJBPlayerManagement     _players;
-    private readonly WardenMenu              _wardenMenu;
-    private readonly BoxManager              _boxManager;
-    private readonly CellManager             _cellManager;
-    private readonly CuffsManager            _cuffsManager;
-    private readonly DrawManager             _drawManager;
-    private readonly SpecialDayManager       _specialDayManager;
-    private readonly LastRequestManager      _lastRequestManager;
-    private readonly WardenTagManager        _wardenTagManager;
-    private readonly JailbreakSoundManager   _soundManager;
+    private readonly ISwiftlyCore _core;
+    private readonly WardenConfig _config = new();
+    private readonly IJBPlayerManagement _players;
+    private readonly WardenMenu _wardenMenu;
+    private readonly BoxManager _boxManager;
+    private readonly CellManager _cellManager;
+    private readonly CuffsManager _cuffsManager;
+    private readonly DrawManager _drawManager;
+    private readonly SpecialDayManager _specialDayManager;
+    private readonly LastRequestManager _lastRequestManager;
+    private readonly WardenTagManager _wardenTagManager;
+    private readonly JailbreakSoundManager _soundManager;
+    private readonly Events _events;
     private readonly ILogger<WardenCommands> _log;
 
     public WardenCommands(
         ISwiftlyCore core,
-        IOptions<WardenConfig> config, 
-        IJBPlayerManagement players, 
-        WardenMenu wardenMenu, 
+        IOptions<WardenConfig> config,
+        IJBPlayerManagement players,
+        WardenMenu wardenMenu,
         BoxManager boxManager,
         CellManager cellManager,
         CuffsManager cuffsManager,
@@ -39,10 +40,11 @@ public sealed class WardenCommands
         LastRequestManager lastRequestManager,
         WardenTagManager wardenTagManager,
         JailbreakSoundManager soundManager,
+        Events events,
         ILogger<WardenCommands> log)
     {
-        _core    = core;
-        _config  = config.Value;
+        _core = core;
+        _config = config.Value;
         _players = players;
         _wardenMenu = wardenMenu;
         _boxManager = boxManager;
@@ -53,7 +55,8 @@ public sealed class WardenCommands
         _lastRequestManager = lastRequestManager;
         _wardenTagManager = wardenTagManager;
         _soundManager = soundManager;
-        _log     = log;
+        _events = events;
+        _log = log;
     }
 
     public void Register()
@@ -62,7 +65,7 @@ public sealed class WardenCommands
         {
             if (_core.Command.IsCommandRegistered(cmd))
                 continue;
-    
+
             _core.Command.RegisterCommand(cmd, BecomeWarden);
         }
 
@@ -227,7 +230,7 @@ public sealed class WardenCommands
     {
         if (ctx.Sender == null)
             return;
-        
+
         var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
             return;
@@ -273,7 +276,7 @@ public sealed class WardenCommands
     {
         if (ctx.Sender == null)
             return;
-        
+
         var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
             return;
@@ -291,12 +294,15 @@ public sealed class WardenCommands
         player.SetWarden(false, "giveup");
         _soundManager.Play(JailbreakSound.WardenRemoved, JailbreakSoundReason.GiveUp);
         _wardenTagManager.RefreshNow();
+
+        // Try to auto-assign a new warden after a short delay, same as round start / warden death.
+        _events.StartWardenCheckTimer();
     }
     private void WardenHelp(ICommandContext ctx)
     {
         if (ctx.Sender == null)
             return;
-        
+
         var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
             return;
@@ -313,15 +319,15 @@ public sealed class WardenCommands
         player.SendMessage(MessageType.Chat, "warden_help.header", true);
         player.SendMessage(MessageType.Chat, "warden_help.become", true);
         player.SendMessage(MessageType.Chat, "warden_help.giveup", true);
-        player.SendMessage(MessageType.Chat, "warden_help.menu"  , true);
-        player.SendMessage(MessageType.Chat, "warden_help.sd"    , true);
-        player.SendMessage(MessageType.Chat, "warden_help.box"   , true);
+        player.SendMessage(MessageType.Chat, "warden_help.menu", true);
+        player.SendMessage(MessageType.Chat, "warden_help.sd", true);
+        player.SendMessage(MessageType.Chat, "warden_help.box", true);
     }
     private void WardenMenu(ICommandContext ctx)
     {
         if (ctx.Sender == null)
             return;
-        
+
         var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
             return;
@@ -361,7 +367,7 @@ public sealed class WardenCommands
     {
         if (ctx.Sender == null)
             return;
-        
+
         var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
             return;
@@ -392,7 +398,7 @@ public sealed class WardenCommands
     {
         if (ctx.Sender == null)
             return;
-        
+
         var player = _players.SyncPlayer(ctx.Sender);
         if (player == null)
             return;

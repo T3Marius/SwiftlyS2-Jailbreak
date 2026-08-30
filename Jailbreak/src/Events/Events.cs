@@ -2,6 +2,7 @@ using HudText.Contract;
 using Jailbreak.Contract;
 using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
+using SwiftlyS2.Shared.Events;
 using SwiftlyS2.Shared.GameEventDefinitions;
 using SwiftlyS2.Shared.GameEvents;
 using SwiftlyS2.Shared.Misc;
@@ -28,6 +29,7 @@ public sealed class Events
     /* -------------------   Hud   ------------------- */
     private IHudTextService? _hudText;
     private HudTextHandle? _currentWardenHud;
+    private HudTextHandle? _roundWinnerHud;
 
     /* ------------------- Configs ------------------- */
     private readonly WardenConfig _wardenConfig;
@@ -39,6 +41,7 @@ public sealed class Events
 
     /* -------------- Game Events -------------- */
     private Guid? _playerSpawnHookId;
+    private Guid? _playerConnectFullHookId;
     private Guid? _playerTeamChangeHookId;
     private Guid? _playerDisconnectHookId;
     private Guid? _roundStartHookId;
@@ -51,6 +54,7 @@ public sealed class Events
     private CancellationTokenSource? _checkPrisonersVoiceCts;
     private readonly Random _random = new();
     private bool _isRoundEnding;
+    private bool _isMapUnloading;
 
     public Events(
         ISwiftlyCore core,
@@ -91,30 +95,45 @@ public sealed class Events
     public void Register()
     {
         _players.CurrentCtRolesChanged += RefreshCurrentCtRolesDisplay;
-        _specialDayManager.StateChanged += RefreshCurrentCtRolesDisplay;
+        _specialDayManager.StateChanged += OnSpecialDayStateChanged;
         _lastRequestManager.StateChanged += RefreshCurrentCtRolesDisplay;
         _playerSpawnHookId = _core.GameEvent.HookPost<EventPlayerSpawn>(OnPlayerSpawn);
+        _playerConnectFullHookId = _core.GameEvent.HookPost<EventPlayerConnectFull>(OnPlayerConnectFull);
         _playerTeamChangeHookId = _core.GameEvent.HookPost<EventPlayerTeam>(OnPlayerTeamChange);
         _playerDisconnectHookId = _core.GameEvent.HookPost<EventPlayerDisconnect>(OnPlayerDisconnect);
         _roundStartHookId = _core.GameEvent.HookPost<EventRoundStart>(OnRoundStart);
         _roundEndHookId = _core.GameEvent.HookPost<EventRoundEnd>(OnRoundEnd);
         _playerDeathHookId = _core.GameEvent.HookPost<EventPlayerDeath>(OnPlayerDeath);
+        _core.Event.OnMapUnload += OnMapUnload;
 
         RefreshCurrentCtRolesDisplay();
     }
     public void Unregister()
     {
         _players.CurrentCtRolesChanged -= RefreshCurrentCtRolesDisplay;
-        _specialDayManager.StateChanged -= RefreshCurrentCtRolesDisplay;
+        _specialDayManager.StateChanged -= OnSpecialDayStateChanged;
         _lastRequestManager.StateChanged -= RefreshCurrentCtRolesDisplay;
-        if (_hudText != null && _currentWardenHud != null)
-            _hudText.RemoveHud(_currentWardenHud.Value);
+
+        // Map unload already destroys CustomHud entities. Calling into HUD natives while
+        // that teardown is in progress can crash the server.
+        if (!_isMapUnloading)
+        {
+            RemoveCurrentWardenHud();
+            RemoveRoundWinnerHud();
+        }
+        else
+        {
+            _currentWardenHud = null;
+            _roundWinnerHud = null;
+        }
         Unhook(ref _playerSpawnHookId);
+        Unhook(ref _playerConnectFullHookId);
         Unhook(ref _playerTeamChangeHookId);
         Unhook(ref _playerDisconnectHookId);
         Unhook(ref _roundStartHookId);
         Unhook(ref _roundEndHookId);
         Unhook(ref _playerDeathHookId);
+        _core.Event.OnMapUnload -= OnMapUnload;
 
         _wardenCheckCts?.Cancel();
         _wardenCheckCts = null;
@@ -129,84 +148,114 @@ public sealed class Events
         if (ReferenceEquals(_hudText, hudText))
             return;
 
-        if (_hudText != null && _currentWardenHud != null)
-            _hudText.RemoveHud(_currentWardenHud.Value);
+        RemoveCurrentWardenHud();
+        RemoveRoundWinnerHud();
 
         _hudText = hudText;
         _currentWardenHud = null;
-
-        RefreshCurrentCtRolesDisplay();
     }
     private void RefreshCurrentCtRolesDisplay()
     {
-        if (_specialDayManager.HasQueuedOrActiveSpecialDay || _lastRequestManager.IsLastRequestActive)
+        if (_isMapUnloading || _hudText is null)
+            return;
+
+        // A queued day starts next round; it must not hide the roles HUD before then.
+        if (_specialDayManager.IsSpecialDayActive || _lastRequestManager.IsLastRequestActive)
         {
-            if (_hudText is not null && _currentWardenHud is not null)
-                _hudText.HideHud(_currentWardenHud.Value);
+            if (_currentWardenHud is not null)
+                TryHideCurrentWardenHud();
 
             return;
         }
 
         var warden = _players.GetWarden()?.Player.Name ?? _core.Localizer["none"];
         var deputy = _players.GetDeputy()?.Player.Name ?? _core.Localizer["none"];
-
-        if (string.Equals(_hudConfig.CurrentWardenAndDeputy, "center", StringComparison.OrdinalIgnoreCase))
-        {
-            _players.SendMessage(
-                MessageType.Center,
-                "current_ct_roles.center",
-                prefix: false,
-                args: [warden, deputy]);
-
-            return;
-        }
-
-        if (!string.Equals(_hudConfig.CurrentWardenAndDeputy, "hud", StringComparison.OrdinalIgnoreCase))
-            return;
-
-        if (_hudText is null)
-            return;
 
         // A global HudText handle has one string for everyone.
         var text = _core.Localizer["current_ct_roles.hud", warden, deputy];
 
         if (_currentWardenHud is null)
         {
-            var style = _hudConfig.CurrentWardenAndDeputyHud;
-
-            _currentWardenHud = _hudText.CreateHud(text, new HudTextOptions
-            {
-                Position = style.Position,
-                Color = style.Color,
-                Size = style.Size,
-                Background = style.Background,
-                BackgroundOpacity = style.BackgroundOpacity,
-                DropShadow = style.DropShadow,
-                OutlineColor = style.OutlineColor
-            });
-
+            CreateCurrentWardenHud(text);
             return;
         }
 
-        _hudText.ShowHud(_currentWardenHud.Value);
-        _hudText.UpdateHud(_currentWardenHud.Value, text);
+        try
+        {
+            _hudText.ShowHud(_currentWardenHud.Value);
+            _hudText.UpdateHud(_currentWardenHud.Value, text);
+        }
+        catch (ArgumentException)
+        {
+            _currentWardenHud = null;
+            CreateCurrentWardenHud(text);
+        }
     }
-    private void SendCurrentCtRolesTo(IJBPlayer player)
+
+    private void CreateCurrentWardenHud(string text)
     {
-        if (!string.Equals(_hudConfig.CurrentWardenAndDeputy, "center", StringComparison.OrdinalIgnoreCase))
+        var style = _hudConfig.CurrentWardenAndDeputyHud;
+        _currentWardenHud = _hudText!.CreateHud(text, new HudTextOptions
+        {
+            Position = style.Position,
+            Color = style.Color,
+            Size = style.Size,
+            Background = style.Background,
+            BackgroundOpacity = style.BackgroundOpacity,
+            DropShadow = style.DropShadow,
+            OutlineColor = style.OutlineColor,
+            Font = style.Font,
+            FontWeight = style.FontWeight,
+            TextAlignment = style.TextAlignment,
+        });
+    }
+
+    private void TryHideCurrentWardenHud()
+    {
+        try
+        {
+            _hudText!.HideHud(_currentWardenHud!.Value);
+        }
+        catch (ArgumentException)
+        {
+            _currentWardenHud = null;
+        }
+    }
+
+    private void RemoveCurrentWardenHud()
+    {
+        if (_hudText is not null && _currentWardenHud is not null)
+        {
+            try
+            {
+                _hudText.RemoveHud(_currentWardenHud.Value);
+            }
+            catch (ArgumentException)
+            {
+                // HudText already discarded the handle during a map change.
+            }
+        }
+
+        _currentWardenHud = null;
+    }
+
+    private void OnMapUnload(IOnMapUnloadEvent _)
+    {
+        _isMapUnloading = true;
+        // The map is destroying CustomHud entities. Do not issue HUD native calls here.
+        _currentWardenHud = null;
+        _roundWinnerHud = null;
+    }
+
+    private void OnSpecialDayStateChanged()
+    {
+        if (_isMapUnloading)
             return;
 
-        if (_specialDayManager.HasQueuedOrActiveSpecialDay || _lastRequestManager.IsLastRequestActive)
-            return;
-
-        var warden = _players.GetWarden()?.Player.Name ?? _core.Localizer["none"];
-        var deputy = _players.GetDeputy()?.Player.Name ?? _core.Localizer["none"];
-
-        player.SendMessage(
-            MessageType.Center,
-            "current_ct_roles.center",
-            prefix: false,
-            args: [warden, deputy]);
+        RefreshCurrentCtRolesDisplay();
+        // Special-day end commonly occurs during round-end callbacks. Recheck after that cleanup
+        // so the roles HUD is reliably recreated when the day is no longer active.
+        _core.Scheduler.NextWorldUpdate(RefreshCurrentCtRolesDisplay);
     }
     private HookResult OnPlayerSpawn(EventPlayerSpawn e)
     {
@@ -218,7 +267,13 @@ public sealed class Events
             return HookResult.Continue;
 
         ApplyTeamLoadout(player);
-        SendCurrentCtRolesTo(player);
+        return HookResult.Continue;
+    }
+    private HookResult OnPlayerConnectFull(EventPlayerConnectFull e)
+    {
+        // Ensure the HUD is created/shown as soon as a player is fully connected,
+        // instead of waiting for a warden/deputy change.
+        RefreshCurrentCtRolesDisplay();
         return HookResult.Continue;
     }
     private HookResult OnPlayerTeamChange(EventPlayerTeam e)
@@ -256,7 +311,9 @@ public sealed class Events
 
     private HookResult OnRoundStart(EventRoundStart e)
     {
+        _isMapUnloading = false;
         _isRoundEnding = false;
+        RemoveRoundWinnerHud();
         _drawManager.ClearRoundAccess();
 
         foreach (var p in _players.GetAllPlayers())
@@ -332,46 +389,13 @@ public sealed class Events
         foreach (var player in _players.GetAllPlayers())
             player.CanBecomeWarden = !normalWardenBlocked && player.Team == JBTeam.Guard;
 
+        // Keep the HUD alive/refreshed across round restarts.
+        RefreshCurrentCtRolesDisplay();
+
         if (normalWardenBlocked)
             return HookResult.Continue;
 
-        _wardenCheckCts = _core.Scheduler.DelayBySeconds(_wardenConfig.AutoGiveWardenWhenNone, () =>
-        {
-            if (_lastRequestManager.IsLastRequestActive)
-            {
-                _wardenCheckCts?.Cancel();
-                _wardenCheckCts = null;
-                return;
-            }
-            if (_players.GetWarden() != null)
-            {
-                _wardenCheckCts?.Cancel();
-                _wardenCheckCts = null;
-                return;
-            }
-
-            var cts = _players.GetPlayersByTeam(JBTeam.Guard).ToList();
-            if (!cts.Any())
-            {
-                _wardenCheckCts?.Cancel();
-                _wardenCheckCts = null;
-                return;
-            }
-
-            var selected = cts[_random.Next(cts.Count)];
-            selected.SetWarden(true);
-            if (selected.IsWarden)
-            {
-                _wardenTagManager.RefreshNow();
-                _soundManager.Play(JailbreakSound.WardenSet);
-                _soundManager.PlayToPlayer(selected, JailbreakSound.YouWarden);
-                _cuffsManager.OnWardenGive(selected);
-                selected.SendMessage(MessageType.Chat, "you_are_new_warden", true);
-            }
-
-            _wardenCheckCts?.Cancel();
-            _wardenCheckCts = null;
-        });
+        StartWardenCheckTimer();
 
         _doorsCheckCts = _core.Scheduler.DelayBySeconds(_utilsConfig.OpenCellsAfterSeconds, () =>
         {
@@ -397,6 +421,7 @@ public sealed class Events
     private HookResult OnRoundEnd(EventRoundEnd e)
     {
         _isRoundEnding = true;
+        ShowRoundWinnerHud(e);
 
         _wardenCheckCts?.Cancel();
         _wardenCheckCts = null;
@@ -443,6 +468,75 @@ public sealed class Events
         return HookResult.Continue;
     }
 
+    private void ShowRoundWinnerHud(EventRoundEnd e)
+    {
+        if (_isMapUnloading || _hudText is null)
+            return;
+
+        var specialDay = _specialDayManager.CurrentSpecialDay;
+        if (specialDay?.AllowFriendlyFire == true)
+        {
+            var survivor = _players.GetAllPlayers()
+                .Where(player => player.Player.IsValid && player.Player.IsAlive)
+                .Take(2)
+                .ToList();
+
+            if (survivor.Count == 1)
+            {
+                ShowTemporaryWinnerHud(
+                    _core.Localizer["special_day_player_winner_hud", survivor[0].Player.Name, specialDay.Name],
+                    _hudConfig.SpecialDayWinnerHud);
+                return;
+            }
+        }
+
+        switch (e.Winner)
+        {
+            case (byte)Team.CT:
+                ShowTemporaryWinnerHud(_core.Localizer["guardians_win_round_hud"], _hudConfig.WinnerTeamHud, HudTextColor.Blue);
+                break;
+            case (byte)Team.T:
+                ShowTemporaryWinnerHud(_core.Localizer["prisoners_win_round_hud"], _hudConfig.WinnerTeamHud, HudTextColor.Orange);
+                break;
+        }
+    }
+
+    private void ShowTemporaryWinnerHud(string text, HudTextSettings style, HudTextColor? colorOverride = null)
+    {
+        RemoveRoundWinnerHud();
+        _roundWinnerHud = _hudText!.CreateHud(text, new HudTextOptions
+        {
+            Position = style.Position,
+            Color = colorOverride ?? style.Color,
+            Size = style.Size,
+            Background = style.Background,
+            BackgroundOpacity = style.BackgroundOpacity,
+            DropShadow = style.DropShadow,
+            OutlineColor = style.OutlineColor,
+            Font = style.Font,
+            FontWeight = style.FontWeight,
+            TextAlignment = style.TextAlignment,
+        });
+
+    }
+
+    private void RemoveRoundWinnerHud()
+    {
+        if (_hudText is not null && _roundWinnerHud is { } hud)
+        {
+            try
+            {
+                _hudText.RemoveHud(hud);
+            }
+            catch (ArgumentException)
+            {
+                // HudText discarded this handle during a map transition.
+            }
+        }
+
+        _roundWinnerHud = null;
+    }
+
     private HookResult OnPlayerDeath(EventPlayerDeath e)
     {
         if (e.AttackerPlayer == null || e.UserIdPlayer == null)
@@ -463,9 +557,67 @@ public sealed class Events
             victim.SetWarden(false, "killed", e.AttackerPlayer.Name);
             _soundManager.Play(JailbreakSound.WardenRemoved, JailbreakSoundReason.Killed);
             _wardenTagManager.RefreshNow();
+
+            // Try to auto-assign a new warden after a short delay, same as round start.
+            StartWardenCheckTimer();
         }
 
         return HookResult.Continue;
+    }
+
+    /// <summary>
+    /// (Re)starts the delayed auto-warden-selection timer. Cancels any existing timer first.
+    /// If a special day/last request is active or queued, does nothing (no timer is started).
+    /// When it fires, it re-checks conditions and only picks from guards who are currently
+    /// eligible to become warden (CanBecomeWarden), since state can change during the delay.
+    /// </summary>
+    public void StartWardenCheckTimer()
+    {
+        _wardenCheckCts?.Cancel();
+        _wardenCheckCts = null;
+
+        if (_specialDayManager.HasQueuedOrActiveSpecialDay || _lastRequestManager.IsLastRequestActive)
+            return;
+
+        _wardenCheckCts = _core.Scheduler.DelayBySeconds(_wardenConfig.AutoGiveWardenWhenNone, () =>
+        {
+            if (_specialDayManager.HasQueuedOrActiveSpecialDay || _lastRequestManager.IsLastRequestActive)
+            {
+                _wardenCheckCts?.Cancel();
+                _wardenCheckCts = null;
+                return;
+            }
+            if (_players.GetWarden() != null)
+            {
+                _wardenCheckCts?.Cancel();
+                _wardenCheckCts = null;
+                return;
+            }
+
+            var cts = _players.GetPlayersByTeam(JBTeam.Guard)
+                .Where(p => p.CanBecomeWarden)
+                .ToList();
+            if (!cts.Any())
+            {
+                _wardenCheckCts?.Cancel();
+                _wardenCheckCts = null;
+                return;
+            }
+
+            var selected = cts[_random.Next(cts.Count)];
+            selected.SetWarden(true);
+            if (selected.IsWarden)
+            {
+                _wardenTagManager.RefreshNow();
+                _soundManager.Play(JailbreakSound.WardenSet);
+                _soundManager.PlayToPlayer(selected, JailbreakSound.YouWarden);
+                _cuffsManager.OnWardenGive(selected);
+                selected.SendMessage(MessageType.Chat, "you_are_new_warden", true);
+            }
+
+            _wardenCheckCts?.Cancel();
+            _wardenCheckCts = null;
+        });
     }
 
     private void ApplyTeamLoadout(IJBPlayer player)

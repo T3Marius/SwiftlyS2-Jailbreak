@@ -1,34 +1,24 @@
 {
     "knife_fight.name": "Knife Fight",
     "knife_fight.description": "Everyone fights with knives only.",
-
     "free_for_all.name": "Free For All",
-    "free_for_all.description": "Everyone is on his own! Use <font color='yellow'>!sguns</font> to select your desire weapons.",
-
+    "free_for_all.description": "Everyone is on his own!\n Use !sguns to select\n your desire weapons.",
     "teleport.name": "Teleport",
-    "teleport.description": "You change positions with the one you shoot at.",
-
+    "teleport.description": "You change positions\n with the one you shoot at.",
     "hide_and_seek.name": "Hide And Seek",
-    "hide_and_seek.description": "Find a place to hide before CT's gets released!",
-
+    "hide_and_seek.description": "Find a place to hide before\n CT's gets released!",
     "war.name": "War",
-    "war.description": "Find a place to withstand the prisoners revolt! Use <font color='yellow'>!sguns</font> to select your desire weapons.",
-
+    "war.description": "Find a place to withstand\n the prisoners revolt!\n Use !sguns to select\n your desire weapons.",
     "no_scope.name": "No Scope",
-    "no_scope.description": "Fight with sniper rifles only. Pick your shots carefully.",
-
+    "no_scope.description": "Fight with sniper rifles only.\n Pick your shots carefully.",
     "scout.name": "Scout",
-    "scout.description": "Everyone gets a scout and low gravity. Gravity: <font color='yellow'>{0}</font>.",
-
+    "scout.description": "Everyone gets a scout\n and low gravity. Gravity: {0}.",
     "taser.name": "Taser",
-    "taser.description": "Fight with taser only. Pick your tase carefully.",
-
+    "taser.description": "Fight with taser only.\n Pick your tase carefully.",
     "one_in_the_chamber.name": "One In The Chamber",
-    "one_in_the_chamber.description": "Each bullet is insta kill! You get one bullet per kill. You can use knife too and it will refill.",
-
+    "one_in_the_chamber.description": "Each bullet is insta kill!\n You get one bullet per kill.\n You can use knife too and it will refill.",
     "headshot_only.name": "Headshot Only",
-    "headshot_only.description": "Headshot only. All weapons are allowed.<br>Use <font color='yellow'>!sguns</font> to choose your weapons!",
-
+    "headshot_only.description": "Headshot only.\n All weapons are allowed.\n Use !sguns to choose your weapons!",
     "chicken_fight.name": "Chicken Fight",
     "chicken_fight.description": "Guards needs to hunt down the chickens!"
 }

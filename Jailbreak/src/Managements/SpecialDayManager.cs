@@ -1,3 +1,4 @@
+using HudText.Contract;
 using Jailbreak.Contract;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -25,6 +26,7 @@ public sealed class SpecialDayManager
     private readonly CellManager _cellsManager;
     private readonly ILogger<SpecialDayManager> _log;
     private readonly SpecialDayConfig _config;
+    private readonly HudConfig _hudConfig;
     private readonly JBStatsDB _statsDB;
     private readonly Dictionary<string, ISpecialDay> _specialDays = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<ulong, string> _participants = [];
@@ -34,16 +36,21 @@ public sealed class SpecialDayManager
     private Guid? _roundStartHookId;
     private Guid? _roundEndHookId;
     private CancellationTokenSource? _countdownCts;
-    private CancellationTokenSource? _activeHudCts;
+    private int? _countdownSecondsRemaining;
+    private IHudTextService? _hudText;
+    private readonly Dictionary<int, HudTextHandle> _specialDayDescriptionHuds = [];
+    private readonly Dictionary<int, HudTextHandle> _specialDayCountdownHuds = [];
     private bool _currentDayStarted;
     private bool _countdownFreezeActive;
     private bool _friendlyFireEnabledBySpecialDay;
+    private bool _isMapUnloading;
 
     public SpecialDayManager(
         ISwiftlyCore core,
         IJBPlayerManagement players,
         CellManager cellManager,
         IOptions<SpecialDayConfig> config,
+        IOptions<HudConfig> hudConfig,
         JBStatsDB statsDB,
         ILogger<SpecialDayManager> log)
     {
@@ -51,6 +58,7 @@ public sealed class SpecialDayManager
         _players = players;
         _cellsManager = cellManager;
         _config = config.Value;
+        _hudConfig = hudConfig.Value;
         _statsDB = statsDB;
         _log = log;
         _teammatesAreEnemies = _core.ConVar.Find<bool>("mp_teammates_are_enemies");
@@ -71,6 +79,8 @@ public sealed class SpecialDayManager
         _roundEndHookId = _core.GameEvent.HookPost<EventRoundEnd>(OnRoundEnd);
         _core.GameHooks.Items.CanAcquire.Post += OnItemServicesCanAcquire;
         _core.Event.OnMapUnload += OnMapUnload;
+        _core.Event.OnClientDisconnected += OnClientDisconnected;
+        _core.Event.OnClientPutInServer += OnClientPutInServer;
 
         foreach (var command in _config.GunsCommands)
         {
@@ -85,6 +95,8 @@ public sealed class SpecialDayManager
         Unhook(ref _roundEndHookId);
         _core.GameHooks.Items.CanAcquire.Post -= OnItemServicesCanAcquire;
         _core.Event.OnMapUnload -= OnMapUnload;
+        _core.Event.OnClientDisconnected -= OnClientDisconnected;
+        _core.Event.OnClientPutInServer -= OnClientPutInServer;
 
         foreach (var command in _config.GunsCommands)
         {
@@ -96,7 +108,21 @@ public sealed class SpecialDayManager
         QueuedSpecialDay = null;
         _specialDays.Clear();
     }
+    public void SetHudTextService(IHudTextService? hudText)
+    {
+        if (ReferenceEquals(_hudText, hudText))
+            return;
 
+        StopSpecialDayHuds();
+
+        _hudText = hudText;
+        if (_hudText != null && CurrentSpecialDay != null)
+        {
+            UpdateDescriptionHud(CurrentSpecialDay);
+            if (_countdownSecondsRemaining is int remaining)
+                UpdateCountdownHud(CurrentSpecialDay, remaining);
+        }
+    }
     public bool RegisterSpecialDay(ISpecialDay specialDay)
     {
         if (string.IsNullOrWhiteSpace(specialDay.Id))
@@ -175,7 +201,7 @@ public sealed class SpecialDayManager
     private void FinishSpecialDay(bool announceAndRecord, string reason)
     {
         StopCountdown();
-        StopActiveHud();
+        StopSpecialDayHuds();
         UnfreezePlayers();
 
         var specialDay = CurrentSpecialDay;
@@ -183,7 +209,10 @@ public sealed class SpecialDayManager
             return;
 
         CurrentSpecialDay = null;
-        StateChanged?.Invoke();
+        // During map teardown, other HUD consumers must not receive a state change that
+        // could cause them to create a replacement HUD against a destroyed map.
+        if (!_isMapUnloading)
+            StateChanged?.Invoke();
         if (_currentDayStarted)
         {
             specialDay.End();
@@ -255,6 +284,7 @@ public sealed class SpecialDayManager
 
     private HookResult OnRoundStart(EventRoundStart e)
     {
+        _isMapUnloading = false;
         var queuedDay = QueuedSpecialDay;
         QueuedSpecialDay = null;
 
@@ -282,6 +312,7 @@ public sealed class SpecialDayManager
 
     private void OnMapUnload(IOnMapUnloadEvent @event)
     {
+        _isMapUnloading = true;
         CancelSpecialDay("map unload");
         QueuedSpecialDay = null;
         CooldownRoundsRemaining = 0;
@@ -302,12 +333,14 @@ public sealed class SpecialDayManager
         specialDay.PreStart();
         _countdownFreezeActive = true;
         FreezePlayers(specialDay, new Color(80, 170, 255, 255));
-        var remaining = specialDay.StartCountdown;
-
         StopCountdown();
+        var remaining = specialDay.StartCountdown;
+        _countdownSecondsRemaining = remaining;
+        UpdateDescriptionHud(specialDay);
+        UpdateCountdownHud(specialDay, remaining);
         _countdownCts = _core.Scheduler.RepeatBySeconds(1f, () =>
         {
-            if (CurrentSpecialDay != specialDay)
+            if (_isMapUnloading || CurrentSpecialDay != specialDay)
             {
                 StopCountdown();
                 return;
@@ -322,8 +355,9 @@ public sealed class SpecialDayManager
             }
 
             specialDay.OnCountdownTick(remaining);
-            SendCountdownMessage(specialDay, remaining);
+            UpdateCountdownHud(specialDay, remaining);
             remaining--;
+            _countdownSecondsRemaining = remaining;
         });
     }
 
@@ -335,10 +369,14 @@ public sealed class SpecialDayManager
 
         _core.Scheduler.NextWorldUpdate(() =>
         {
+            if (_isMapUnloading || !ReferenceEquals(CurrentSpecialDay, specialDay))
+                return;
+
             ApplyStartLoadout(specialDay);
             specialDay.Start();
             _currentDayStarted = true;
-            StartActiveHud(specialDay);
+            StopCountdownHud();
+            UpdateDescriptionHud(specialDay);
             _log.LogInformation("Started special day. Id={Id}, Name={Name}", specialDay.Id, specialDay.Name);
         });
     }
@@ -433,46 +471,58 @@ public sealed class SpecialDayManager
         return $"{color}{player.Player.Name}[silver] ([lime]{wins} Wins[silver])";
     }
 
-    private void SendCountdownMessage(ISpecialDay specialDay, int remaining)
+    private void UpdateDescriptionHud(ISpecialDay specialDay)
     {
-        foreach (var player in _players.GetAllPlayers())
-        {
-            if (!player.Player.IsValid)
-                continue;
-
-            var message = player.Localizer["special_day_countdown_html", specialDay.Name, remaining, specialDay.Description];
-            player.Player.SendCenterHTML(message, 1500);
-        }
+        UpdateHudForPlayers(specialDay, _specialDayDescriptionHuds, _hudConfig.CurrentDayDescriptionHud,
+            player => player.Localizer["special_day_active_hud", specialDay.Name, specialDay.Description]);
     }
 
-    private void StartActiveHud(ISpecialDay specialDay)
+    private void UpdateCountdownHud(ISpecialDay specialDay, int remaining)
     {
-        StopActiveHud();
-        SendActiveHudMessage(specialDay);
+        UpdateHudForPlayers(specialDay, _specialDayCountdownHuds, _hudConfig.SpecialDayCountdownHud,
+            player => player.Localizer["special_day_countdown_hud", specialDay.Name, remaining]);
+    }
 
-        _activeHudCts = _core.Scheduler.RepeatBySeconds(1f, () =>
+    private void UpdateHudForPlayers(ISpecialDay specialDay, Dictionary<int, HudTextHandle> huds, HudTextSettings style, Func<IJBPlayer, string> messageFactory)
+    {
+        if (_isMapUnloading || _hudText is null || !ReferenceEquals(CurrentSpecialDay, specialDay))
+            return;
+
+        foreach (var player in _players.GetAllPlayers().Where(player => player.Player.IsValid))
         {
-            if (CurrentSpecialDay != specialDay || !_currentDayStarted)
+            var playerId = player.Player.PlayerID;
+            var message = messageFactory(player);
+            if (huds.TryGetValue(playerId, out var hud))
             {
-                StopActiveHud();
-                return;
+                try
+                {
+                    _hudText.UpdateHud(hud, message);
+                    _hudText.ShowHud(hud);
+                    continue;
+                }
+                catch (ArgumentException)
+                {
+                    huds.Remove(playerId);
+                }
             }
 
-            SendActiveHudMessage(specialDay);
-        });
-    }
-
-    private void SendActiveHudMessage(ISpecialDay specialDay)
-    {
-        foreach (var player in _players.GetAllPlayers())
-        {
-            if (!player.Player.IsValid)
-                continue;
-
-            var message = player.Localizer["special_day_active_html", specialDay.Name, string.Empty, specialDay.Description];
-            player.Player.SendCenterHTML(message, 1500);
+            huds[playerId] = _hudText.CreateHud(playerId, message, ToHudTextOptions(style));
         }
     }
+
+    private static HudTextOptions ToHudTextOptions(HudTextSettings style) => new()
+    {
+        Position = style.Position,
+        Color = style.Color,
+        Size = style.Size,
+        Background = style.Background,
+        BackgroundOpacity = style.BackgroundOpacity,
+        DropShadow = style.DropShadow,
+        OutlineColor = style.OutlineColor,
+        Font = style.Font,
+        FontWeight = style.FontWeight,
+        TextAlignment = style.TextAlignment,
+    };
 
     private IMenuAPI PrimaryGunsMenu(IJBPlayer player, IReadOnlyList<ItemDefinitionIndex> primaryWeapons, IReadOnlyList<ItemDefinitionIndex> secondaryWeapons)
     {
@@ -539,12 +589,80 @@ public sealed class SpecialDayManager
     {
         _countdownCts?.Cancel();
         _countdownCts = null;
+        _countdownSecondsRemaining = null;
     }
 
-    private void StopActiveHud()
+    private void StopSpecialDayHuds()
     {
-        _activeHudCts?.Cancel();
-        _activeHudCts = null;
+        if (_isMapUnloading)
+        {
+            _specialDayDescriptionHuds.Clear();
+            _specialDayCountdownHuds.Clear();
+            return;
+        }
+
+        if (_hudText != null)
+        {
+            foreach (var hud in _specialDayDescriptionHuds.Values)
+                RemoveHudSafely(hud);
+            foreach (var hud in _specialDayCountdownHuds.Values)
+                RemoveHudSafely(hud);
+        }
+
+        _specialDayDescriptionHuds.Clear();
+        _specialDayCountdownHuds.Clear();
+    }
+
+    private void StopCountdownHud()
+    {
+        if (!_isMapUnloading && _hudText != null)
+            foreach (var hud in _specialDayCountdownHuds.Values)
+                RemoveHudSafely(hud);
+
+        _specialDayCountdownHuds.Clear();
+    }
+
+    private void OnClientDisconnected(IOnClientDisconnectedEvent @event)
+    {
+        RemovePlayerHud(_specialDayDescriptionHuds, @event.PlayerId);
+        RemovePlayerHud(_specialDayCountdownHuds, @event.PlayerId);
+    }
+
+    private void OnClientPutInServer(IOnClientPutInServerEvent @event)
+    {
+        var specialDay = CurrentSpecialDay;
+        if (_isMapUnloading || _hudText is null || specialDay is null)
+            return;
+
+        _core.Scheduler.NextWorldUpdate(() =>
+        {
+            if (!_isMapUnloading && ReferenceEquals(CurrentSpecialDay, specialDay))
+            {
+                UpdateDescriptionHud(specialDay);
+                if (_countdownSecondsRemaining is int remaining)
+                    UpdateCountdownHud(specialDay, remaining);
+            }
+        });
+    }
+
+    private void RemovePlayerHud(Dictionary<int, HudTextHandle> huds, int playerId)
+    {
+        if (!_isMapUnloading && _hudText != null && huds.Remove(playerId, out var hud))
+            RemoveHudSafely(hud);
+        else
+            huds.Remove(playerId);
+    }
+
+    private void RemoveHudSafely(HudTextHandle hud)
+    {
+        try
+        {
+            _hudText!.RemoveHud(hud);
+        }
+        catch (ArgumentException)
+        {
+            // HudText already discarded the handle during a map change or disconnect.
+        }
     }
 
     private void FreezePlayer(IJBPlayer player, Color? color = null)

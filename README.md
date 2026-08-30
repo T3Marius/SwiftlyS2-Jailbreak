@@ -30,7 +30,7 @@
 - Warden cleanup on death, round end, and plugin unload.
 - Cuffs are given to the warden and cleaned up when warden is removed.
 - Warden can remove weapons by shooting them.
-- HUD center message shows the current warden and deputy.
+- HudText shows the current warden and deputy.
 - Warden chat and scoreboard tags are applied while the role is active.
 - Gameplay sounds can be configured for warden set/remove, rebel set, cuffs, and Last Request events.
 
@@ -73,12 +73,13 @@
 - Warden can queue a Special Day with `!sd` or from the Warden Menu.
 - Queued days start next round and respect the configurable round cooldown.
 - Countdown support can freeze all players, prisoners, guards, or nobody depending on the day.
-- Countdown HTML shows the day name, remaining time, and day description.
+- HudText shows a configurable countdown and a persistent day name/description HUD.
 - Special Day weapon restrictions are enforced through acquire checks.
 - Optional `!sguns` menu supports selecting a primary first, then a secondary, then gives both weapons.
 - Special days can enable friendly fire with `AllowFriendlyFire`.
 - Normal Jailbreak systems are blocked during active Special Days, including warden actions, rebels, freedays, cuffs, laser, ping, and warden voice handling.
-- Active Special Days keep showing their name and description in center HTML.
+- The persistent Special Day HUD is cleaned up on player disconnect, map changes, and day end.
+- Round-end HUDs announce the winning team, or the sole winner of an FFA Special Day.
 - Bunnyhop is enabled instantly during Special Day countdowns and active Special Days when enabled in config.
 - End announcements show the Special Day name and surviving players, with names colored by team.
 
@@ -192,6 +193,17 @@ The plugin can run with custom paths, but the built-in model and sound defaults 
   />
 </a>
 
+## Required HudText Plugin
+
+Jailbreak's warden/deputy, Special Day, countdown, and winner displays require **HudText**. Install HudText and load it before Jailbreak; without it, those HUD displays cannot be shown.
+
+<a href="https://github.com/T3Marius/HudText" target="_blank">
+  <img
+    src="https://img.shields.io/badge/Required%20Dependency-HudText-5b9bd5?style=for-the-badge"
+    alt="HudText required dependency"
+  />
+</a>
+
 ## Configuration
 
 | File | Section | Key settings |
@@ -204,6 +216,7 @@ The plugin can run with custom paths, but the built-in model and sound defaults 
 | `voice.toml` | Voice | Prisoner mute behavior. |
 | `sounds.toml` | Sounds | Gameplay sounds, sound event files, and muted sound reasons. Built-in defaults use the Jailbreak Workshop addon. |
 | `queue.toml` | GuardQueue | Queue command aliases, list output targets, and premium permission flags. |
+| `hud.toml` | Hud | Warden/deputy, Special Day, countdown, team-winner, and FFA-winner HudText styles. |
 | `config.toml` under `JBShop` | JBShop | Global/Prisoners/Guards category names, IDs, currencies, and ordering. |
 | `commands.toml` under `JBShop` | JBShop | Shop, balance, gift, and admin command aliases plus the shop admin permissions. |
 | `global_items.toml` under `JBShop` | JBShop | Items available to both teams. |
