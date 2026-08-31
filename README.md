@@ -11,6 +11,10 @@
   <img src="https://img.shields.io/github/license/T3Marius/SwiftlyS2-Jailbreak" alt="License">
 </p>
 
+<p align="center">
+  <img src="assets/jailbreak_photo.png" alt="Gamemode Preview For Jailbreak." width="100%">
+</p>
+
 ## Features
 
 ### Player Roles And Teams
