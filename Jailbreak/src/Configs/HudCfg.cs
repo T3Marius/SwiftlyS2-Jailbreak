@@ -56,7 +56,9 @@ public sealed class HudConfig
     };
     public HudTextSettings CurrencyHud { get; set; } = new()
     {
-        Position = HudTextPosition.BottomLeftCorner,
+        Position = HudTextPosition.CenterLeft,
+        VerticalAlignment = VerticalAlignment.Middle,
+        MarginTop = 200,
         TextAlignment = HudTextAlignment.Left,
         Background = false,
         DropShadow = true,
@@ -75,8 +77,13 @@ public sealed class HudTextSettings
     public HudTextSize Size { get; set; } = HudTextSize.Normal;
     /// <summary>Aligns the text inside the HUD panel.</summary>
     public HudTextAlignment TextAlignment { get; set; } = HudTextAlignment.Center;
+    public VerticalAlignment VerticalAlignment { get; set; } = VerticalAlignment.Top;
     public HudTextBackgroundOpacity BackgroundOpacity { get; set; } = HudTextBackgroundOpacity.Light;
     public HudTextColor OutlineColor { get; set; } = HudTextColor.White;
     public HudTextFont Font { get; set; } = HudTextFont.Stratum2;
     public FontWeight FontWeight { get; set; } = FontWeight.Bold;
+    public int MarginBottom { get; set; }
+    public int MarginTop { get; set; }
+    public int MarginLeft { get; set; }
+    public int MarginRight { get; set; }
 }

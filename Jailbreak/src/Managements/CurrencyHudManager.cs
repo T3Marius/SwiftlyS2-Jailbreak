@@ -205,5 +205,10 @@ public sealed class CurrencyHudManager
         Font = style.Font,
         FontWeight = style.FontWeight,
         TextAlignment = style.TextAlignment,
+        MarginBottom = style.MarginBottom,
+        MarginTop = style.MarginTop,
+        MarginLeft = style.MarginLeft,
+        MarginRight = style.MarginRight,
+        VerticalAlignment = style.VerticalAlignment,
     };
 }

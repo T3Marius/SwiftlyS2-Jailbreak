@@ -14,7 +14,7 @@ namespace Jailbreak;
     Name = "Jailbreak",
     Id = "Jailbreak",
     Author = "Marius",
-    Version = "0.2.1"
+    Version = "0.2.2"
 )]
 public sealed class Main : BasePlugin
 {
@@ -45,9 +45,6 @@ public sealed class Main : BasePlugin
 
         if (interfaceManager.TryGetSharedInterface<IEconomyAPIv1>(ShopManager.EconomyInterfaceKey, out var economy))
             _provider.GetRequiredService<ShopManager>().AttachEconomy(economy);
-
-
-        Core.Logger.LogInformation("Economy API was not found. Optional Jailbreak shop purchases remain disabled.");
     }
     public override void Load(bool hotReload)
     {
