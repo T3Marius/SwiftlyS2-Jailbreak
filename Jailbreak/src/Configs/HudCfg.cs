@@ -54,6 +54,17 @@ public sealed class HudConfig
         FontWeight = FontWeight.Bold,
         Size = HudTextSize.ExtraLarge,
     };
+    public HudTextSettings CurrencyHud { get; set; } = new()
+    {
+        Position = HudTextPosition.BottomLeftCorner,
+        TextAlignment = HudTextAlignment.Left,
+        Background = false,
+        DropShadow = true,
+        Color = HudTextColor.Yellow,
+        Font = HudTextFont.Stratum2,
+        FontWeight = FontWeight.Bold,
+        Size = HudTextSize.Small,
+    };
 }
 public sealed class HudTextSettings
 {

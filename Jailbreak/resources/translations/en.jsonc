@@ -171,6 +171,8 @@
     "special_day_winners_label": "Winners",
     "guardians_win_round_hud": "Guardians Win The Round!",
     "prisoners_win_round_hud": "Prisoners Win The Round!",
+    "currency_hud_header": "Currency:",
+    "currency_hud_line": "- {0}: {1}",
     "special_day_queued": "[blue]{0}[silver] will start next round.",
     "special_days_days_submenu.title": "Days",
     "special_days_submenu.title": "Special Days",

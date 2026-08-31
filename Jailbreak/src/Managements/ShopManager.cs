@@ -58,6 +58,7 @@ public sealed class ShopManager : IJBShop
     public event Action<ShopContext, ShopPurchaseResult>? ItemPurchased;
     public event Action<ShopContext>? ItemEquipped;
     public event Action<ShopContext>? ItemUnequipped;
+    public event Action<IJBPlayer, string, decimal>? PlayerCurrencyChanged;
 
     public void Register()
     {
@@ -277,7 +278,11 @@ public sealed class ShopManager : IJBShop
         try
         {
             economy.TransferFunds(sender.Player, recipient.Player, registeredCurrency, amount);
-            return new(ShopBalanceStatus.Success, GetBalance(sender, registeredCurrency));
+            var senderBalance = GetBalance(sender, registeredCurrency);
+            var recipientBalance = GetBalance(recipient, registeredCurrency);
+            PlayerCurrencyChanged?.Invoke(sender, registeredCurrency, senderBalance);
+            PlayerCurrencyChanged?.Invoke(recipient, registeredCurrency, recipientBalance);
+            return new(ShopBalanceStatus.Success, senderBalance);
         }
         catch (Exception ex)
         {
@@ -333,7 +338,10 @@ public sealed class ShopManager : IJBShop
                 return Result(ShopPurchaseStatus.InsufficientFunds, item.Id, currency, item.Price, GetBalance(player, currency));
 
             if (item.Price > 0)
+            {
                 economy.SubtractPlayerBalance(player.Player, currency, item.Price);
+                PlayerCurrencyChanged?.Invoke(player, currency, GetBalance(player, currency));
+            }
 
             ShopActionResult activation;
             try
@@ -657,8 +665,11 @@ public sealed class ShopManager : IJBShop
                     economy.SetPlayerBalance(player.Player, registeredCurrency, amount);
                     break;
             }
+            var newBalance = GetBalance(player, registeredCurrency);
+            PlayerCurrencyChanged?.Invoke(player, registeredCurrency, newBalance);
 
-            return new(ShopBalanceStatus.Success, GetBalance(player, registeredCurrency));
+
+            return new(ShopBalanceStatus.Success, newBalance);
         }
         catch (Exception ex)
         {
@@ -685,8 +696,11 @@ public sealed class ShopManager : IJBShop
 
     private void Refund(IJBPlayer player, string currency, decimal amount)
     {
-        if (amount > 0)
-            _economy?.AddPlayerBalance(player.Player, currency, amount);
+        if (amount <= 0)
+            return;
+
+        _economy?.AddPlayerBalance(player.Player, currency, amount);
+        PlayerCurrencyChanged?.Invoke(player, currency, GetBalance(player, currency));
     }
 
     private static ShopPurchaseResult Result(

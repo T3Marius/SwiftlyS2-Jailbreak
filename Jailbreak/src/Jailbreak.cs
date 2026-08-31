@@ -14,7 +14,7 @@ namespace Jailbreak;
     Name = "Jailbreak",
     Id = "Jailbreak",
     Author = "Marius",
-    Version = "0.2.0"
+    Version = "0.2.1"
 )]
 public sealed class Main : BasePlugin
 {
@@ -40,6 +40,7 @@ public sealed class Main : BasePlugin
         {
             _provider.GetRequiredService<Events>().SetHudTextService(hudText);
             _provider.GetRequiredService<SpecialDayManager>().SetHudTextService(hudText);
+            _provider.GetRequiredService<CurrencyHudManager>().SetHudTextService(hudText);
         }
 
         if (interfaceManager.TryGetSharedInterface<IEconomyAPIv1>(ShopManager.EconomyInterfaceKey, out var economy))
@@ -86,6 +87,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<TeamManager>()
                   .AddSingleton<GuardQueueManager>()
                   .AddSingleton<ShopManager>()
+                  .AddSingleton<CurrencyHudManager>()
                   .AddSingleton<ShopItemModuleManager>()
                   .AddSingleton<IJBShop>(provider => provider.GetRequiredService<ShopManager>())
                   .AddSingleton<RebelManager>()
@@ -186,6 +188,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<CuffsManager>().Register();
         _provider.GetRequiredService<LaserManager>().Register();
         _provider.GetRequiredService<DrawManager>().Register();
+        _provider.GetRequiredService<CurrencyHudManager>().Register();
 
         if (_provider.GetRequiredService<IOptions<UtilsConfig>>().Value.Bunnyhoop.Enable)
             _provider.GetRequiredService<BunnyhoopManager>().Register();
@@ -218,6 +221,7 @@ public sealed class Main : BasePlugin
         _provider.GetRequiredService<CuffsManager>().Unregister();
         _provider.GetRequiredService<LaserManager>().Unregister();
         _provider.GetRequiredService<DrawManager>().Unregister();
+        _provider.GetRequiredService<CurrencyHudManager>().Unregister();
         if (_provider.GetRequiredService<IOptions<UtilsConfig>>().Value.Bunnyhoop.Enable)
             _provider.GetRequiredService<BunnyhoopManager>().Unregister();
         _provider.GetRequiredService<IconManager>().CleanupAll();

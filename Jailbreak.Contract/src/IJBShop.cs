@@ -293,6 +293,7 @@ public interface IJBShop
     event Action<ShopContext, ShopPurchaseResult>? ItemPurchased;
     event Action<ShopContext>? ItemEquipped;
     event Action<ShopContext>? ItemUnequipped;
+    event Action<IJBPlayer, string, decimal>? PlayerCurrencyChanged;
 
     bool RegisterCategory(ShopCategory category);
     bool UnregisterCategory(string categoryId);
