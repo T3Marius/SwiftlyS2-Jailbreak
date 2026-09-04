@@ -1,11 +1,10 @@
 using Jailbreak.Contract;
 using Microsoft.Extensions.Options;
-using SwiftlyS2.Core.Menus.OptionsBase;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Commands;
 using SwiftlyS2.Shared.Helpers;
-using SwiftlyS2.Shared.Menus;
 using SwiftlyS2.Shared.Players;
+using T3Menu.Contract;
 
 namespace Jailbreak;
 
@@ -16,7 +15,7 @@ public sealed class PrisonerCommands
     private readonly LastRequestManager _lastRequestManager;
     private readonly SpecialDayManager _specialDayManager;
     private readonly PrisonerConfig _config;
-    private readonly HashSet<ulong> _pendingSurrenders = [];
+    private readonly Dictionary<ulong, Guid> _pendingSurrenders = [];
 
     public PrisonerCommands(
         ISwiftlyCore core,
@@ -77,7 +76,7 @@ public sealed class PrisonerCommands
         if (!ValidateCanOpenLastRequest(player))
             return;
 
-        _core.MenusAPI.OpenMenuForPlayer(player.Player, LastRequestMenu(player));
+        LastRequestMenu(player).Open(player.Player);
     }
 
     private void SurrenderCommand(ICommandContext ctx)
@@ -100,31 +99,34 @@ public sealed class PrisonerCommands
         }
 
         var prisonerKey = PlayerIdentity.GetKey(prisoner.Player);
-        if (!_pendingSurrenders.Add(prisonerKey))
+        var requestId = Guid.NewGuid();
+        if (!_pendingSurrenders.TryAdd(prisonerKey, requestId))
         {
             prisoner.SendMessage(MessageType.Chat, "surrender_already_pending", true);
             return;
         }
 
+        _core.Scheduler.DelayBySeconds(15, () => RemovePendingSurrender(prisonerKey, requestId));
+
         prisoner.SendMessage(MessageType.Chat, "surrender_request_sent", true, args: warden.Player.Name);
         warden.SendMessage(MessageType.Chat, "surrender_request_received", true, args: prisoner.Player.Name);
-        _core.MenusAPI.OpenMenuForPlayer(warden.Player, SurrenderMenu(warden, prisoner, prisonerKey));
+        SurrenderMenu(warden, prisoner, prisonerKey, requestId).Open(warden.Player);
     }
 
-    private IMenuAPI LastRequestMenu(IJBPlayer prisoner)
+    private Menu LastRequestMenu(IJBPlayer prisoner)
     {
-        var builder = CreateBuilder(prisoner, "last_request_menu.title");
+        var menu = CreateMenu(prisoner, "last_request_menu.title");
         var lastRequests = _lastRequestManager.LastRequests.OrderBy(lr => lr.Name).ToList();
 
         if (lastRequests.Count == 0)
         {
-            builder.AddOption(new TextMenuOption(prisoner.Localizer["last_request_menu.no_requests"]));
-            return builder.Build();
+            menu.AddSpacer(prisoner.Localizer["last_request_menu.no_requests"]);
+            return menu;
         }
 
         foreach (var lastRequest in lastRequests)
         {
-            AddButton(builder, lastRequest.Name, () =>
+            AddButton(menu, lastRequest.Name, () =>
             {
                 _core.Scheduler.NextWorldUpdate(() =>
                 {
@@ -136,44 +138,47 @@ public sealed class PrisonerCommands
             });
         }
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI SurrenderMenu(IJBPlayer warden, IJBPlayer prisoner, ulong prisonerKey)
+    private Menu SurrenderMenu(IJBPlayer warden, IJBPlayer prisoner, ulong prisonerKey, Guid requestId)
     {
-        var builder = _core.MenusAPI.CreateBuilder().Design
-            .SetMenuTitle(warden.Localizer["surrender_menu.title", prisoner.Player.Name]);
+        var menu = new Menu(warden.Localizer["surrender_menu.title", prisoner.Player.Name])
+        {
+            HasExitButton = true,
+            Navigation = MenuNavigation.KeyPress
+        };
 
-        AddButton(builder, warden.Localizer["surrender_menu_option.accept"], () =>
+        AddButton(menu, warden.Localizer["surrender_menu_option.accept"], () =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
-                if (!ValidatePendingSurrender(warden, prisoner, prisonerKey))
+                if (!ValidatePendingSurrender(warden, prisoner, prisonerKey, requestId))
                     return;
 
-                _pendingSurrenders.Remove(prisonerKey);
+                RemovePendingSurrender(prisonerKey, requestId);
                 prisoner.SetRebel(false);
                 StripWeapons(prisoner.Player);
                 _players.SendMessage(MessageType.Chat, "surrender_accepted", true, args: [warden.Player.Name, prisoner.Player.Name]);
-                _core.MenusAPI.CloseActiveMenu(warden.Player);
+                MenuManager.CloseActiveMenu(warden.Player);
             });
         });
 
-        AddButton(builder, warden.Localizer["surrender_menu_option.refuse"], () =>
+        AddButton(menu, warden.Localizer["surrender_menu_option.refuse"], () =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
-                if (_pendingSurrenders.Remove(prisonerKey))
+                if (RemovePendingSurrender(prisonerKey, requestId))
                 {
                     _players.SendMessage(MessageType.Chat, "surrender_refused", true, args: [warden.Player.Name, prisoner.Player.Name]);
                 }
 
                 if (warden.Player.IsValid)
-                    _core.MenusAPI.CloseActiveMenu(warden.Player);
+                    MenuManager.CloseActiveMenu(warden.Player);
             });
         });
 
-        return builder.Build();
+        return menu;
     }
 
     private void OpenWeaponStepOrNext(IJBPlayer prisoner, ILastRequest lastRequest)
@@ -197,16 +202,16 @@ public sealed class PrisonerCommands
             return;
         }
 
-        _core.MenusAPI.OpenMenuForPlayer(prisoner.Player, WeaponMenu(prisoner, lastRequest, weapons));
+        WeaponMenu(prisoner, lastRequest, weapons).Open(prisoner.Player);
     }
 
-    private IMenuAPI WeaponMenu(IJBPlayer prisoner, ILastRequest lastRequest, IReadOnlyList<ItemDefinitionIndex> weapons)
+    private Menu WeaponMenu(IJBPlayer prisoner, ILastRequest lastRequest, IReadOnlyList<ItemDefinitionIndex> weapons)
     {
-        var builder = CreateBuilder(prisoner, "last_request_weapon_menu.title");
+        var menu = CreateMenu(prisoner, "last_request_weapon_menu.title");
 
         if (lastRequest.WeaponSelection == LastRequestWeaponSelection.Optional)
         {
-            AddButton(builder, prisoner.Localizer["last_request_weapon_menu.no_weapon"], () =>
+            AddButton(menu, prisoner.Localizer["last_request_weapon_menu.no_weapon"], () =>
             {
                 _core.Scheduler.NextWorldUpdate(() => OpenVariantStepOrNext(prisoner, lastRequest, null));
             });
@@ -214,13 +219,13 @@ public sealed class PrisonerCommands
 
         foreach (var weapon in weapons)
         {
-            AddButton(builder, GetWeaponLabel(weapon), () =>
+            AddButton(menu, GetWeaponLabel(weapon), () =>
             {
                 _core.Scheduler.NextWorldUpdate(() => OpenVariantStepOrNext(prisoner, lastRequest, weapon));
             });
         }
 
-        return builder.Build();
+        return menu;
     }
 
     private void OpenVariantStepOrNext(IJBPlayer prisoner, ILastRequest lastRequest, ItemDefinitionIndex? weapon)
@@ -231,22 +236,22 @@ public sealed class PrisonerCommands
             return;
         }
 
-        _core.MenusAPI.OpenMenuForPlayer(prisoner.Player, VariantMenu(prisoner, lastRequest, weapon));
+        VariantMenu(prisoner, lastRequest, weapon).Open(prisoner.Player);
     }
 
-    private IMenuAPI VariantMenu(IJBPlayer prisoner, ILastRequest lastRequest, ItemDefinitionIndex? weapon)
+    private Menu VariantMenu(IJBPlayer prisoner, ILastRequest lastRequest, ItemDefinitionIndex? weapon)
     {
-        var builder = CreateBuilder(prisoner, "last_request_variant_menu.title");
+        var menu = CreateMenu(prisoner, "last_request_variant_menu.title");
 
         foreach (var variant in lastRequest.Variants)
         {
-            AddButton(builder, variant.Name, () =>
+            AddButton(menu, variant.Name, () =>
             {
                 _core.Scheduler.NextWorldUpdate(() => OpenGuardStepOrStart(prisoner, lastRequest, weapon, variant));
             });
         }
 
-        return builder.Build();
+        return menu;
     }
 
     private void OpenGuardStepOrStart(IJBPlayer prisoner, ILastRequest lastRequest, ItemDefinitionIndex? weapon, LastRequestVariant? variant)
@@ -268,28 +273,28 @@ public sealed class PrisonerCommands
             return;
         }
 
-        _core.MenusAPI.OpenMenuForPlayer(prisoner.Player, GuardMenu(prisoner, lastRequest, weapon, variant, guards));
+        GuardMenu(prisoner, lastRequest, weapon, variant, guards).Open(prisoner.Player);
     }
 
-    private IMenuAPI GuardMenu(
+    private Menu GuardMenu(
         IJBPlayer prisoner,
         ILastRequest lastRequest,
         ItemDefinitionIndex? weapon,
         LastRequestVariant? variant,
         IReadOnlyList<IJBPlayer> guards)
     {
-        var builder = CreateBuilder(prisoner, "last_request_guard_menu.title");
+        var menu = CreateMenu(prisoner, "last_request_guard_menu.title");
 
         foreach (var guard in guards)
         {
             var guardRef = guard;
-            AddButton(builder, guardRef.Player.Name, () =>
+            AddButton(menu, guardRef.Player.Name, () =>
             {
                 _core.Scheduler.NextWorldUpdate(() => StartLastRequest(prisoner, lastRequest, weapon, variant, guardRef));
             });
         }
 
-        return builder.Build();
+        return menu;
     }
 
     private void StartLastRequest(
@@ -315,7 +320,7 @@ public sealed class PrisonerCommands
             return;
         }
 
-        _core.MenusAPI.CloseActiveMenu(prisoner.Player);
+        MenuManager.CloseActiveMenu(prisoner.Player);
     }
 
     private bool ValidateCanOpenLastRequest(IJBPlayer prisoner)
@@ -394,25 +399,37 @@ public sealed class PrisonerCommands
         return true;
     }
 
-    private bool ValidatePendingSurrender(IJBPlayer warden, IJBPlayer prisoner, ulong prisonerKey)
+    private bool ValidatePendingSurrender(IJBPlayer warden, IJBPlayer prisoner, ulong prisonerKey, Guid requestId)
     {
-        if (!_pendingSurrenders.Contains(prisonerKey))
+        if (!_pendingSurrenders.TryGetValue(prisonerKey, out var pendingId) || pendingId != requestId)
+        {
+            if (warden.Player.IsValid)
+                warden.SendMessage(MessageType.Chat, "surrender_unavailable", true);
+
             return false;
+        }
 
         if (!warden.Player.IsValid || !warden.IsWarden)
         {
-            _pendingSurrenders.Remove(prisonerKey);
+            RemovePendingSurrender(prisonerKey, requestId);
             return false;
         }
 
         if (!prisoner.Player.IsValid || !prisoner.Player.IsAlive || !prisoner.IsRebel)
         {
-            _pendingSurrenders.Remove(prisonerKey);
+            RemovePendingSurrender(prisonerKey, requestId);
             warden.SendMessage(MessageType.Chat, "surrender_unavailable", true);
             return false;
         }
 
         return true;
+    }
+
+    private bool RemovePendingSurrender(ulong prisonerKey, Guid requestId)
+    {
+        return _pendingSurrenders.TryGetValue(prisonerKey, out var pendingId)
+            && pendingId == requestId
+            && _pendingSurrenders.Remove(prisonerKey);
     }
 
     private IEnumerable<ItemDefinitionIndex> GetMenuWeapons(ILastRequest lastRequest)
@@ -438,21 +455,18 @@ public sealed class PrisonerCommands
             .ToUpperInvariant();
     }
 
-    private IMenuBuilderAPI CreateBuilder(IJBPlayer player, string titleKey)
+    private static Menu CreateMenu(IJBPlayer player, string titleKey)
     {
-        return _core.MenusAPI.CreateBuilder().Design
-            .SetMenuTitle(player.Localizer[titleKey]);
+        return new Menu(player.Localizer[titleKey])
+        {
+            HasExitButton = true,
+            Navigation = MenuNavigation.KeyPress
+        };
     }
 
-    private static void AddButton(IMenuBuilderAPI builder, string label, Action action)
+    private static void AddButton(Menu menu, string label, Action action)
     {
-        var option = new ButtonMenuOption(label);
-        option.Click += (_, _) =>
-        {
-            action();
-            return ValueTask.CompletedTask;
-        };
-        builder.AddOption(option);
+        menu.AddItem(label, (_, _) => action());
     }
 
     private static bool IsAlive(IJBPlayer player)

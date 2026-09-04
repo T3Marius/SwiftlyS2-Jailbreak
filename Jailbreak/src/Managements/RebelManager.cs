@@ -1,3 +1,4 @@
+using HudText.Contract;
 using Jailbreak.Contract;
 using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
@@ -16,6 +17,7 @@ public sealed class RebelManager
     private readonly SpecialDayManager   _specialDayManager;
     private readonly LastRequestManager  _lastRequestManager;
     private readonly JailbreakSoundManager _soundManager;
+    private readonly HudAlertManager _hudAlerts;
 
     private Guid? _weaponFireHookId;
     private Guid? _playerHurtHookId;
@@ -27,7 +29,8 @@ public sealed class RebelManager
         IOptions<UtilsConfig> utilsConfig,
         SpecialDayManager specialDayManager,
         LastRequestManager lastRequestManager,
-        JailbreakSoundManager soundManager)
+        JailbreakSoundManager soundManager,
+        HudAlertManager hudAlerts)
     {
         _core = core;
         _players = players;
@@ -35,6 +38,7 @@ public sealed class RebelManager
         _specialDayManager = specialDayManager;
         _lastRequestManager = lastRequestManager;
         _soundManager = soundManager;
+        _hudAlerts = hudAlerts;
     }
 
     public void Register()
@@ -55,7 +59,7 @@ public sealed class RebelManager
     {
         player.SetRebel(true);
         _soundManager.Play(JailbreakSound.RebelSet);
-        _players.SendMessage(MessageType.Alert, "became_rebel_alert", false, args: player.Player.Name);
+        _hudAlerts.Broadcast("became_rebel_alert", HudAlertSeverity.Danger, player.Player.Name);
         _players.SendMessage(MessageType.Chat, "became_rebel_chat", true, args: player.Player.Name);
     }
 

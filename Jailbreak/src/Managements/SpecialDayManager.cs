@@ -2,7 +2,6 @@ using HudText.Contract;
 using Jailbreak.Contract;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using SwiftlyS2.Core.Menus.OptionsBase;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Commands;
 using SwiftlyS2.Shared.Convars;
@@ -11,11 +10,11 @@ using SwiftlyS2.Shared.GameEventDefinitions;
 using SwiftlyS2.Shared.GameEvents;
 using SwiftlyS2.Shared.GameHooks;
 using SwiftlyS2.Shared.Helpers;
-using SwiftlyS2.Shared.Menus;
 using SwiftlyS2.Shared.Misc;
 using SwiftlyS2.Shared.Natives;
 using SwiftlyS2.Shared.Players;
 using SwiftlyS2.Shared.SchemaDefinitions;
+using T3Menu.Contract;
 
 namespace Jailbreak;
 
@@ -41,6 +40,7 @@ public sealed class SpecialDayManager
     private readonly Dictionary<int, HudTextHandle> _specialDayDescriptionHuds = [];
     private readonly Dictionary<int, HudTextHandle> _specialDayCountdownHuds = [];
     private bool _currentDayStarted;
+    private bool _currentDayPrepared;
     private bool _countdownFreezeActive;
     private bool _friendlyFireEnabledBySpecialDay;
     private bool _isMapUnloading;
@@ -146,6 +146,12 @@ public sealed class SpecialDayManager
         if (ReferenceEquals(CurrentSpecialDay, specialDay))
             EndSpecialDay();
 
+        if (ReferenceEquals(QueuedSpecialDay, specialDay))
+        {
+            QueuedSpecialDay = null;
+            StateChanged?.Invoke();
+        }
+
         _specialDays.Remove(id);
         _log.LogInformation("Unregistered special day. Id={Id}, Name={Name}", specialDay.Id, specialDay.Name);
         return true;
@@ -156,7 +162,10 @@ public sealed class SpecialDayManager
         if (!_specialDays.TryGetValue(id, out var specialDay))
             return false;
 
-        if (QueuedSpecialDay != null || CooldownRoundsRemaining > 0 || !specialDay.CanStart())
+        if (CurrentSpecialDay != null
+            || QueuedSpecialDay != null
+            || CooldownRoundsRemaining > 0
+            || !specialDay.CanStart())
             return false;
 
         QueuedSpecialDay = specialDay;
@@ -181,10 +190,6 @@ public sealed class SpecialDayManager
         }
 
         BeginSpecialDay(specialDay);
-
-        if (!_cellsManager.CellsOpen)   // cells should always be open when a sd starts, prisoners can get stuck in them.
-            _cellsManager.OpenCells();
-
         return true;
     }
 
@@ -213,19 +218,28 @@ public sealed class SpecialDayManager
         // could cause them to create a replacement HUD against a destroyed map.
         if (!_isMapUnloading)
             StateChanged?.Invoke();
-        if (_currentDayStarted)
+        if (_currentDayPrepared)
         {
-            specialDay.End();
-            if (announceAndRecord)
+            try
             {
-                var winners = RecordSpecialDayStats();
-                AnnounceSpecialDayEnded(specialDay, winners);
+                specialDay.End();
             }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Failed to clean up special day. Id={Id}, Name={Name}", specialDay.Id, specialDay.Name);
+            }
+        }
+
+        if (_currentDayStarted && announceAndRecord)
+        {
+            var winners = RecordSpecialDayStats();
+            AnnounceSpecialDayEnded(specialDay, winners);
         }
 
         RestoreSpecialDayConvars();
         _participants.Clear();
         _currentDayStarted = false;
+        _currentDayPrepared = false;
         _log.LogInformation(
             "{Action} special day. Id={Id}, Name={Name}, Reason={Reason}",
             announceAndRecord ? "Ended" : "Cancelled",
@@ -258,17 +272,8 @@ public sealed class SpecialDayManager
             return;
 
         var specialDay = CurrentSpecialDay;
-        if (specialDay == null || (!_currentDayStarted && !_countdownFreezeActive))
-        {
-            player.SendMessage(MessageType.Chat, "special_guns_no_active_day", true);
+        if (specialDay == null || !CanUseGunsMenu(player, specialDay))
             return;
-        }
-
-        if (!specialDay.EnableGunsMenu)
-        {
-            player.SendMessage(MessageType.Chat, "special_guns_disabled", true);
-            return;
-        }
 
         var primaryWeapons = GetMenuWeapons(specialDay, SpecialDayWeapons.PrimaryWeapons).ToList();
         var secondaryWeapons = GetMenuWeapons(specialDay, SpecialDayWeapons.SecondaryWeapons).ToList();
@@ -279,7 +284,7 @@ public sealed class SpecialDayManager
             return;
         }
 
-        _core.MenusAPI.OpenMenuForPlayer(player.Player, PrimaryGunsMenu(player, primaryWeapons, secondaryWeapons));
+        PrimaryGunsMenu(player, specialDay, primaryWeapons, secondaryWeapons).Open(player.Player);
     }
 
     private HookResult OnRoundStart(EventRoundStart e)
@@ -292,19 +297,19 @@ public sealed class SpecialDayManager
             CancelSpecialDay("new round started while special day was active");
 
         if (queuedDay != null)
-        {
-            CooldownRoundsRemaining = Math.Max(0, _config.CooldownRounds);
             BeginSpecialDay(queuedDay);
-        }
 
         return HookResult.Continue;
     }
 
     private HookResult OnRoundEnd(EventRoundEnd e)
     {
+        var specialDayEnded = CurrentSpecialDay != null;
         EndSpecialDay();
 
-        if (CooldownRoundsRemaining > 0)
+        // The configured cooldown counts complete rounds after the special-day
+        // round, not the special-day round itself.
+        if (!specialDayEnded && CooldownRoundsRemaining > 0)
             CooldownRoundsRemaining--;
 
         return HookResult.Continue;
@@ -321,8 +326,26 @@ public sealed class SpecialDayManager
     private void BeginSpecialDay(ISpecialDay specialDay)
     {
         CurrentSpecialDay = specialDay;
+        CooldownRoundsRemaining = Math.Max(CooldownRoundsRemaining, Math.Max(0, _config.CooldownRounds));
         StateChanged?.Invoke();
         _currentDayStarted = false;
+        _currentDayPrepared = true;
+
+        // Events suppresses the normal auto-open timer for special-day rounds, so
+        // opening the cells belongs here for both queued and API-started days.
+        if (!_cellsManager.CellsOpen)
+            _cellsManager.OpenCells();
+
+        try
+        {
+            specialDay.PreStart();
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Failed to prepare special day. Id={Id}, Name={Name}", specialDay.Id, specialDay.Name);
+            CancelSpecialDay("pre-start failed");
+            return;
+        }
 
         if (specialDay.StartCountdown <= 0)
         {
@@ -330,7 +353,6 @@ public sealed class SpecialDayManager
             return;
         }
 
-        specialDay.PreStart();
         _countdownFreezeActive = true;
         FreezePlayers(specialDay, new Color(80, 170, 255, 255));
         StopCountdown();
@@ -346,6 +368,9 @@ public sealed class SpecialDayManager
                 return;
             }
 
+            remaining--;
+            _countdownSecondsRemaining = remaining;
+
             if (remaining <= 0)
             {
                 StopCountdown();
@@ -356,8 +381,6 @@ public sealed class SpecialDayManager
 
             specialDay.OnCountdownTick(remaining);
             UpdateCountdownHud(specialDay, remaining);
-            remaining--;
-            _countdownSecondsRemaining = remaining;
         });
     }
 
@@ -372,12 +395,20 @@ public sealed class SpecialDayManager
             if (_isMapUnloading || !ReferenceEquals(CurrentSpecialDay, specialDay))
                 return;
 
-            ApplyStartLoadout(specialDay);
-            specialDay.Start();
-            _currentDayStarted = true;
-            StopCountdownHud();
-            UpdateDescriptionHud(specialDay);
-            _log.LogInformation("Started special day. Id={Id}, Name={Name}", specialDay.Id, specialDay.Name);
+            try
+            {
+                ApplyStartLoadout(specialDay);
+                specialDay.Start();
+                _currentDayStarted = true;
+                StopCountdownHud();
+                UpdateDescriptionHud(specialDay);
+                _log.LogInformation("Started special day. Id={Id}, Name={Name}", specialDay.Id, specialDay.Name);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Failed to start special day. Id={Id}, Name={Name}", specialDay.Id, specialDay.Name);
+                CancelSpecialDay("start failed");
+            }
         });
     }
 
@@ -524,41 +555,90 @@ public sealed class SpecialDayManager
         TextAlignment = style.TextAlignment,
     };
 
-    private IMenuAPI PrimaryGunsMenu(IJBPlayer player, IReadOnlyList<ItemDefinitionIndex> primaryWeapons, IReadOnlyList<ItemDefinitionIndex> secondaryWeapons)
+    private Menu PrimaryGunsMenu(
+        IJBPlayer player,
+        ISpecialDay specialDay,
+        IReadOnlyList<ItemDefinitionIndex> primaryWeapons,
+        IReadOnlyList<ItemDefinitionIndex> secondaryWeapons)
     {
-        var builder = _core.MenusAPI.CreateBuilder().Design
-            .SetMenuTitle(player.Localizer["special_guns_primary_menu.title"]);
+        var menu = new Menu(player.Localizer["special_guns_primary_menu.title"])
+        {
+            HasExitButton = true,
+            Navigation = MenuNavigation.KeyPress
+        };
 
         foreach (var weapon in primaryWeapons)
         {
-            AddButton(builder, GetWeaponLabel(weapon), () =>
+            AddButton(menu, GetWeaponLabel(weapon), () =>
             {
-                _core.MenusAPI.OpenMenuForPlayer(player.Player, SecondaryGunsMenu(player, weapon, secondaryWeapons));
+                if (!CanUseGunsMenu(player, specialDay))
+                    return;
+
+                SecondaryGunsMenu(player, specialDay, weapon, secondaryWeapons).Open(player.Player);
             });
         }
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI SecondaryGunsMenu(IJBPlayer player, ItemDefinitionIndex primaryWeapon, IReadOnlyList<ItemDefinitionIndex> secondaryWeapons)
+    private Menu SecondaryGunsMenu(
+        IJBPlayer player,
+        ISpecialDay specialDay,
+        ItemDefinitionIndex primaryWeapon,
+        IReadOnlyList<ItemDefinitionIndex> secondaryWeapons)
     {
-        var builder = _core.MenusAPI.CreateBuilder().Design
-            .SetMenuTitle(player.Localizer["special_guns_secondary_menu.title"]);
+        var menu = new Menu(player.Localizer["special_guns_secondary_menu.title"])
+        {
+            HasExitButton = true,
+            Navigation = MenuNavigation.KeyPress
+        };
 
         foreach (var weapon in secondaryWeapons)
         {
-            AddButton(builder, GetWeaponLabel(weapon), () =>
+            AddButton(menu, GetWeaponLabel(weapon), () =>
             {
                 _core.Scheduler.NextWorldUpdate(() =>
                 {
+                    if (!CanUseGunsMenu(player, specialDay))
+                        return;
+
                     GiveSelectedGuns(player.Player, primaryWeapon, weapon);
-                    player.SendMessage(MessageType.Chat, "special_guns_given", true, args: [GetWeaponLabel(primaryWeapon), GetWeaponLabel(weapon)]);
-                    _core.MenusAPI.CloseActiveMenu(player.Player);
+                    player.SendMessage(
+                        MessageType.Chat,
+                        "special_guns_given",
+                        true,
+                        args: [GetWeaponLabel(primaryWeapon), GetWeaponLabel(weapon)]);
+
+                    MenuManager.CloseActiveMenu(player.Player);
                 });
             });
         }
 
-        return builder.Build();
+        return menu;
+    }
+
+    private bool CanUseGunsMenu(IJBPlayer player, ISpecialDay specialDay)
+    {
+        if (!ReferenceEquals(CurrentSpecialDay, specialDay)
+            || (!_currentDayStarted && !_countdownFreezeActive))
+        {
+            player.SendMessage(MessageType.Chat, "special_guns_no_active_day", true);
+            return false;
+        }
+
+        if (!specialDay.EnableGunsMenu)
+        {
+            player.SendMessage(MessageType.Chat, "special_guns_disabled", true);
+            return false;
+        }
+
+        if (!player.Player.IsValid || !player.Player.IsAlive)
+        {
+            player.SendMessage(MessageType.Chat, "special_guns_must_be_alive", true);
+            return false;
+        }
+
+        return true;
     }
 
     private void FreezePlayers(ISpecialDay specialDay, Color? color = null)
@@ -676,7 +756,7 @@ public sealed class SpecialDayManager
 
     private IJBPlayer? FindPlayerByKey(ulong playerKey)
     {
-        return _players.GetAllPlayers().FirstOrDefault(player => PlayerIdentity.GetKey(player.Player) == playerKey);
+        return _players.FindByKey(playerKey);
     }
 
     private IEnumerable<IJBPlayer> GetFreezePlayers(ISpecialDay specialDay)
@@ -750,15 +830,9 @@ public sealed class SpecialDayManager
             .ToUpperInvariant();
     }
 
-    private static void AddButton(IMenuBuilderAPI builder, string label, Action action)
+    private static void AddButton(Menu menu, string label, Action action)
     {
-        var option = new ButtonMenuOption(label);
-        option.Click += (_, _) =>
-        {
-            action();
-            return ValueTask.CompletedTask;
-        };
-        builder.AddOption(option);
+        menu.AddItem(label, (_, _) => action());
     }
 
     private static void StripWeapons(IPlayer player)

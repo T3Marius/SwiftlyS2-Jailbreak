@@ -16,6 +16,9 @@ public static class PlayerUtils
     /// </summary>
     public static void SetModel(IPlayer player, string model, ISchedulerService scheduler)
     {
+        if (string.IsNullOrWhiteSpace(model))
+            return;
+
         scheduler.NextWorldUpdate(() =>
         {
             if (!player.IsValid) return;
@@ -49,9 +52,15 @@ public static class PlayerUtils
 
         scheduler.NextWorldUpdate(() =>
         {
+            if (!player.IsValid || !pawn.IsValid)
+                return;
+
+            if (pawn.RenderMode == RenderMode_t.kRenderTransAlpha && ColorsEqual(pawn.Render, color))
+                return;
+
             pawn.RenderMode = RenderMode_t.kRenderTransAlpha;
             pawn.Render = color;
-            pawn.RenderUpdated();
+            pawn.RenderModeUpdated();
             pawn.RenderUpdated();
         });
     }
@@ -69,6 +78,9 @@ public static class PlayerUtils
 
         scheduler.NextWorldUpdate(() =>
         {
+            if (!player.IsValid || !pawn.IsValid)
+                return;
+
             pawn.ItemServices?.GiveItem<CBaseEntity>(weapon_name);
         });
     }

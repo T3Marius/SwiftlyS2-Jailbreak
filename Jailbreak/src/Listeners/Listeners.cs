@@ -29,30 +29,31 @@ public sealed class Listeners
     public void Register()
     {
         _core.Event.OnPrecacheResource           += OnPrecacheResource;
-        _core.Event.OnMapUnload                  += OnMapUnload;
         _core.GameHooks.Entities.TakeDamage.Post += OnEntityTakeDamage;
     }
 
     public void Unregister()
     {
         _core.Event.OnPrecacheResource           -= OnPrecacheResource;
-        _core.Event.OnMapUnload                  -= OnMapUnload;
         _core.GameHooks.Entities.TakeDamage.Post -= OnEntityTakeDamage;
     }
 
     private void OnPrecacheResource(IOnPrecacheResourceEvent @event)
     {
-        @event.AddItem(IconManager.CoinModelPath);
-        @event.AddItem(_modelsConfig.WardenModel);
-        @event.AddItem(_modelsConfig.DeputyModel);
-        @event.AddItem(_modelsConfig.FreedayModel);
-        foreach (var m in _modelsConfig.GuardModels)     @event.AddItem(m);
-        foreach (var m in _modelsConfig.PrisonerModels)  @event.AddItem(m);
-        foreach (var s in _soundsConfig.SoundEventFiles) @event.AddItem(s);
-    }
+        var resources = new HashSet<string>(StringComparer.Ordinal);
+        AddResource(IconManager.CoinModelPath);
+        AddResource(_modelsConfig.WardenModel);
+        AddResource(_modelsConfig.DeputyModel);
+        AddResource(_modelsConfig.FreedayModel);
+        foreach (var model in _modelsConfig.GuardModels) AddResource(model);
+        foreach (var model in _modelsConfig.PrisonerModels) AddResource(model);
+        foreach (var sound in _soundsConfig.SoundEventFiles) AddResource(sound);
 
-    private void OnMapUnload(IOnMapUnloadEvent @event)
-    {
+        void AddResource(string resource)
+        {
+            if (!string.IsNullOrWhiteSpace(resource) && resources.Add(resource))
+                @event.AddItem(resource);
+        }
     }
 
     private void OnEntityTakeDamage(ref TakeDamageEntityPostContext ctx)

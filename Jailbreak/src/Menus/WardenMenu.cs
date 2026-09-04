@@ -1,9 +1,8 @@
 using Jailbreak.Contract;
-using SwiftlyS2.Core.Menus.OptionsBase;
 using SwiftlyS2.Shared;
-using SwiftlyS2.Shared.Menus;
 using SwiftlyS2.Shared.Natives;
 using SwiftlyS2.Shared.Players;
+using T3Menu.Contract;
 
 namespace Jailbreak;
 
@@ -56,89 +55,73 @@ public sealed class WardenMenu
         if (BlockDuringSpecialDay(player))
             return;
 
-        var builder = CreateBuilder(player, "warden_menu.title");
+        var menu = CreateMenu(player, "warden_menu.title");
 
-        AddSubmenu(builder, player, "warden_menu_option.toggle_cells", () => CellsSubmenu(player));
-        AddSubmenu(builder, player, "warden_menu_option.toggle_box", () => BoxSubmenu(player));
-        AddSubmenu(builder, player, "warden_menu_option.toggle_voice", () => VoiceSubmenu(player));
-        AddSubmenu(builder, player, "warden_menu_option.manage_deputy", () => DeputySubmenu(player));
-        AddSubmenu(builder, player, "warden_menu_option.manage_freeday", () => FreedaySubmenu(player));
-        AddSubmenu(builder, player, "warden_menu_option.color_prisoners", () => ColorPrisonersSubmenu(player));
-        AddSubmenu(builder, player, "warden_menu_option.special_days", () => SpecialDaysSubmenu(player));
-        AddSubmenu(builder, player, "warden_menu_option.visual_management", () => VisualManagementSubmenu(player));
-        AddSubmenu(builder, player, "warden_menu_option.extend_round", () => ExtendRoundSubmenu(player));
+        AddSubmenu(menu, player, "warden_menu_option.toggle_cells", () => CellsSubmenu(player));
+        AddSubmenu(menu, player, "warden_menu_option.toggle_box", () => BoxSubmenu(player));
+        AddSubmenu(menu, player, "warden_menu_option.toggle_voice", () => VoiceSubmenu(player));
+        AddSubmenu(menu, player, "warden_menu_option.manage_deputy", () => DeputySubmenu(player));
+        AddSubmenu(menu, player, "warden_menu_option.manage_freeday", () => FreedaySubmenu(player));
+        AddSubmenu(menu, player, "warden_menu_option.color_prisoners", () => ColorPrisonersSubmenu(player));
+        AddSubmenu(menu, player, "warden_menu_option.special_days", () => SpecialDaysSubmenu(player));
+        AddSubmenu(menu, player, "warden_menu_option.visual_management", () => VisualManagementSubmenu(player));
+        AddSubmenu(menu, player, "warden_menu_option.extend_round", () => ExtendRoundSubmenu(player));
 
-        _core.MenusAPI.OpenMenuForPlayer(player.Player, builder.Build());
+        menu.Open(player.Player);
     }
-    private IMenuAPI ExtendRoundSubmenu(IJBPlayer player)
+    private Menu ExtendRoundSubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "extend_round_submenu.title");
+        var menu = CreateMenu(player, "extend_round_submenu.title");
 
-        var customOption = new InputMenuOption(
-            player.Localizer["extend_round_submenu_option.custom_value"],
-            maxLength: 2,
-            validator: IsValidRoundExtension,
-            defaultValue: "1",
-            hintMessage: player.Localizer["extend_round_custom_hint"]);
-        customOption.ValueChanged += (_, args) =>
+        foreach (var minutes in new[] { 1, 2, 3, 5, 10, 15 })
         {
-            if (!int.TryParse(args.NewValue, out var minutes))
-                return;
-
-            var menuPlayer = _players.SyncPlayer(args.Player) ?? player;
-            ExtendRound(menuPlayer, minutes);
-        };
-        builder.AddOption(customOption);
-
-        foreach (var minutes in new[] { 1, 2, 3, 5 })
-        {
-            AddButton(builder, player.Localizer["extend_round_submenu_option.minutes", minutes], () =>
+            AddButton(menu, player.Localizer["extend_round_submenu_option.minutes", minutes], () =>
             {
                 ExtendRound(player, minutes);
             });
         }
 
-        return builder.Build();
+        return menu;
     }
     public void ShowSpecialDays(IJBPlayer player)
     {
         if (BlockDuringSpecialDay(player))
             return;
 
-        _core.MenusAPI.OpenMenuForPlayer(player.Player, SpecialDaysSubmenu(player));
+        SpecialDaysSubmenu(player).Open(player.Player);
     }
 
     public void ShowDrawColor(IJBPlayer player)
     {
-        if (BlockDuringSpecialDay(player))
+        if (BlockDrawAction(player))
             return;
 
-        _core.MenusAPI.OpenMenuForPlayer(player.Player, DrawColorSubmenu(player));
+        DrawColorSubmenu(player).Open(player.Player);
     }
 
-    private IMenuAPI SpecialDaysSubmenu(IJBPlayer player)
+    private Menu SpecialDaysSubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "special_days_submenu.title");
+        var menu = CreateMenu(player, "special_days_submenu.title");
 
-        AddSubmenu(builder, player, "special_days_submenu_option.days", () => SpecialDaysListSubmenu(player));
+        AddSubmenu(menu, player, "special_days_submenu_option.days", () => SpecialDaysListSubmenu(player));
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI SpecialDaysListSubmenu(IJBPlayer player)
+    private Menu SpecialDaysListSubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "special_days_days_submenu.title");
+        var menu = CreateMenu(player, "special_days_days_submenu.title");
         var days = _specialDayManager.SpecialDays.OrderBy(day => day.Name).ToList();
 
         if (days.Count == 0)
         {
-            builder.AddOption(new TextMenuOption(player.Localizer["special_days_submenu_option.no_days"]));
-            return builder.Build();
+            menu.AddSpacer(player.Localizer["special_days_submenu_option.no_days"]);
+            return menu;
         }
 
         foreach (var day in days)
         {
-            AddButton(builder, day.Name, () =>
+            AddButton(menu, day.Name, () =>
             {
                 _core.Scheduler.NextWorldUpdate(() =>
                 {
@@ -163,39 +146,39 @@ public sealed class WardenMenu
             });
         }
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI VisualManagementSubmenu(IJBPlayer player)
+    private Menu VisualManagementSubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "visual_management_submenu.title");
+        var menu = CreateMenu(player, "visual_management_submenu.title");
 
         AddDynamicSubmenu(
-            builder,
+            menu,
             () => player.Localizer["visual_management_submenu_option.laser_color_current", GetSelectedLaserColorName(player)],
             () => LaserColorSubmenu(player));
 
         AddDynamicSubmenu(
-            builder,
+            menu,
             () => player.Localizer["visual_management_submenu_option.ping_color_current", GetSelectedPingColorName(player)],
             () => PingColorSubmenu(player));
 
         AddDynamicSubmenu(
-            builder,
+            menu,
             () => player.Localizer["visual_management_submenu_option.draw_color_current", GetSelectedDrawColorName(player)],
             () => DrawColorSubmenu(player));
 
-        AddSubmenu(builder, player, "visual_management_submenu_option.draw_access", () => DrawAccessSubmenu(player));
-        AddSubmenu(builder, player, "visual_management_submenu_option.draw_cleanup", () => DrawCleanupSubmenu(player));
+        AddSubmenu(menu, player, "visual_management_submenu_option.draw_access", () => DrawAccessSubmenu(player));
+        AddSubmenu(menu, player, "visual_management_submenu_option.draw_cleanup", () => DrawCleanupSubmenu(player));
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI DrawCleanupSubmenu(IJBPlayer player)
+    private Menu DrawCleanupSubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "draw_cleanup_submenu.title");
+        var menu = CreateMenu(player, "draw_cleanup_submenu.title");
 
-        AddButton(builder, player.Localizer["draw_cleanup_submenu_option.clear_all"], () =>
+        AddButton(menu, player.Localizer["draw_cleanup_submenu_option.clear_all"], () =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
@@ -207,7 +190,7 @@ public sealed class WardenMenu
             });
         });
 
-        AddButton(builder, player.Localizer["draw_cleanup_submenu_option.clear_mine"], () =>
+        AddButton(menu, player.Localizer["draw_cleanup_submenu_option.clear_mine"], () =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
@@ -219,14 +202,14 @@ public sealed class WardenMenu
             });
         });
 
-        AddSubmenu(builder, player, "draw_cleanup_submenu_option.clear_prisoner", () => DrawCleanupPrisonersSubmenu(player));
+        AddSubmenu(menu, player, "draw_cleanup_submenu_option.clear_prisoner", () => DrawCleanupPrisonersSubmenu(player));
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI DrawCleanupPrisonersSubmenu(IJBPlayer player)
+    private Menu DrawCleanupPrisonersSubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "draw_cleanup_prisoners_submenu.title");
+        var menu = CreateMenu(player, "draw_cleanup_prisoners_submenu.title");
         var prisoners = _players.GetPlayersByTeam(JBTeam.Prisoner)
             .Where(prisoner => prisoner.Player.IsValid)
             .OrderBy(prisoner => prisoner.Player.Name)
@@ -234,13 +217,13 @@ public sealed class WardenMenu
 
         if (prisoners.Count == 0)
         {
-            builder.AddOption(new TextMenuOption(player.Localizer["draw_cleanup_prisoners_submenu_option.no_prisoners"]));
-            return builder.Build();
+            menu.AddSpacer(player.Localizer["draw_cleanup_prisoners_submenu_option.no_prisoners"]);
+            return menu;
         }
 
         foreach (var prisoner in prisoners)
         {
-            AddDynamicButton(builder, () =>
+            AddDynamicButton(menu, () =>
             {
                 var state = player.Localizer[_drawManager.HasDrawing(prisoner) ? "menu_state.enabled" : "menu_state.none"];
                 return player.Localizer["draw_cleanup_prisoners_submenu_option.prisoner_state_label", prisoner.Player.Name, state];
@@ -257,23 +240,23 @@ public sealed class WardenMenu
             });
         }
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI DrawAccessSubmenu(IJBPlayer player)
+    private Menu DrawAccessSubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "draw_access_submenu.title");
+        var menu = CreateMenu(player, "draw_access_submenu.title");
         var prisoners = GetDrawAccessPrisoners().ToList();
 
         if (prisoners.Count == 0)
         {
-            builder.AddOption(new TextMenuOption(player.Localizer["draw_access_submenu_option.no_prisoners"]));
-            return builder.Build();
+            menu.AddSpacer(player.Localizer["draw_access_submenu_option.no_prisoners"]);
+            return menu;
         }
 
         foreach (var prisoner in prisoners)
         {
-            AddDynamicButton(builder, () =>
+            AddDynamicButton(menu, () =>
             {
                 var state = player.Localizer[_drawManager.HasDrawAccess(prisoner) ? "menu_state.enabled" : "menu_state.disabled"];
                 return player.Localizer["draw_access_submenu_option.prisoner_state_label", prisoner.Player.Name, state];
@@ -302,63 +285,65 @@ public sealed class WardenMenu
             });
         }
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI LaserColorSubmenu(IJBPlayer player)
+    private Menu LaserColorSubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "laser_color_submenu.title");
+        var menu = CreateMenu(player, "laser_color_submenu.title");
 
         AddColorOptions(
-            builder,
+            menu,
             player,
             settings => settings.LaserRainbow,
             settings => settings.LaserColor,
             saveRainbow: () => _wardenDatabase.SaveWardenLaserRainbow(player.SteamID),
             saveColor: color => _wardenDatabase.SaveWardenLaserColor(player.SteamID, color));
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI PingColorSubmenu(IJBPlayer player)
+    private Menu PingColorSubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "ping_color_submenu.title");
+        var menu = CreateMenu(player, "ping_color_submenu.title");
 
         AddColorOptions(
-            builder,
+            menu,
             player,
             settings => settings.BeamRainbow,
             settings => settings.BeamColor,
             saveRainbow: () => _wardenDatabase.SaveWardenBeamRainbow(player.SteamID),
             saveColor: color => _wardenDatabase.SaveWardenBeamColor(player.SteamID, color));
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI DrawColorSubmenu(IJBPlayer player)
+    private Menu DrawColorSubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "draw_color_submenu.title");
+        var menu = CreateMenu(player, "draw_color_submenu.title");
 
         AddColorOptions(
-            builder,
+            menu,
             player,
             settings => settings.DrawRainbow,
             settings => settings.DrawColor,
             saveRainbow: () => _wardenDatabase.SaveWardenDrawRainbow(player.SteamID),
-            saveColor: color => _wardenDatabase.SaveWardenDrawColor(player.SteamID, color));
+            saveColor: color => _wardenDatabase.SaveWardenDrawColor(player.SteamID, color),
+            allowDrawAccess: true);
 
-        return builder.Build();
+        return menu;
     }
 
     private void AddColorOptions(
-        IMenuBuilderAPI builder,
+        Menu menu,
         IJBPlayer player,
         Func<WardenDatabase.WardenVisualSettings, bool> isRainbowSelected,
         Func<WardenDatabase.WardenVisualSettings, Color> selectedColor,
         Action saveRainbow,
-        Action<Color> saveColor)
+        Action<Color> saveColor,
+        bool allowDrawAccess = false)
     {
-        AddDynamicButton(builder, () =>
+        AddDynamicButton(menu, () =>
         {
             var label = player.Localizer["visual_color.rainbow"];
             return SelectedLabel(label, isRainbowSelected(_wardenDatabase.GetWardenSettings(player.SteamID)));
@@ -366,6 +351,9 @@ public sealed class WardenMenu
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
+                if (allowDrawAccess ? BlockDrawAction(player) : BlockDuringSpecialDay(player))
+                    return;
+
                 saveRainbow();
                 player.SendMessage(MessageType.Chat, "visual_color_selected", true, args: player.Localizer["visual_color.rainbow"]);
             });
@@ -373,7 +361,7 @@ public sealed class WardenMenu
 
         foreach (var choice in ColorChoices)
         {
-            AddDynamicButton(builder, () =>
+            AddDynamicButton(menu, () =>
             {
                 var settings = _wardenDatabase.GetWardenSettings(player.SteamID);
                 var label = player.Localizer[choice.LocalizerKey];
@@ -383,6 +371,9 @@ public sealed class WardenMenu
             {
                 _core.Scheduler.NextWorldUpdate(() =>
                 {
+                    if (allowDrawAccess ? BlockDrawAction(player) : BlockDuringSpecialDay(player))
+                        return;
+
                     saveColor(choice.Color);
                     player.SendMessage(MessageType.Chat, "visual_color_selected", true, args: player.Localizer[choice.LocalizerKey]);
                 });
@@ -390,51 +381,50 @@ public sealed class WardenMenu
         }
     }
 
-    private IMenuAPI FreedaySubmenu(IJBPlayer player)
+    private Menu FreedaySubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "freeday_submenu.title");
+        var menu = CreateMenu(player, "freeday_submenu.title");
 
-        AddSubmenu(builder, player, "freeday_submenu_option.give_freeday", () => GiveFreedaySubmenu(player));
-        AddSubmenu(builder, player, "freeday_submenu_option.remove_freeday", () => RemoveFreedaySubmenu(player));
+        AddSubmenu(menu, player, "freeday_submenu_option.give_freeday", () => GiveFreedaySubmenu(player));
+        AddSubmenu(menu, player, "freeday_submenu_option.remove_freeday", () => RemoveFreedaySubmenu(player));
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI ColorPrisonersSubmenu(IJBPlayer player)
+    private Menu ColorPrisonersSubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "color_prisoners_submenu.title");
+        var menu = CreateMenu(player, "color_prisoners_submenu.title");
         var prisoners = GetColorablePrisoners().ToList();
 
-        AddSubmenu(builder, player, "color_prisoners_submenu_option.all_prisoners", () => PrisonerColorSelectionSubmenu(
+        AddSubmenu(menu, player, "color_prisoners_submenu_option.all_prisoners", () => PrisonerColorSelectionSubmenu(
             player,
             player.Localizer["color_prisoners_target.all_prisoners"],
             () => GetColorablePrisoners()));
 
         if (prisoners.Count == 0)
         {
-            builder.AddOption(new TextMenuOption(player.Localizer["color_prisoners_submenu_option.no_prisoners"]));
-            return builder.Build();
+            menu.AddSpacer(player.Localizer["color_prisoners_submenu_option.no_prisoners"]);
+            return menu;
         }
 
         foreach (var prisoner in prisoners)
         {
-            AddSubmenu(builder, prisoner.Player.Name, () => PrisonerColorSelectionSubmenu(
+            AddSubmenu(menu, prisoner.Player.Name, () => PrisonerColorSelectionSubmenu(
                 player,
                 prisoner.Player.Name,
                 () => IsColorablePrisoner(prisoner) ? [prisoner] : []));
         }
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI PrisonerColorSelectionSubmenu(IJBPlayer player, string targetName, Func<IEnumerable<IJBPlayer>> targets)
+    private Menu PrisonerColorSelectionSubmenu(IJBPlayer player, string targetName, Func<IEnumerable<IJBPlayer>> targets)
     {
-        var builder = _core.MenusAPI.CreateBuilder().Design
-            .SetMenuTitle(player.Localizer["color_prisoners_colors_submenu.title", targetName]);
+        var menu = CreateMenu(player.Localizer["color_prisoners_colors_submenu.title", targetName]);
 
         foreach (var choice in ColorChoices)
         {
-            AddButton(builder, player.Localizer[choice.LocalizerKey], () =>
+            AddButton(menu, player.Localizer[choice.LocalizerKey], () =>
             {
                 _core.Scheduler.NextWorldUpdate(() =>
                 {
@@ -453,7 +443,7 @@ public sealed class WardenMenu
             });
         }
 
-        return builder.Build();
+        return menu;
     }
 
     private IEnumerable<IJBPlayer> GetColorablePrisoners()
@@ -490,15 +480,18 @@ public sealed class WardenMenu
             && !prisoner.IsFreeday;
     }
 
-    private IMenuAPI GiveFreedaySubmenu(IJBPlayer player)
+    private Menu GiveFreedaySubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "give_freeday_submenu.title");
+        var menu = CreateMenu(player, "give_freeday_submenu.title");
 
-        var prisoners = _players.GetPlayersByTeam(JBTeam.Prisoner).ToList();
+        var prisoners = _players.GetPlayersByTeam(JBTeam.Prisoner)
+            .Where(IsEligibleForFreeday)
+            .OrderBy(prisoner => prisoner.Player.Name)
+            .ToList();
 
         foreach (var prisoner in prisoners)
         {
-            AddDynamicButton(builder, () =>
+            AddDynamicButton(menu, () =>
             {
                 var state = player.Localizer[prisoner.IsFreeday ? "menu_state.freeday" : "menu_state.none"];
                 return player.Localizer["freeday_submenu_option.prisoner_state_label", prisoner.Player.Name, state];
@@ -509,7 +502,7 @@ public sealed class WardenMenu
                     if (BlockDuringSpecialDay(player))
                         return;
 
-                    if (prisoner.IsFreeday)
+                    if (!IsEligibleForFreeday(prisoner))
                         return;
 
                     prisoner.SetFreeday(true);
@@ -518,17 +511,20 @@ public sealed class WardenMenu
             });
         }
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI RemoveFreedaySubmenu(IJBPlayer player)
+    private Menu RemoveFreedaySubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "remove_freeday_submenu.title");
+        var menu = CreateMenu(player, "remove_freeday_submenu.title");
 
-        var prisoners = _players.GetPlayersByTeam(JBTeam.Prisoner).ToList();
+        var prisoners = _players.GetPlayersByTeam(JBTeam.Prisoner)
+            .Where(prisoner => prisoner.Player.IsValid && prisoner.IsFreeday)
+            .OrderBy(prisoner => prisoner.Player.Name)
+            .ToList();
         foreach (var prisoner in prisoners)
         {
-            AddDynamicButton(builder, () =>
+            AddDynamicButton(menu, () =>
             {
                 var state = player.Localizer[prisoner.IsFreeday ? "menu_state.freeday" : "menu_state.none"];
                 return player.Localizer["freeday_submenu_option.prisoner_state_label", prisoner.Player.Name, state];
@@ -546,18 +542,18 @@ public sealed class WardenMenu
                     _players.SendMessage(MessageType.Chat, "freeday_removed", true, 0, prisoner.Player.Name);
                 });
             });
-        } 
+        }
 
-        return builder.Build();
+        return menu;
     }
 
     // ─── Cells ───────────────────────────────────────────────────────────────
 
-    private IMenuAPI CellsSubmenu(IJBPlayer player)
+    private Menu CellsSubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "cells_submenu.title");
+        var menu = CreateMenu(player, "cells_submenu.title");
 
-        AddDynamicButton(builder, () =>
+        AddDynamicButton(menu, () =>
         {
             var state = player.Localizer[_cellManager.CellsOpen ? "menu_state.open" : "menu_state.closed"];
             return player.Localizer["cells_submenu_option.toggle_cells", state];
@@ -581,16 +577,16 @@ public sealed class WardenMenu
             });
         });
 
-        return builder.Build();
+        return menu;
     }
 
     // ─── Box ─────────────────────────────────────────────────────────────────
 
-    private IMenuAPI BoxSubmenu(IJBPlayer player)
+    private Menu BoxSubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "box_submenu.title");
+        var menu = CreateMenu(player, "box_submenu.title");
 
-        AddDynamicButton(builder, () =>
+        AddDynamicButton(menu, () =>
         {
             var state = player.Localizer[_boxManager.BoxEnabled ? "menu_state.enabled" : "menu_state.disabled"];
             return player.Localizer["box_submenu_option.toggle_box", state];
@@ -614,20 +610,20 @@ public sealed class WardenMenu
             });
         });
 
-        return builder.Build();
+        return menu;
     }
 
     // ─── Voice ───────────────────────────────────────────────────────────────
 
-    private IMenuAPI VoiceSubmenu(IJBPlayer player)
+    private Menu VoiceSubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "voice_submenu.title");
+        var menu = CreateMenu(player, "voice_submenu.title");
 
         // Per-prisoner submenus listed first for quick access
         foreach (var prisoner in _players.GetPlayersByTeam(JBTeam.Prisoner))
         {
             AddDynamicSubmenu(
-                builder,
+                menu,
                 () =>
                 {
                     var state = player.Localizer[prisoner.IsMuted ? "menu_state.muted" : "menu_state.unmuted"];
@@ -637,7 +633,7 @@ public sealed class WardenMenu
         }
 
         // Bulk actions at the bottom
-        AddButton(builder, player.Localizer["voice_submenu_option.unmute_all_prisoner"], () =>
+        AddButton(menu, player.Localizer["voice_submenu_option.unmute_all_prisoner"], () =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
@@ -653,7 +649,7 @@ public sealed class WardenMenu
             });
         });
 
-        AddButton(builder, player.Localizer["voice_submenu_option.mute_all_prisoner"], () =>
+        AddButton(menu, player.Localizer["voice_submenu_option.mute_all_prisoner"], () =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
@@ -669,15 +665,14 @@ public sealed class WardenMenu
             });
         });
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI PrisonerVoiceSubmenu(IJBPlayer player, IJBPlayer prisoner)
+    private Menu PrisonerVoiceSubmenu(IJBPlayer player, IJBPlayer prisoner)
     {
-        var builder = _core.MenusAPI.CreateBuilder().Design
-            .SetMenuTitle(prisoner.Player.Name);
+        var menu = CreateMenu(prisoner.Player.Name);
 
-        AddDynamicButton(builder, () =>
+        AddDynamicButton(menu, () =>
         {
             var state = player.Localizer[prisoner.IsMuted ? "menu_state.muted" : "menu_state.unmuted"];
             return player.Localizer["voice_submenu_option.toggle_prisoner", state];
@@ -703,14 +698,14 @@ public sealed class WardenMenu
             });
         });
 
-        return builder.Build();
+        return menu;
     }
 
     // ─── Deputy ──────────────────────────────────────────────────────────────
 
-    private IMenuAPI DeputySubmenu(IJBPlayer player)
+    private Menu DeputySubmenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "manage_deputy_submenu.title");
+        var menu = CreateMenu(player, "manage_deputy_submenu.title");
 
         var currentDeputy = _players.GetDeputy();
 
@@ -719,10 +714,10 @@ public sealed class WardenMenu
             ? player.Localizer["manage_deputy_submenu_option.current_deputy", currentDeputy.Player.Name]
             : player.Localizer["manage_deputy_submenu_option.current_deputy_none"];
 
-        builder.AddOption(new TextMenuOption(statusLabel));
+        menu.AddSpacer(statusLabel);
 
         // Remove deputy — only actionable when one exists
-        AddButton(builder, player.Localizer["manage_deputy_submenu_option.remove_deputy"], () =>
+        AddButton(menu, player.Localizer["manage_deputy_submenu_option.remove_deputy"], () =>
         {
             _core.Scheduler.NextWorldUpdate(() =>
             {
@@ -739,39 +734,44 @@ public sealed class WardenMenu
 
         // Assign from alive guards (exclude the warden themselves and the current deputy)
         var candidates = _players.GetPlayersByTeam(JBTeam.Guard)
-            .Where(g => !g.IsWarden && !(g.IsDeputy))
+            .Where(IsEligibleForDeputy)
+            .OrderBy(guard => guard.Player.Name)
             .ToList();
 
         if (candidates.Count > 0)
         {
-            builder.AddOption(new TextMenuOption(player.Localizer["manage_deputy_submenu_option.assign_deputy_header"]));
+            menu.AddSpacer(player.Localizer["manage_deputy_submenu_option.assign_deputy_header"]);
 
             foreach (var guard in candidates)
             {
                 var guardRef = guard; // capture for closure
-                AddButton(builder, guardRef.Player.Name, () =>
+                AddButton(menu, guardRef.Player.Name, () =>
                 {
                     _core.Scheduler.NextWorldUpdate(() =>
                     {
                         if (BlockDuringSpecialDay(player))
                             return;
 
+                        if (!IsEligibleForDeputy(guardRef))
+                            return;
+
                         // Remove previous deputy first if one exists
                         var previousDeputy = _players.GetDeputy();
                         if (previousDeputy != null)
                         {
-                            previousDeputy.SetDeputy(false);
+                            previousDeputy.SetDeputy(false, silent: true);
                             _players.SendMessage(MessageType.Chat, "deputy_removed_warden", true, args: previousDeputy.Player.Name);
                         }
 
                         guardRef.SetDeputy(true);
-                        _players.SendMessage(MessageType.Chat, "deputy_assigned_warden", true, args: guardRef.Player.Name);
+                        if (guardRef.IsDeputy)
+                            _players.SendMessage(MessageType.Chat, "deputy_assigned_warden", true, args: guardRef.Player.Name);
                     });
                 });
             }
         }
 
-        return builder.Build();
+        return menu;
     }
 
     private void ExtendRound(IJBPlayer player, int minutes)
@@ -786,15 +786,35 @@ public sealed class WardenMenu
         });
     }
 
-    private static bool IsValidRoundExtension(string value)
+    private static bool IsEligibleForFreeday(IJBPlayer prisoner)
     {
-        return int.TryParse(value, out var minutes) && minutes is >= 1 and <= 60;
+        return prisoner.Player.IsValid
+            && prisoner.Player.IsAlive
+            && prisoner.Team == JBTeam.Prisoner
+            && !prisoner.IsFreeday
+            && !prisoner.IsRebel;
     }
 
-    private IMenuBuilderAPI CreateBuilder(IJBPlayer player, string titleKey)
+    private static bool IsEligibleForDeputy(IJBPlayer guard)
     {
-        return _core.MenusAPI.CreateBuilder().Design
-            .SetMenuTitle(player.Localizer[titleKey]);
+        return guard.Player.IsValid
+            && guard.Player.IsAlive
+            && guard.Team == JBTeam.Guard
+            && !guard.IsWarden
+            && !guard.IsDeputy;
+    }
+
+    private Menu CreateMenu(IJBPlayer player, string titleKey)
+    {
+        return CreateMenu(player.Localizer[titleKey]);
+    }
+
+    private static Menu CreateMenu(string title)
+    {
+        return new Menu(title)
+        {
+            HasExitButton = true,
+        };
     }
 
     private bool BlockDuringSpecialDay(IJBPlayer player)
@@ -811,51 +831,76 @@ public sealed class WardenMenu
             return true;
         }
 
+        if (!player.Player.IsValid || !player.IsWarden)
+        {
+            player.SendMessage(MessageType.Chat, "you_are_not_warden", true);
+            return true;
+        }
+
         return false;
     }
 
-    private static void AddSubmenu(IMenuBuilderAPI builder, IJBPlayer player, string labelKey, Func<IMenuAPI> submenu)
+    private bool BlockDrawAction(IJBPlayer player)
     {
-        builder.AddOption(new SubmenuMenuOption(player.Localizer[labelKey], submenu));
-    }
-
-    private static void AddSubmenu(IMenuBuilderAPI builder, string label, Func<IMenuAPI> submenu)
-    {
-        builder.AddOption(new SubmenuMenuOption(label, submenu));
-    }
-
-    private static void AddDynamicSubmenu(IMenuBuilderAPI builder, Func<string> label, Func<IMenuAPI> submenu)
-    {
-        var option = new SubmenuMenuOption(label(), submenu)
+        if (_specialDayManager.IsSpecialDayActive)
         {
-            BindingText = label
-        };
-        builder.AddOption(option);
+            player.SendMessage(MessageType.Chat, "special_day_active_blocked", true);
+            return true;
+        }
+
+        if (_lastRequestManager.IsLastRequestActive)
+        {
+            player.SendMessage(MessageType.Chat, "last_request_already_active", true);
+            return true;
+        }
+
+        if (!player.Player.IsValid || !_drawManager.CanUseDrawing(player))
+        {
+            player.SendMessage(MessageType.Chat, "draw_no_access", true);
+            return true;
+        }
+
+        return false;
     }
 
-    private static void AddButton(IMenuBuilderAPI builder, string label, Action action)
+    private static void AddSubmenu(Menu menu, IJBPlayer player, string labelKey, Func<Menu> submenu)
     {
-        var option = new ButtonMenuOption(label);
-        option.Click += (_, _) =>
+        menu.AddSubmenu(player.Localizer[labelKey], submenu);
+    }
+
+    private static void AddSubmenu(Menu menu, string label, Func<Menu> submenu)
+    {
+        menu.AddSubmenu(label, submenu);
+    }
+
+    private static void AddDynamicSubmenu(Menu menu, Func<string> label, Func<Menu> submenu)
+    {
+        SubmenuItem? item = null;
+        item = menu.AddSubmenu(label(), selectedPlayer =>
+        {
+            item!.Text = label();
+            item.Refresh(selectedPlayer);
+            return submenu();
+        });
+    }
+
+    private static void AddButton(Menu menu, string label, Action action)
+    {
+        menu.AddItem(label, (_, _) => action());
+    }
+
+    private void AddDynamicButton(Menu menu, Func<string> label, Action action)
+    {
+        menu.AddItem(label(), (selectedPlayer, option) =>
         {
             action();
-            return ValueTask.CompletedTask;
-        };
-        builder.AddOption(option);
-    }
 
-    private static void AddDynamicButton(IMenuBuilderAPI builder, Func<string> label, Action action)
-    {
-        var option = new ButtonMenuOption(label(), 120, 250)
-        {
-            BindingText = label
-        };
-        option.Click += (_, _) =>
-        {
-            action();
-            return ValueTask.CompletedTask;
-        };
-        builder.AddOption(option);
+            _core.Scheduler.NextWorldUpdate(() =>
+            {
+                option.Text = label();
+                option.Refresh(selectedPlayer);
+            });
+        });
     }
 
     private string GetSelectedLaserColorName(IJBPlayer player)

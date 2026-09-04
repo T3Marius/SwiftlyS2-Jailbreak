@@ -23,6 +23,10 @@
     <ProjectReference Include="..\..\Jailbreak.Contract\Jailbreak.Contract.csproj">
       <Private>false</Private>
     </ProjectReference>
+    <Reference Include="T3Menu.Contract.dll">
+      <HintPath>resources/exports/T3Menu.Contract.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>

@@ -20,7 +20,7 @@ namespace SpecialDays;
     Author = "T3Marius",
     Name = "[JB Core] SpecialDays",
     Id = "SpecialDays",
-    Version = "0.2.0"
+    Version = "0.2.1"
 )]
 public sealed class Main : BasePlugin
 {
@@ -455,6 +455,8 @@ public sealed class ScoutDay : SpecialDayBase
 }
 public sealed class TaserDay : SpecialDayBase
 {
+    private static readonly IReadOnlySet<ItemDefinitionIndex> TaserWeapons =
+        System.Collections.Frozen.FrozenSet.ToFrozenSet(new[] { ItemDefinitionIndex.Taser });
     public TaserDay(ISwiftlyCore core, IJailbreak jail)
         : base(core, jail) { }
 
@@ -465,10 +467,7 @@ public sealed class TaserDay : SpecialDayBase
 
     public override SpecialDayFreezeTeam FreezeTeamOnCountdown => SpecialDayFreezeTeam.None;
     public override bool AllowAllWeapons => false;
-    public override IReadOnlySet<ItemDefinitionIndex> AllowedWeapons => new HashSet<ItemDefinitionIndex>
-    {
-        ItemDefinitionIndex.Taser
-    };
+    public override IReadOnlySet<ItemDefinitionIndex> AllowedWeapons => TaserWeapons;
 
     public override bool EnableGunsMenu => false;
     public override bool StripWeaponsOnStart => true;
@@ -480,6 +479,8 @@ public sealed class TaserDay : SpecialDayBase
 }
 public sealed class OneInTheChamberDay : SpecialDayBase
 {
+    private string? _cachedGun;
+    private IReadOnlySet<ItemDefinitionIndex>? _cachedAllowedWeapons;
     public OneInTheChamberDay(ISwiftlyCore core, IJailbreak jail)
         : base(core, jail) { }
 
@@ -504,17 +505,23 @@ public sealed class OneInTheChamberDay : SpecialDayBase
     {
         get
         {
+            var configuredGun = Main.GlobalConfig.OneInTheChamber.OitcGun;
+            if (_cachedAllowedWeapons != null && string.Equals(_cachedGun, configuredGun, StringComparison.Ordinal))
+                return _cachedAllowedWeapons;
+
             var allowed = SpecialDayWeapons.AllKnives.ToHashSet();
 
             var weapon = GetConfiguredOitcWeapon();
             if (weapon.HasValue)
                 allowed.Add(weapon.Value);
 
-            return allowed;
+            _cachedGun = configuredGun;
+            _cachedAllowedWeapons = System.Collections.Frozen.FrozenSet.ToFrozenSet(allowed);
+            return _cachedAllowedWeapons;
         }
     }
     public override bool StripWeaponsOnStart => true;
-    public override IReadOnlyList<string> GiveWeaponsOnStart => [""];
+    public override IReadOnlyList<string> GiveWeaponsOnStart => [];
     public override bool EnableGunsMenu => false;
     public override bool AllowFriendlyFire => true;
 
@@ -542,6 +549,7 @@ public sealed class OneInTheChamberDay : SpecialDayBase
         if (_playerDeathId.HasValue)
         {
             Core.GameEvent.Unhook(_playerDeathId.Value);
+            _playerDeathId = null;
         }
     }
     private void OnTakeDamage(ref TakeDamageEntityPostContext ctx)
@@ -642,10 +650,13 @@ public sealed class OneInTheChamberDay : SpecialDayBase
 
         foreach (var weapon in pawn.WeaponServices.MyValidWeapons)
         {
+            if (!weapon.IsValid
+                || !weapon.DesignerName.Equals(Main.GlobalConfig.OneInTheChamber.OitcGun, StringComparison.OrdinalIgnoreCase))
+                continue;
+
             weapon.Clip1 += 1;
-            weapon.Clip2 += 1;
             weapon.Clip1Updated();
-            weapon.Clip2Updated();
+            break;
         }
     }
 }
@@ -687,6 +698,9 @@ public sealed class OnlyheadshotDay : SpecialDayBase
 
 public sealed class ChickenFightDay : SpecialDayBase
 {
+    private static readonly IReadOnlySet<ItemDefinitionIndex> ChickenWeapons =
+        System.Collections.Frozen.FrozenSet.ToFrozenSet(
+            SpecialDayWeapons.AllKnives.Concat([ItemDefinitionIndex.Xm1014]));
     public ChickenFightDay(ISwiftlyCore core, IJailbreak jail)
         : base(core, jail) { }
 
@@ -697,9 +711,7 @@ public sealed class ChickenFightDay : SpecialDayBase
     public override SpecialDayFreezeTeam FreezeTeamOnCountdown => SpecialDayFreezeTeam.None;
     public override bool AllowAllWeapons => true;
     public override bool EnableGunsMenu => false;
-    public override IReadOnlySet<ItemDefinitionIndex> AllowedWeapons => SpecialDayWeapons.AllKnives
-        .Concat([ItemDefinitionIndex.Xm1014])
-        .ToHashSet();
+    public override IReadOnlySet<ItemDefinitionIndex> AllowedWeapons => ChickenWeapons;
     public override bool AllowFriendlyFire => false;
     public override bool StripWeaponsOnStart => true;
     public override IReadOnlyList<string> GiveWeaponsOnStart => ["weapon_xm1014", "weapon_knife"];
@@ -725,10 +737,19 @@ public sealed class ChickenFightDay : SpecialDayBase
         if (_playerDeathHookId.HasValue)
         {
             Core.GameEvent.Unhook(_playerDeathHookId.Value);
+            _playerDeathHookId = null;
         }
-        
-        foreach (var player in Core.PlayerManager.GetAllPlayers().Where(p => p.Controller.Team == Team.T))
+
+        foreach (var player in Core.PlayerManager.GetAllPlayers())
             RemoveChicken(player);
+
+        foreach (var chicken in _chickenPlayers.Values)
+        {
+            if (chicken?.IsValid == true)
+                chicken.Despawn();
+        }
+
+        _chickenPlayers.Clear();
     }
     private HookResult HandlePlayerDeath(EventPlayerDeath e)
     {
@@ -764,21 +785,16 @@ public sealed class ChickenFightDay : SpecialDayBase
     }
     private void CreateChicken(IPlayer player)
     {
-        if (player.PlayerPawn == null)
+        if (player.PlayerPawn?.AbsOrigin is not { } origin)
             return;
 
         var prop = Core.EntitySystem.CreateEntityByDesignerName<CPhysicsPropOverride>("prop_physics_override");
         if (prop == null)  
             return;
-            
-
-        var origin = player.PlayerPawn.AbsOrigin;
-        if (origin == null)
-            return;
 
         prop.SetModel("models/chicken/chicken.vmdl");
         prop.CBodyComponent?.SceneNode?.Owner?.Entity?.Flags &= ~(uint)(1 << 2);
-        prop.Teleport(origin.Value, QAngle.Zero, Vector.Zero);
+        prop.Teleport(origin, QAngle.Zero, Vector.Zero);
         prop.DispatchSpawn();
         prop.AcceptInput("DisableMotion", "");
         prop.AcceptInput("SetParent", "!activator", player.PlayerPawn, player.PlayerPawn);
@@ -797,7 +813,9 @@ public sealed class ChickenFightDay : SpecialDayBase
         player.PlayerPawn.RenderUpdated();
         player.PlayerPawn.ShadowStrengthUpdated();
 
-        foreach (var weapon in player.PlayerPawn.WeaponServices?.MyValidWeapons!)
+        var weapons = player.PlayerPawn.WeaponServices?.MyValidWeapons;
+        if (weapons != null)
+        foreach (var weapon in weapons)
         {
             if (weapon == null || !weapon.IsValid)
                 continue;
@@ -838,7 +856,9 @@ public sealed class ChickenFightDay : SpecialDayBase
         player.PlayerPawn.RenderUpdated();
         player.PlayerPawn.ShadowStrengthUpdated();
 
-        foreach (var weapon in player.PlayerPawn.WeaponServices?.MyValidWeapons!)
+        var weapons = player.PlayerPawn.WeaponServices?.MyValidWeapons;
+        if (weapons != null)
+        foreach (var weapon in weapons)
         {
             if (weapon == null || !weapon.IsValid)
                 continue;

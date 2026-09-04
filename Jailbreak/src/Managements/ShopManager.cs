@@ -59,6 +59,7 @@ public sealed class ShopManager : IJBShop
     public event Action<ShopContext>? ItemEquipped;
     public event Action<ShopContext>? ItemUnequipped;
     public event Action<IJBPlayer, string, decimal>? PlayerCurrencyChanged;
+    internal event Action? CurrencyAvailabilityChanged;
 
     public void Register()
     {
@@ -113,6 +114,7 @@ public sealed class ShopManager : IJBShop
         }
 
         _log.LogInformation("Jailbreak shop connected to Economy API.");
+        CurrencyAvailabilityChanged?.Invoke();
     }
 
     public bool RegisterCategory(ShopCategory category)
@@ -133,6 +135,7 @@ public sealed class ShopManager : IJBShop
             return false;
 
         EnsureCurrency(normalized.Currency);
+        CurrencyAvailabilityChanged?.Invoke();
         return true;
     }
 
@@ -171,7 +174,10 @@ public sealed class ShopManager : IJBShop
             return false;
 
         if (!string.IsNullOrWhiteSpace(item.Currency))
+        {
             EnsureCurrency(item.Currency!);
+            CurrencyAvailabilityChanged?.Invoke();
+        }
 
         foreach (var player in _players.GetAllPlayers())
         {

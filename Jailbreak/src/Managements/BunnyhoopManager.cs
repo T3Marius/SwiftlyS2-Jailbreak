@@ -101,13 +101,16 @@ public sealed class BunnyhoopManager
 
     private void SetBunnyhoop(bool enabled)
     {
-        _core.ConVar.Find<bool>("sv_autobunnyhopping")?.SetInternal(enabled);
-        _core.ConVar.Find<bool>("sv_enablebunnyhopping")?.SetInternal(enabled);
+        var autoBunnyhopping = _core.ConVar.Find<bool>("sv_autobunnyhopping");
+        var enableBunnyhopping = _core.ConVar.Find<bool>("sv_enablebunnyhopping");
+        autoBunnyhopping?.SetInternal(enabled);
+        enableBunnyhopping?.SetInternal(enabled);
 
         foreach (var player in _players.GetAllPlayers())
         {
-            _core.ConVar.Find<bool>("sv_autobunnyhopping")?.ReplicateToClient(player.Player.PlayerID, enabled);
-            _core.ConVar.Find<bool>("sv_enablebunnyhopping")?.ReplicateToClient(player.Player.PlayerID, enabled);
+            var playerId = player.Player.PlayerID;
+            autoBunnyhopping?.ReplicateToClient(playerId, enabled);
+            enableBunnyhopping?.ReplicateToClient(playerId, enabled);
         }
 
         _bunnyhoopEnabled = enabled;

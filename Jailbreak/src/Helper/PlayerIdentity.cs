@@ -1,3 +1,4 @@
+using Jailbreak.Contract;
 using SwiftlyS2.Shared.Players;
 
 namespace Jailbreak;
@@ -16,5 +17,12 @@ public static class PlayerIdentity
     public static bool UsesSteamKey(IPlayer player)
     {
         return player.SteamID != 0 && !player.IsFakeClient;
+    }
+
+    internal static IJBPlayer? FindByKey(this IJBPlayerManagement players, ulong key)
+    {
+        return players is JBPlayerManagement tracked
+            ? tracked.FindByKey(key)
+            : players.GetAllPlayers().FirstOrDefault(player => GetKey(player.Player) == key);
     }
 }

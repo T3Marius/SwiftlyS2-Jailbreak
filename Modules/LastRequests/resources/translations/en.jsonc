@@ -1,6 +1,6 @@
 {
     "knife_fight.name": "Knife Fight",
-    "knife_fight.description": "Fight the <font color='blue'>guard</font> with a knife.",
+    "knife_fight.description": "Fight the guard with a knife.",
 
     "shot_for_shot.name": "Shot For Shot",
     "shot_for_shot.description": "A random player will be chosen to have the first bullet!<br>",
@@ -12,5 +12,5 @@
     "no_scope.description": "You can't use scope in this duel!",
 
     "dodgeball.name": "Dodgeball",
-    "dodgeball.description": "Both of you have 1HP! Try hitting eachother with the decoy!"
+    "dodgeball.description": "Both of you have 1 HP! Try hitting each other with the decoy!"
 }

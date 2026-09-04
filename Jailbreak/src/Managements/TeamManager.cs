@@ -67,11 +67,12 @@ public sealed class TeamManager
             return HookResult.Continue;
 
         var playerId = player.PlayerID;
+        var sessionId = player.SessionId;
 
         _core.Scheduler.NextWorldUpdate(() =>
         {
             var currentPlayer = _core.PlayerManager.GetPlayer(playerId);
-            if (currentPlayer == null || !currentPlayer.IsValid)
+            if (currentPlayer == null || !currentPlayer.IsValid || currentPlayer.SessionId != sessionId)
                 return;
 
             if (GetTeam(currentPlayer) != Team.CT || IsCurrentGuardRatioAllowed())

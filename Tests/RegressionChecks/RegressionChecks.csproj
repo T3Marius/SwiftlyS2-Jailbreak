@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SwiftlyS2.CS2" Version="1.4.6" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
+    <Compile Include="../../Jailbreak/src/Database/GuardGunsDatabase.cs" Link="GuardGunsDatabase.cs" />
+    <Compile Include="../../Jailbreak/src/Configs/Utils.cs" Link="Utils.cs" />
+    <Compile Include="../../Jailbreak.Contract/src/SpecialDayWeapons.cs" Link="SpecialDayWeapons.cs" />
+  </ItemGroup>
+</Project>

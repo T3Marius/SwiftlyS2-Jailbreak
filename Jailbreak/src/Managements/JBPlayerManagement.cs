@@ -10,15 +10,22 @@ public sealed class JBPlayerManagement : IJBPlayerManagement
     private readonly ISwiftlyCore _core;
     private readonly IOptions<ModelsConfig> _modelsConfig;
     private readonly IconManager _iconManager;
+    private readonly HudAlertManager _hudAlerts;
 
     private readonly Dictionary<ulong, JBPlayer> _players = [];
+    private bool _syncingTeams;
     public event Action? CurrentCtRolesChanged;
 
-    public JBPlayerManagement(ISwiftlyCore core, IOptions<ModelsConfig> modelsConfig, IconManager iconManager)
+    public JBPlayerManagement(
+        ISwiftlyCore core,
+        IOptions<ModelsConfig> modelsConfig,
+        IconManager iconManager,
+        HudAlertManager hudAlerts)
     {
         _core = core;
         _modelsConfig = modelsConfig;
         _iconManager = iconManager;
+        _hudAlerts = hudAlerts;
     }
     private void OnPlayerRoleChanged(JBPlayer player, JBRole previousRole, JBRole newRole)
     {
@@ -42,7 +49,7 @@ public sealed class JBPlayerManagement : IJBPlayerManagement
             return jbPlayer;
         }
 
-        jbPlayer = new JBPlayer(player, _core, _modelsConfig, _iconManager);
+        jbPlayer = new JBPlayer(player, _core, _modelsConfig, _iconManager, _hudAlerts);
         jbPlayer.RoleChanged += OnPlayerRoleChanged;
         _players[playerKey] = jbPlayer;
         return jbPlayer;
@@ -85,21 +92,41 @@ public sealed class JBPlayerManagement : IJBPlayerManagement
 
     public void SyncTeams()
     {
-        var livePlayerKeys = new HashSet<ulong>();
+        // Role notifications can query the roster while it is being normalized.
+        if (_syncingTeams)
+            return;
 
-        foreach (var rawPlayer in _core.PlayerManager.GetAllValidPlayers())
+        _syncingTeams = true;
+        try
         {
-            livePlayerKeys.Add(PlayerIdentity.GetKey(rawPlayer));
+            var livePlayerKeys = new HashSet<ulong>();
 
-            var player = SyncPlayer(rawPlayer);
-            if (player == null)
-                continue;
+            foreach (var rawPlayer in _core.PlayerManager.GetAllValidPlayers())
+            {
+                livePlayerKeys.Add(PlayerIdentity.GetKey(rawPlayer));
+
+                SyncPlayer(rawPlayer);
+            }
+
+            foreach (var playerKey in _players.Keys.Where(playerKey => !livePlayerKeys.Contains(playerKey)).ToList())
+                RemoveTrackedPlayer(playerKey);
         }
-
-        foreach (var playerKey in _players.Keys.Where(playerKey => !livePlayerKeys.Contains(playerKey)).ToList())
+        finally
         {
-            RemoveTrackedPlayer(playerKey);
+            _syncingTeams = false;
         }
+    }
+
+    internal IJBPlayer? FindByKey(ulong key)
+    {
+        if (!_players.TryGetValue(key, out var player))
+            return null;
+
+        var rawPlayer = player.Player;
+        if (!rawPlayer.IsValid || PlayerIdentity.GetKey(rawPlayer) != key)
+            return null;
+
+        return SyncPlayer(rawPlayer);
     }
 
     public IEnumerable<IJBPlayer> GetAllPlayers()
@@ -144,12 +171,20 @@ public sealed class JBPlayerManagement : IJBPlayerManagement
     {
         player.CanBecomeWarden = player.Team == JBTeam.Guard;
 
-        if (player.Team == JBTeam.Guard)
-            return;
+        if (player.Team != JBTeam.Guard)
+        {
+            if (player.IsWarden)
+                player.SetWarden(false);
+            else if (player.IsDeputy)
+                player.SetDeputy(false);
+        }
 
-        if (player.IsWarden)
-            player.SetWarden(false);
-        else if (player.IsDeputy)
-            player.SetDeputy(false);
+        if (player.Team != JBTeam.Prisoner)
+        {
+            if (player.IsFreeday)
+                player.SetFreeday(false);
+            else if (player.IsRebel)
+                player.SetRebel(false);
+        }
     }
 }

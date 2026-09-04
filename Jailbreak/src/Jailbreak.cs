@@ -7,6 +7,7 @@ using Jailbreak.Contract;
 using Tomlyn.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using HudText.Contract;
+using T3Menu.Contract;
 
 namespace Jailbreak;
 
@@ -14,7 +15,7 @@ namespace Jailbreak;
     Name = "Jailbreak",
     Id = "Jailbreak",
     Author = "Marius",
-    Version = "0.2.2"
+    Version = "0.2.3"
 )]
 public sealed class Main : BasePlugin
 {
@@ -30,7 +31,10 @@ public sealed class Main : BasePlugin
         var api = _provider.GetRequiredService<Api>();
         interfaceManager.AddSharedInterface<IJailbreak, Api>(IJailbreak.Key, api);
     }
-
+    public override void OnSharedInterfaceInjected(IInterfaceManager interfaceManager)
+    {
+        IT3Menu.Inject(interfaceManager);
+    }
     public override void UseSharedInterface(IInterfaceManager interfaceManager)
     {
         if (_provider == null)
@@ -40,7 +44,9 @@ public sealed class Main : BasePlugin
         {
             _provider.GetRequiredService<Events>().SetHudTextService(hudText);
             _provider.GetRequiredService<SpecialDayManager>().SetHudTextService(hudText);
+            _provider.GetRequiredService<LastRequestManager>().SetHudTextService(hudText);
             _provider.GetRequiredService<CurrencyHudManager>().SetHudTextService(hudText);
+            _provider.GetRequiredService<HudAlertManager>().SetHudTextService(hudText);
         }
 
         if (interfaceManager.TryGetSharedInterface<IEconomyAPIv1>(ShopManager.EconomyInterfaceKey, out var economy))
@@ -77,6 +83,7 @@ public sealed class Main : BasePlugin
                   .AddSingleton<CuffsManager>()
                   .AddSingleton<ICuffsManager>(provider => provider.GetRequiredService<CuffsManager>())
                   .AddSingleton<IconManager>()
+                  .AddSingleton<HudAlertManager>()
                   .AddSingleton<CellManager>()
                   .AddSingleton<ICellsManager>(provider => provider.GetRequiredService<CellManager>())
                   .AddSingleton<JBPlayerManagement>()

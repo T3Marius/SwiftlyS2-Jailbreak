@@ -1,3 +1,4 @@
+using HudText.Contract;
 using Jailbreak.Contract;
 using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
@@ -13,6 +14,7 @@ public sealed class JBPlayer : IJBPlayer
     private readonly ISwiftlyCore _core;
     private readonly ModelsConfig _modelsConfig;
     private readonly IconManager _iconManager;
+    private readonly HudAlertManager _hudAlerts;
     private bool _usesSteamLookup;
 
     public IPlayer Player => GetLivePlayer() ?? _player;
@@ -37,7 +39,12 @@ public sealed class JBPlayer : IJBPlayer
         ? _core.Translation.GetPlayerLocalizer(livePlayer)
         : _core.Localizer;
 
-    public JBPlayer(IPlayer player, ISwiftlyCore core, IOptions<ModelsConfig> modelsConfig, IconManager iconManager)
+    public JBPlayer(
+        IPlayer player,
+        ISwiftlyCore core,
+        IOptions<ModelsConfig> modelsConfig,
+        IconManager iconManager,
+        HudAlertManager hudAlerts)
     {
         _player = player;
         SteamID = player.SteamID;
@@ -45,6 +52,7 @@ public sealed class JBPlayer : IJBPlayer
         _core = core;
         _modelsConfig = modelsConfig.Value;
         _iconManager = iconManager;
+        _hudAlerts = hudAlerts;
     }
 
     internal void RefreshPlayer(IPlayer player)
@@ -81,7 +89,7 @@ public sealed class JBPlayer : IJBPlayer
             _iconManager.SpawnCoin(livePlayer);
 
             if (!silent)
-                BroadcastLocalized(MessageType.Alert, "new_warden_alert", livePlayer.Name);
+                _hudAlerts.Broadcast("new_warden_alert", HudAlertSeverity.Success, livePlayer.Name);
 
             if (!string.IsNullOrEmpty(_modelsConfig.WardenModel))
                 PlayerUtils.SetModel(livePlayer, _modelsConfig.WardenModel, _core.Scheduler);
@@ -105,7 +113,7 @@ public sealed class JBPlayer : IJBPlayer
         if (!silent)
         {
             BroadcastLocalizedWithPrefix(MessageType.Chat, key, args);
-            BroadcastLocalized(MessageType.Alert, "no_warden_alert");
+            _hudAlerts.Broadcast("no_warden_alert", HudAlertSeverity.Warning);
         }
 
         SyncTeam();
@@ -133,7 +141,7 @@ public sealed class JBPlayer : IJBPlayer
                 PlayerUtils.SetModel(livePlayer, _modelsConfig.DeputyModel, _core.Scheduler);
 
             if (!silent)
-                BroadcastLocalized(MessageType.Alert, "new_deputy_alert", Player.Name);
+                _hudAlerts.Broadcast("new_deputy_alert", HudAlertSeverity.Success, Player.Name);
 
             return;
         }
@@ -142,7 +150,7 @@ public sealed class JBPlayer : IJBPlayer
             ChangeRole(JBRole.None);
 
         if (!silent)
-            BroadcastLocalized(MessageType.Alert, "no_deputy_alert");
+            _hudAlerts.Broadcast("no_deputy_alert", HudAlertSeverity.Warning);
 
         SyncTeam();
         ApplyTeamDefaults();
@@ -181,11 +189,7 @@ public sealed class JBPlayer : IJBPlayer
         if (Role == JBRole.Freeday)
             Role = JBRole.None;
 
-        var prisonerModel = PlayerUtils.PickRandomModel(_modelsConfig.PrisonerModels);
-        if (!string.IsNullOrEmpty(prisonerModel))
-            SetModelIfLive(prisonerModel);
-        else
-            ColorIfLive(new Color(255, 255, 255, 255));
+        ApplyTeamDefaults();
     }
 
     public void Mute()
@@ -244,10 +248,12 @@ public sealed class JBPlayer : IJBPlayer
             _ => null
         };
 
+        // Changing a model does not reset a previous role's render tint.
+        if (Team is JBTeam.Guard or JBTeam.Prisoner)
+            ColorIfLive(new Color(255, 255, 255, 255));
+
         if (!string.IsNullOrEmpty(model))
             SetModelIfLive(model);
-        else if (Team is JBTeam.Guard or JBTeam.Prisoner)
-            ColorIfLive(new Color(255, 255, 255, 255));
     }
 
     private IPlayer? GetLivePlayer()
@@ -283,18 +289,6 @@ public sealed class JBPlayer : IJBPlayer
 
         livePlayer = player;
         return true;
-    }
-    private void BroadcastLocalized(MessageType type, string key, params object[] args)
-    {
-        foreach (var recipient in _core.PlayerManager.GetAllPlayers())
-        {
-            if (recipient is not { IsValid: true })
-                continue;
-
-            var localizer = _core.Translation.GetPlayerLocalizer(recipient);
-            var message = args.Length > 0 ? localizer[key, args] : localizer[key];
-            recipient.SendMessage(type, message);
-        }
     }
     private void BroadcastLocalizedWithPrefix(MessageType type, string key, params object[] args)
     {

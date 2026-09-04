@@ -355,9 +355,9 @@ public sealed class WardenCommands
         if (BlockDuringSpecialDay(player))
             return;
 
-        if (!_drawManager.CanUseDrawing(player))
+        if (!player.IsWarden)
         {
-            player.SendMessage(MessageType.Chat, "draw_no_access", true);
+            player.SendMessage(MessageType.Chat, "you_are_not_warden", true);
             return;
         }
 
@@ -485,9 +485,9 @@ public sealed class WardenCommands
         if (BlockDuringSpecialDay(player))
             return;
 
-        if (!player.IsWarden)
+        if (!_drawManager.CanUseDrawing(player))
         {
-            player.SendMessage(MessageType.Chat, "you_are_not_warden", true);
+            player.SendMessage(MessageType.Chat, "draw_no_access", true);
             return;
         }
 

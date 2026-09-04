@@ -11,6 +11,8 @@ using SwiftlyS2.Shared.Plugins;
 using SwiftlyS2.Shared.Translation;
 using Tomlyn.Extensions.Configuration;
 using System.Reflection;
+using T3Menu.Contract;
+using SwiftlyS2.Shared.Players;
 
 namespace JBShop;
 
@@ -18,7 +20,7 @@ namespace JBShop;
     Author = "T3Marius",
     Name = "[JB Core] JBShop",
     Id = "JBShop",
-    Version = "0.1.4"
+    Version = "0.1.5"
 )]
 public sealed class Main : BasePlugin
 {
@@ -37,7 +39,6 @@ public sealed class Main : BasePlugin
     public Main(ISwiftlyCore core) : base(core)
     {
     }
-
     public override void Load(bool hotReload)
     {
         Core.Configuration.InitializeTomlWithModel<ShopConfig>("config.toml", "JBShop")
@@ -91,6 +92,8 @@ public sealed class Main : BasePlugin
             Core.Logger);
 
         _commandManager?.Register(jailbreak, OpenMainMenu);
+
+        IT3Menu.Inject(interfaceManager);
     }
 
     public override void Unload()
@@ -137,15 +140,15 @@ public sealed class Main : BasePlugin
             return;
 
         var localizer = GetLocalizer(player);
-        var builder = Core.MenusAPI.CreateBuilder();
-        builder.Design.SetMenuTitle(localizer["shop.title"]);
+
+        Menu menu = new Menu(localizer["shop.title"]);
 
         var categories = _jailbreak.Shop.Categories
             .Where(category => _jailbreak.Shop.CanAccessCategory(player, category.Id))
             .ToArray();
         if (categories.Length == 0)
         {
-            builder.AddOption(new TextMenuOption(localizer["shop.empty"]) { Enabled = false });
+            menu.AddSpacer(localizer["shop.empty"]);
         }
         else
         {
@@ -153,28 +156,27 @@ public sealed class Main : BasePlugin
             {
                 var captured = category;
                 var balance = _jailbreak.Shop.GetBalance(player, category.Currency);
-                builder.AddOption(new SubmenuMenuOption(
-                    localizer["shop.category", category.Name, balance, category.Currency],
-                    () => BuildCategoryMenu(player, captured)));
+                menu.AddSubmenu(localizer["shop.category", category.Name, balance, category.Currency],
+                    () => BuildCategoryMenu(player, captured));
             }
         }
 
-        Core.MenusAPI.OpenMenuForPlayer(player.Player, builder.Build());
+        menu.Open(player.Player);
     }
 
-    private IMenuAPI BuildCategoryMenu(IJBPlayer player, ShopCategory category)
+    private Menu BuildCategoryMenu(IJBPlayer player, ShopCategory category)
     {
         if (_jailbreak == null)
             throw new InvalidOperationException("Jailbreak API is unavailable.");
 
         var localizer = GetLocalizer(player);
-        var builder = Core.MenusAPI.CreateBuilder();
-        builder.Design.SetMenuTitle(category.Name);
+
+        Menu menu = new Menu(category.Name);
 
         var items = _jailbreak.Shop.GetItems(category.Id);
         if (items.Count == 0)
         {
-            builder.AddOption(new TextMenuOption(localizer["shop.category_empty"]) { Enabled = false });
+            menu.AddSpacer(localizer["shop.category_empty"]);
         }
         else
         {
@@ -190,32 +192,24 @@ public sealed class Main : BasePlugin
                 else if (_jailbreak.Shop.OwnsItem(player, item.Id))
                     label = localizer["shop.item_owned", label];
 
-                builder.AddOption(new SubmenuMenuOption(
-                    label,
-                    () => BuildItemMenu(player, category, captured)));
+                menu.AddSubmenu(label, () => BuildItemMenu(player, category, captured));
             }
         }
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI BuildItemMenu(IJBPlayer player, ShopCategory category, IShopItem item)
+    private Menu BuildItemMenu(IJBPlayer player, ShopCategory category, IShopItem item)
     {
         if (_jailbreak == null)
             throw new InvalidOperationException("Jailbreak API is unavailable.");
 
         var localizer = GetLocalizer(player);
-        var builder = Core.MenusAPI.CreateBuilder();
-        builder.Design.SetMenuTitle(item.Name);
+        var menu = new Menu(item.Name);
 
         if (!string.IsNullOrWhiteSpace(item.Description))
         {
-            builder.AddOption(new TextMenuOption(localizer["shop.item_description", item.Description])
-            {
-                Enabled = false,
-                TextSize = MenuOptionTextSize.Medium,
-                TextStyle = MenuOptionTextStyle.ScrollLeftLoop
-            });
+            menu.AddSpacer(localizer["shop.item_description", item.Description]);
         }
 
         var currency = string.IsNullOrWhiteSpace(item.Currency) ? category.Currency : item.Currency!;
@@ -224,12 +218,12 @@ public sealed class Main : BasePlugin
 
         if (!owns || item.Kind is ShopItemKind.Consumable or ShopItemKind.Temporary)
         {
-            AddButton(builder, localizer["shop.buy", item.Price, currency], () => Purchase(player, item));
+            AddButton(menu, localizer["shop.buy", item.Price, currency], (p, i) => Purchase(player, item));
         }
 
         if (item.Kind == ShopItemKind.Equippable && owns)
         {
-            AddButton(builder, localizer[equipped ? "shop.unequip" : "shop.equip"], () =>
+            AddButton(menu, localizer[equipped ? "shop.unequip" : "shop.equip"], (p, i) =>
             {
                 var result = equipped
                     ? _jailbreak.Shop.Unequip(player, item.Id)
@@ -242,7 +236,7 @@ public sealed class Main : BasePlugin
             });
         }
 
-        return builder.Build();
+        return menu;
     }
 
     private void Purchase(IJBPlayer player, IShopItem item)
@@ -284,14 +278,8 @@ public sealed class Main : BasePlugin
         player.Player.SendChat($"{localizer["shop.prefix"]}{message}");
     }
 
-    private void AddButton(IMenuBuilderAPI builder, string label, Action action)
+    private void AddButton(Menu builder, string label, Action<IPlayer, MenuItem> action)
     {
-        var option = new ButtonMenuOption(label);
-        option.Click += (_, _) =>
-        {
-            Core.Scheduler.NextWorldUpdate(action);
-            return ValueTask.CompletedTask;
-        };
-        builder.AddOption(option);
+        builder.AddItem(label, action);
     }
 }

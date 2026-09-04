@@ -333,7 +333,7 @@ public sealed class GuardQueueManager
 
     private IJBPlayer? FindPlayer(QueueEntry entry)
     {
-        return _players.GetAllPlayers().FirstOrDefault(player => PlayerIdentity.GetKey(player.Player) == entry.PlayerKey);
+        return _players.FindByKey(entry.PlayerKey);
     }
 
     private string GetDisplayName(QueueEntry entry)

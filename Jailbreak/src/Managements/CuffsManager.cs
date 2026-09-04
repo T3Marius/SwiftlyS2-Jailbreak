@@ -525,7 +525,7 @@ public sealed class CuffsManager : ICuffsManager
 
     private IJBPlayer? FindPlayerByKey(ulong playerKey)
     {
-        return _players.GetAllPlayers().FirstOrDefault(p => GetPlayerKey(p) == playerKey);
+        return _players.FindByKey(playerKey);
     }
 
     private static ulong GetPlayerKey(IJBPlayer player)

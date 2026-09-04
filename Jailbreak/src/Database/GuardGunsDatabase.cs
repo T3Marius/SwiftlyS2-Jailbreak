@@ -12,7 +12,7 @@ public sealed class GuardGunsDatabase
 
     private readonly ISwiftlyCore _core;
     private readonly UtilsConfig _utilsConfig;
-    private readonly Dictionary<ulong, GuardGunsSettings> _cache = [];
+    private readonly Dictionary<ulong, GuardGunsSettings?> _cache = [];
     private readonly object _lock = new();
 
     public GuardGunsDatabase(ISwiftlyCore core, IOptions<UtilsConfig> utilsConfig)
@@ -46,9 +46,6 @@ public sealed class GuardGunsDatabase
         }
 
         var settings = LoadSettings(steamId);
-        if (settings == null)
-            return null;
-
         lock (_lock)
         {
             _cache[steamId] = settings;

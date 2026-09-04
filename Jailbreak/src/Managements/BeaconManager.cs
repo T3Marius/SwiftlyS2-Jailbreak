@@ -23,6 +23,22 @@ public sealed class BeaconManager
     private const float PlayerHeight = 10f;
     private const float SegmentOverlap = 0.22f;
     private const float UpdateSeconds = 0.05f;
+    private static readonly (Vector Start, Vector End)[] PingRing = CreateRing(PingSegments);
+    private static readonly (Vector Start, Vector End)[] PlayerRing = CreateRing(PlayerSegments);
+
+    private static (Vector Start, Vector End)[] CreateRing(int segments)
+    {
+        var ring = new (Vector Start, Vector End)[segments];
+        for (var i = 0; i < segments; i++)
+        {
+            var startAngle = (MathF.Tau / segments) * (i - SegmentOverlap);
+            var endAngle = (MathF.Tau / segments) * (i + 1f + SegmentOverlap);
+            ring[i] = (new Vector(MathF.Cos(startAngle), MathF.Sin(startAngle), 0f),
+                new Vector(MathF.Cos(endAngle), MathF.Sin(endAngle), 0f));
+        }
+
+        return ring;
+    }
 
     private readonly ISwiftlyCore _core;
     private readonly IJBPlayerManagement _players;
@@ -255,6 +271,7 @@ public sealed class BeaconManager
         private readonly float _radius;
         private readonly float _animationSeconds;
         private readonly float _lifetimeSeconds;
+        private bool _staticRingRendered;
 
         public int Segments { get; }
         public Color Color { get; }
@@ -292,6 +309,10 @@ public sealed class BeaconManager
             if (_lifetimeSeconds > 0f && elapsed >= _lifetimeSeconds)
                 return false;
 
+            // A completed, single-color ping does not change until it expires.
+            if (_staticRingRendered)
+                return true;
+
             var center = GetCenter();
             if (center == null)
                 return false;
@@ -314,6 +335,7 @@ public sealed class BeaconManager
 
             var color = Rainbow ? ColorFromHue(elapsed * 0.45f, alpha) : new Color(Color.R, Color.G, Color.B, alpha);
             UpdateRing(center.Value, Math.Max(1f, radius), Math.Max(1f, width), color);
+            _staticRingRendered = _player == null && !Rainbow && phase >= 1f;
             return true;
         }
 
@@ -346,14 +368,15 @@ public sealed class BeaconManager
 
         private void UpdateRing(Vector center, float radius, float width, Color color)
         {
+            var ring = _player == null ? PingRing : PlayerRing;
             for (var i = 0; i < BeamHandles.Count; i++)
             {
                 var beam = BeamHandles[i].Value;
                 if (beam?.IsValid != true)
                     continue;
 
-                var start = GetCirclePoint(center, radius, i - SegmentOverlap);
-                var end = GetCirclePoint(center, radius, i + 1f + SegmentOverlap);
+                var start = GetCirclePoint(center, radius, ring[i].Start);
+                var end = GetCirclePoint(center, radius, ring[i].End);
 
                 beam.Teleport(start, null, null);
                 beam.EndPos = end;
@@ -368,12 +391,11 @@ public sealed class BeaconManager
             }
         }
 
-        private Vector GetCirclePoint(Vector center, float radius, float index)
+        private static Vector GetCirclePoint(Vector center, float radius, Vector direction)
         {
-            var angle = (MathF.Tau / Segments) * index;
             return new Vector(
-                center.X + (MathF.Cos(angle) * radius),
-                center.Y + (MathF.Sin(angle) * radius),
+                center.X + (direction.X * radius),
+                center.Y + (direction.Y * radius),
                 center.Z);
         }
 

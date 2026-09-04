@@ -20,7 +20,7 @@ namespace LastRequests;
     Author = "T3Marius",
     Name = "[JB Core] LastRequests",
     Id = "LastRequests",
-    Version = "0.1.3"
+    Version = "0.1.4"
 )]
 public sealed class Main : BasePlugin
 {
@@ -189,10 +189,12 @@ public sealed class KnifeFightLastRequest : LastRequestBase
 
     private void RestoreModifiedPlayers()
     {
-        foreach (var steamId in _modifiedPlayers.ToArray())
+        if (_modifiedPlayers.Count == 0)
+            return;
+
+        foreach (var player in Jailbreak.Players.GetAllPlayers())
         {
-            var player = Jailbreak.Players.GetAllPlayers().FirstOrDefault(p => p.SteamID == steamId);
-            if (player == null)
+            if (!_modifiedPlayers.Contains(player.SteamID))
                 continue;
 
             Core.Scheduler.NextWorldUpdate(() =>
@@ -311,6 +313,7 @@ public sealed class ShotForShotLastRequest : LastRequestBase
         if (context.Guard == null)
             return;
 
+        base.Start(context);
         _guard      = context.Guard;
         _prisoner   = context.Prisoner;
         
@@ -339,7 +342,10 @@ public sealed class ShotForShotLastRequest : LastRequestBase
         if (_weaponFire.HasValue)
         {
             Core.GameEvent.Unhook(_weaponFire.Value);
+            _weaponFire = null;
         }
+
+        base.End(winner, loser);
     }
     private HookResult OnWeaponFire(EventWeaponFire e)
     {
@@ -353,11 +359,11 @@ public sealed class ShotForShotLastRequest : LastRequestBase
         if (_guard == null || _prisoner == null)
             return HookResult.Continue;
 
-        if (shooter == _guard)
+        if (shooter.SteamID == _guard.SteamID)
         {
             SetAmmo(_prisoner, 1);
         }
-        else if (shooter == _prisoner)
+        else if (shooter.SteamID == _prisoner.SteamID)
         {
             SetAmmo(_guard, 1);
         }
@@ -594,14 +600,12 @@ public sealed class NoScopeLastRequest : LastRequestBase
 
     public override void Start(LastRequestStartContext context)
     {
+        base.Start(context);
         _prisoner = context.Prisoner;
         _guard = context.Guard;
 
         if (_prisoner == null || _guard == null)
             return;
-
-        GiveRandomSniper(_prisoner.Player);
-        GiveRandomSniper(_guard.Player);
 
         Core.Event.OnTick += OnTick;
     }
@@ -611,6 +615,7 @@ public sealed class NoScopeLastRequest : LastRequestBase
         _guard = null;
 
         Core.Event.OnTick -= OnTick;
+        base.End(winner, loser);
     }
     private void OnTick()
     {
@@ -627,18 +632,6 @@ public sealed class NoScopeLastRequest : LastRequestBase
         gActiveWeapon.NextSecondaryAttackTick.Value = Core.Engine.GlobalVars.TickCount + 500;
         pActiveWeapon.NextSecondaryAttackTickUpdated();
         gActiveWeapon.NextSecondaryAttackTickUpdated();
-    }
-    private void GiveRandomSniper(IPlayer player)
-    {
-        if (SniperWeapons.Length == 0)
-            return;
-
-        var weapon = SniperWeapons[Random.Shared.Next(SniperWeapons.Length)];
-        var classname = Core.Helpers.GetClassnameByDefinitionIndex(weapon);
-        if (string.IsNullOrEmpty(classname))
-            return;
-
-        player.Pawn?.ItemServices?.GiveItem<CBaseEntity>(classname);
     }
 }
 public sealed class DodgeballLastRequest : LastRequestBase
@@ -664,6 +657,7 @@ public sealed class DodgeballLastRequest : LastRequestBase
 
     public override void Start(LastRequestStartContext context)
     {
+        base.Start(context);
         SetHealth(Guard!, 1);
         SetHealth(Prisoner, 1);
 
@@ -674,14 +668,17 @@ public sealed class DodgeballLastRequest : LastRequestBase
         if (_grenadeThrownId.HasValue)
         {
             Core.GameEvent.Unhook(_grenadeThrownId.Value);
+            _grenadeThrownId = null;
         }
+
+        base.End(winner, loser);
     }
     private HookResult OnGrenadeThrown(EventGrenadeThrown e)
     {
         if (e.UserIdPlayer is not IPlayer player)
             return HookResult.Continue;
 
-        if (player.SteamID != Prisoner.SteamID || player.SteamID != Guard?.SteamID)
+        if (player.SteamID != Prisoner.SteamID && player.SteamID != Guard?.SteamID)
             return HookResult.Continue;
 
         player.Pawn?.ItemServices?.GiveItem<CBaseEntity>("weapon_decoy");

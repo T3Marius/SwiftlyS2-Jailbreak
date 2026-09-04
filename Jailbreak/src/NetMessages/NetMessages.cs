@@ -15,6 +15,7 @@ public sealed class NetMessages
 
     private Guid? _voiceDataMsg;
     private CancellationTokenSource? _unmuteCts;
+    private readonly HashSet<ulong> _speechMutedPlayers = [];
 
     public NetMessages(ISwiftlyCore core, IJBPlayerManagement players, IOptions<VoiceConfig> voiceConfig, SpecialDayManager specialDayManager)
     {
@@ -38,6 +39,11 @@ public sealed class NetMessages
 
         _unmuteCts?.Cancel();
         _unmuteCts = null;
+
+        foreach (var player in _players.GetAllPlayers().Where(IsMutedByWardenSpeech))
+            player.Unmute();
+
+        _speechMutedPlayers.Clear();
     }
     private HookResult OnVoiceData(CCLCMsg_VoiceData msg, int playerId)
     {
@@ -63,7 +69,7 @@ public sealed class NetMessages
                         if (_core.Permission.PlayerHasPermissions(p.SteamID, _voiceConfig.SkipVoicePenalties))
                             continue;
                         
-                        p.Mute();
+                        MuteForWardenSpeech(p);
                     }
                     break;
                 case "prisoners":
@@ -72,7 +78,7 @@ public sealed class NetMessages
                         if (_core.Permission.PlayerHasPermissions(p.SteamID, _voiceConfig.SkipVoicePenalties))
                             continue;
 
-                        p.Mute();
+                        MuteForWardenSpeech(p);
                     }
                     break;
                 case "guardians":
@@ -81,7 +87,7 @@ public sealed class NetMessages
                         if (_core.Permission.PlayerHasPermissions(p.SteamID, _voiceConfig.SkipVoicePenalties))
                             continue;
                         
-                        p.Mute();
+                        MuteForWardenSpeech(p);
                     }
                     break;
             }
@@ -91,21 +97,33 @@ public sealed class NetMessages
             _unmuteCts?.Cancel();
             _unmuteCts = _core.Scheduler.DelayBySeconds(_voiceConfig.WardenVoiceCheckIntervalSeconds, () =>
             {
-                foreach (var p in _players.GetAllPlayers().Where(p => p.IsMuted))
+                foreach (var p in _players.GetAllPlayers().Where(IsMutedByWardenSpeech))
                 {
                     if (_voiceConfig.KeepPrisonersMutedDuringRound && p.Team == JBTeam.Prisoner)
-                        continue;
-
-                    if (_core.Permission.PlayerHasPermissions(p.SteamID, _voiceConfig.SkipVoicePenalties))
                         continue;
 
                     p.Unmute();
                 }
 
+                _speechMutedPlayers.Clear();
                 _unmuteCts = null;
             });
         }
 
         return HookResult.Continue;
+    }
+
+    private void MuteForWardenSpeech(IJBPlayer player)
+    {
+        if (player.IsMuted)
+            return;
+
+        player.Mute();
+        _speechMutedPlayers.Add(PlayerIdentity.GetKey(player.Player));
+    }
+
+    private bool IsMutedByWardenSpeech(IJBPlayer player)
+    {
+        return _speechMutedPlayers.Contains(PlayerIdentity.GetKey(player.Player));
     }
 }

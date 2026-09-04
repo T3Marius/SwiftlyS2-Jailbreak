@@ -1,5 +1,7 @@
+using HudText.Contract;
 using Jailbreak.Contract;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Events;
 using SwiftlyS2.Shared.GameEventDefinitions;
@@ -31,6 +33,7 @@ public sealed class LastRequestManager
     private readonly JBStatsDB _statsDB;
     private readonly SpecialDayManager _specialDayManager;
     private readonly JailbreakSoundManager _soundManager;
+    private readonly HudConfig _hudConfig;
     private readonly ILogger<LastRequestManager> _log;
     private readonly Dictionary<string, ILastRequest> _lastRequests = new(StringComparer.OrdinalIgnoreCase);
 
@@ -39,11 +42,16 @@ public sealed class LastRequestManager
     private Guid? _roundEndHookId;
     private CancellationTokenSource? _countdownCts;
     private CancellationTokenSource? _fightBeaconSoundCts;
+    private IHudTextService? _hudText;
+    private readonly Dictionary<int, HudTextHandle> _lastRequestInfoHuds = [];
+    private readonly Dictionary<int, HudTextHandle> _lastRequestCountdownHuds = [];
     private LastRequestStartContext? _currentContext;
     private CHandle<CBeam>? _duelBeamHandle;
     private bool _currentStarted;
     private bool _countdownActive;
+    private int? _countdownSecondsRemaining;
     private bool _availableSoundPlayed;
+    private bool _isMapUnloading;
 
     public LastRequestManager(
         ISwiftlyCore core,
@@ -53,6 +61,7 @@ public sealed class LastRequestManager
         JBStatsDB statsDB,
         SpecialDayManager specialDayManager,
         JailbreakSoundManager soundManager,
+        IOptions<HudConfig> hudConfig,
         ILogger<LastRequestManager> log)
     {
         _core = core;
@@ -62,6 +71,7 @@ public sealed class LastRequestManager
         _statsDB = statsDB;
         _specialDayManager = specialDayManager;
         _soundManager = soundManager;
+        _hudConfig = hudConfig.Value;
         _log = log;
     }
 
@@ -78,6 +88,8 @@ public sealed class LastRequestManager
         _roundEndHookId = _core.GameEvent.HookPost<EventRoundEnd>(OnRoundEnd);
         _core.GameHooks.Entities.TakeDamage.Post += OnEntityTakeDamage;
         _core.Event.OnMapUnload += OnMapUnload;
+        _core.Event.OnClientDisconnected += OnClientDisconnected;
+        _core.Event.OnClientPutInServer += OnClientPutInServer;
         _core.Event.OnTick += OnTick;
     }
 
@@ -88,10 +100,28 @@ public sealed class LastRequestManager
         Unhook(ref _roundEndHookId);
         _core.GameHooks.Entities.TakeDamage.Post -= OnEntityTakeDamage;
         _core.Event.OnMapUnload -= OnMapUnload;
+        _core.Event.OnClientDisconnected -= OnClientDisconnected;
+        _core.Event.OnClientPutInServer -= OnClientPutInServer;
         _core.Event.OnTick -= OnTick;
 
         EndLastRequest(null, null, announce: false);
         _lastRequests.Clear();
+    }
+
+    public void SetHudTextService(IHudTextService? hudText)
+    {
+        if (ReferenceEquals(_hudText, hudText))
+            return;
+
+        StopLastRequestHuds();
+        _hudText = hudText;
+
+        if (_hudText != null && CurrentLastRequest != null && _currentContext != null)
+        {
+            UpdateInfoHud(CurrentLastRequest, _currentContext);
+            if (_countdownSecondsRemaining is int remaining)
+                UpdateCountdownHud(CurrentLastRequest, remaining);
+        }
     }
 
     public bool RegisterLastRequest(ILastRequest lastRequest)
@@ -136,12 +166,14 @@ public sealed class LastRequestManager
         StateChanged?.Invoke();
         _currentContext = context;
         _currentStarted = false;
+        _isMapUnloading = false;
 
         StopFightBeaconSound();
 
         DisableCurrentWarden();
         ApplyVisuals(context);
         AnnounceLastRequestSelected(lastRequest, context);
+        UpdateInfoHud(lastRequest, context);
 
         if (lastRequest.StartCountdown <= 0)
         {
@@ -180,11 +212,12 @@ public sealed class LastRequestManager
 
     private void StartCountdown(ILastRequest lastRequest, LastRequestStartContext context)
     {
+        StopCountdown();
         _countdownActive = true;
         var remaining = lastRequest.StartCountdown;
+        _countdownSecondsRemaining = remaining;
 
-        SendCountdownMessage(lastRequest, context, remaining);
-        StopCountdown();
+        UpdateCountdownHud(lastRequest, remaining);
         _countdownCts = _core.Scheduler.RepeatBySeconds(1f, () =>
         {
             if (CurrentLastRequest != lastRequest || _currentContext != context)
@@ -194,6 +227,7 @@ public sealed class LastRequestManager
             }
 
             remaining--;
+            _countdownSecondsRemaining = remaining;
             if (remaining <= 0)
             {
                 StopCountdown();
@@ -201,19 +235,22 @@ public sealed class LastRequestManager
                 return;
             }
 
-            SendCountdownMessage(lastRequest, context, remaining);
+            UpdateCountdownHud(lastRequest, remaining);
         });
     }
 
     private void StartCurrentLastRequest(ILastRequest lastRequest, LastRequestStartContext context)
     {
         _countdownActive = false;
+        StopCountdownHud();
 
         try
         {
             ApplyStartLoadout(lastRequest, context);
-            lastRequest.Start(context);
+            // Mark the module active before invoking external code so a partial
+            // start is still cleaned up if Start throws after registering hooks.
             _currentStarted = true;
+            lastRequest.Start(context);
             _soundManager.Play(JailbreakSound.LastRequestStarted);
             StartFightBeaconSound();
             _players.SendMessage(MessageType.Chat, "last_request_started", true, args: [lastRequest.Name, context.Prisoner.Player.Name]);
@@ -234,6 +271,7 @@ public sealed class LastRequestManager
     {
         StopCountdown();
         StopFightBeaconSound();
+        StopLastRequestHuds();
 
         var lastRequest = CurrentLastRequest;
         if (lastRequest == null)
@@ -250,7 +288,16 @@ public sealed class LastRequestManager
         _countdownActive = false;
 
         if (_currentStarted)
-            lastRequest.End(winner, loser);
+        {
+            try
+            {
+                lastRequest.End(winner, loser);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Failed to clean up Last Request. Id={Id}, Name={Name}", lastRequest.Id, lastRequest.Name);
+            }
+        }
 
         _currentStarted = false;
         CleanupVisuals();
@@ -286,8 +333,15 @@ public sealed class LastRequestManager
 
         if (_currentStarted)
         {
-            lastRequest.OnPlayerDied(victim, attacker);
-            _currentStarted = false;
+            try
+            {
+                lastRequest.OnPlayerDied(victim, attacker);
+                _currentStarted = false;
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Last Request death callback failed. Id={Id}, Name={Name}", lastRequest.Id, lastRequest.Name);
+            }
         }
 
         EndLastRequest(winner, victim);
@@ -311,8 +365,15 @@ public sealed class LastRequestManager
 
         if (_currentStarted)
         {
-            lastRequest.OnPlayerDisconnected(player);
-            _currentStarted = false;
+            try
+            {
+                lastRequest.OnPlayerDisconnected(player);
+                _currentStarted = false;
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Last Request disconnect callback failed. Id={Id}, Name={Name}", lastRequest.Id, lastRequest.Name);
+            }
         }
 
         EndLastRequest(winner, player);
@@ -328,6 +389,7 @@ public sealed class LastRequestManager
 
     private void OnMapUnload(IOnMapUnloadEvent @event)
     {
+        _isMapUnloading = true;
         _availableSoundPlayed = false;
         EndLastRequest(null, null, announce: false);
     }
@@ -487,28 +549,174 @@ public sealed class LastRequestManager
         beam.RenderUpdated();
     }
 
-    private void SendCountdownMessage(ILastRequest lastRequest, LastRequestStartContext context, int remaining)
+    private void UpdateInfoHud(ILastRequest lastRequest, LastRequestStartContext context)
     {
-        var variant = context.SelectedVariant == null
-            ? _core.Localizer["none"]
-            : string.IsNullOrWhiteSpace(context.SelectedVariant.Description)
-                ? context.SelectedVariant.Name
-                : $"{context.SelectedVariant.Name}: {context.SelectedVariant.Description}";
+        UpdateHudForPlayers(
+            lastRequest,
+            _lastRequestInfoHuds,
+            _hudConfig.CurrentLastRequestHud,
+            player => player.Localizer[
+                "last_request_active_hud",
+                lastRequest.Name,
+                lastRequest.Description,
+                FormatVariant(player, context)]);
+    }
 
-        foreach (var player in _players.GetAllPlayers())
+    private void UpdateCountdownHud(ILastRequest lastRequest, int remaining)
+    {
+        UpdateHudForPlayers(
+            lastRequest,
+            _lastRequestCountdownHuds,
+            _hudConfig.LastRequestCountdownHud,
+            player => player.Localizer["last_request_countdown_hud", lastRequest.Name, remaining]);
+    }
+
+    private void UpdateHudForPlayers(
+        ILastRequest lastRequest,
+        Dictionary<int, HudTextHandle> huds,
+        HudTextSettings style,
+        Func<IJBPlayer, string> messageFactory)
+    {
+        if (_isMapUnloading || _hudText is null || !ReferenceEquals(CurrentLastRequest, lastRequest))
+            return;
+
+        foreach (var player in _players.GetAllPlayers().Where(player => player.Player.IsValid))
         {
-            if (!player.Player.IsValid)
-                continue;
+            var playerId = player.Player.PlayerID;
+            var message = messageFactory(player);
 
-            var message = player.Localizer["last_request_countdown_html", lastRequest.Name, remaining, lastRequest.Description, variant];
-            player.Player.SendCenterHTML(message, 1100);
+            if (huds.TryGetValue(playerId, out var hud))
+            {
+                try
+                {
+                    _hudText.UpdateHud(hud, message);
+                    _hudText.ShowHud(hud);
+                    continue;
+                }
+                catch (ArgumentException)
+                {
+                    huds.Remove(playerId);
+                }
+            }
+
+            huds[playerId] = _hudText.CreateHud(playerId, message, ToHudTextOptions(style));
         }
     }
+
+    private static string FormatVariant(IJBPlayer player, LastRequestStartContext context)
+    {
+        if (context.SelectedVariant == null)
+            return player.Localizer["none"];
+
+        return string.IsNullOrWhiteSpace(context.SelectedVariant.Description)
+            ? context.SelectedVariant.Name
+            : $"{context.SelectedVariant.Name}: {context.SelectedVariant.Description}";
+    }
+
+    private void StopLastRequestHuds()
+    {
+        if (_isMapUnloading)
+        {
+            _lastRequestInfoHuds.Clear();
+            _lastRequestCountdownHuds.Clear();
+            return;
+        }
+
+        if (_hudText != null)
+        {
+            foreach (var hud in _lastRequestInfoHuds.Values)
+                RemoveHudSafely(hud);
+
+            foreach (var hud in _lastRequestCountdownHuds.Values)
+                RemoveHudSafely(hud);
+        }
+
+        _lastRequestInfoHuds.Clear();
+        _lastRequestCountdownHuds.Clear();
+    }
+
+    private void StopCountdownHud()
+    {
+        if (!_isMapUnloading && _hudText != null)
+        {
+            foreach (var hud in _lastRequestCountdownHuds.Values)
+                RemoveHudSafely(hud);
+        }
+
+        _lastRequestCountdownHuds.Clear();
+    }
+
+    private void OnClientDisconnected(IOnClientDisconnectedEvent @event)
+    {
+        RemovePlayerHud(_lastRequestInfoHuds, @event.PlayerId);
+        RemovePlayerHud(_lastRequestCountdownHuds, @event.PlayerId);
+    }
+
+    private void OnClientPutInServer(IOnClientPutInServerEvent @event)
+    {
+        _isMapUnloading = false;
+        var lastRequest = CurrentLastRequest;
+        var context = _currentContext;
+        if (_hudText is null || lastRequest is null || context is null)
+            return;
+
+        _core.Scheduler.NextWorldUpdate(() =>
+        {
+            if (ReferenceEquals(CurrentLastRequest, lastRequest) && ReferenceEquals(_currentContext, context))
+            {
+                UpdateInfoHud(lastRequest, context);
+                if (_countdownSecondsRemaining is int remaining)
+                    UpdateCountdownHud(lastRequest, remaining);
+            }
+        });
+    }
+
+    private void RemovePlayerHud(Dictionary<int, HudTextHandle> huds, int playerId)
+    {
+        if (!_isMapUnloading && _hudText != null && huds.Remove(playerId, out var hud))
+            RemoveHudSafely(hud);
+        else
+            huds.Remove(playerId);
+    }
+
+    private void RemoveHudSafely(HudTextHandle hud)
+    {
+        try
+        {
+            _hudText!.RemoveHud(hud);
+        }
+        catch (ArgumentException)
+        {
+            // HudText may already have discarded the handle during a transition.
+        }
+    }
+
+    private static HudTextOptions ToHudTextOptions(HudTextSettings style) => new()
+    {
+        Position = style.Position,
+        Color = style.Color,
+        Size = style.Size,
+        Background = style.Background,
+        BackgroundOpacity = style.BackgroundOpacity,
+        DropShadow = style.DropShadow,
+        OutlineColor = style.OutlineColor,
+        Font = style.Font,
+        FontWeight = style.FontWeight,
+        TextAlignment = style.TextAlignment,
+        // Position already supplies the vertical anchor. Passing the shared
+        // settings default (Top) here would override CenterMiddle/CenterBottom.
+        MarginBottom = style.MarginBottom,
+        MarginTop = style.MarginTop,
+        MarginLeft = style.MarginLeft,
+        MarginRight = style.MarginRight,
+    };
 
     private void StopCountdown()
     {
         _countdownCts?.Cancel();
         _countdownCts = null;
+        _countdownSecondsRemaining = null;
+        StopCountdownHud();
     }
 
     private void StartFightBeaconSound()

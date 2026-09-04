@@ -1,4 +1,3 @@
-using System.Windows.Input;
 using Jailbreak.Contract;
 using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;

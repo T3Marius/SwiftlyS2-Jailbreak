@@ -4,6 +4,10 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Events;
+using SwiftlyS2.Shared.GameEventDefinitions;
+using SwiftlyS2.Shared.Misc;
+using SwiftlyS2.Shared.Players;
+using System.Globalization;
 using System.Text;
 
 namespace Jailbreak;
@@ -19,6 +23,9 @@ public sealed class CurrencyHudManager
     private readonly Dictionary<int, Dictionary<string, decimal>> _playerBalances = [];
 
     private IHudTextService? _hudText;
+    private bool _registered;
+    private Guid? _spawnHookId;
+    private bool _refreshQueued;
 
     public CurrencyHudManager(
         ISwiftlyCore core,
@@ -36,13 +43,29 @@ public sealed class CurrencyHudManager
 
     public void Register()
     {
+        if (_registered)
+            return;
+
+        _registered = true;
         _shop.PlayerCurrencyChanged += OnPlayerCurrencyChanged;
         _core.Event.OnClientDisconnected += OnClientDisconnected;
         _core.Event.OnClientPutInServer += OnClientPutInServer;
+        _spawnHookId = _core.GameEvent.HookPost<EventPlayerSpawn>(OnPlayerSpawn);
+        if (_shop is ShopManager shopManager)
+            shopManager.CurrencyAvailabilityChanged += QueueRefresh;
+        QueueRefresh();
     }
 
     public void Unregister()
     {
+        _registered = false;
+        if (_spawnHookId is { } hookId)
+        {
+            _core.GameEvent.Unhook(hookId);
+            _spawnHookId = null;
+        }
+        if (_shop is ShopManager shopManager)
+            shopManager.CurrencyAvailabilityChanged -= QueueRefresh;
         _shop.PlayerCurrencyChanged -= OnPlayerCurrencyChanged;
         _core.Event.OnClientDisconnected -= OnClientDisconnected;
         _core.Event.OnClientPutInServer -= OnClientPutInServer;
@@ -55,6 +78,7 @@ public sealed class CurrencyHudManager
 
         _huds.Clear();
         _playerBalances.Clear();
+        _hudText = null;
     }
 
     public void SetHudTextService(IHudTextService? hudText)
@@ -74,13 +98,37 @@ public sealed class CurrencyHudManager
         if (_hudText == null)
             return;
 
-        foreach (var player in _players.GetAllPlayers())
-            RefreshAllCurrencies(player);
+        QueueRefresh();
+    }
+
+    private void QueueRefresh()
+    {
+        if (!_registered || _refreshQueued)
+            return;
+
+        _refreshQueued = true;
+        _core.Scheduler.NextWorldUpdate(() =>
+        {
+            _refreshQueued = false;
+            if (!_registered || _hudText == null)
+                return;
+
+            foreach (var player in _players.GetAllPlayers())
+                RefreshAllCurrencies(player);
+        });
+    }
+
+    private HookResult OnPlayerSpawn(EventPlayerSpawn @event)
+    {
+        if (@event.UserIdPlayer is { IsValid: true } player)
+            QueuePlayerRefresh(player);
+
+        return HookResult.Continue;
     }
 
     private void OnPlayerCurrencyChanged(IJBPlayer player, string currency, decimal balance)
     {
-        if (!player.Player.IsValid)
+        if (!player.Player.IsValid || string.IsNullOrWhiteSpace(currency))
             return;
 
         var playerId = player.Player.PlayerID;
@@ -100,9 +148,28 @@ public sealed class CurrencyHudManager
         if (_hudText is null)
             return;
 
+        var playerId = @event.PlayerId;
+        var joiningPlayer = _core.PlayerManager.GetPlayer(playerId);
+        if (joiningPlayer is not { IsValid: true })
+            return;
+
+        QueuePlayerRefresh(joiningPlayer);
+    }
+
+    private void QueuePlayerRefresh(IPlayer joiningPlayer)
+    {
+        var playerId = joiningPlayer.PlayerID;
+        var sessionId = joiningPlayer.SessionId;
         _core.Scheduler.NextWorldUpdate(() =>
         {
-            var player = _players.SyncPlayer(_core.PlayerManager.GetPlayer(@event.PlayerId)!);
+            if (!_registered || _hudText == null)
+                return;
+
+            var currentPlayer = _core.PlayerManager.GetPlayer(playerId);
+            if (currentPlayer is not { IsValid: true } || currentPlayer.SessionId != sessionId)
+                return;
+
+            var player = _players.SyncPlayer(currentPlayer);
             if (player != null)
                 RefreshAllCurrencies(player);
         });
@@ -110,7 +177,7 @@ public sealed class CurrencyHudManager
 
     private void RefreshAllCurrencies(IJBPlayer player)
     {
-        if (!player.Player.IsValid)
+        if (!player.Player.IsValid || player.Player.IsFakeClient)
             return;
 
         var playerId = player.Player.PlayerID;
@@ -124,6 +191,19 @@ public sealed class CurrencyHudManager
     }
 
     private void RenderHud(IJBPlayer player, Dictionary<string, decimal> balances)
+    {
+        try
+        {
+            RenderHudCore(player, balances);
+        }
+        catch (Exception ex)
+        {
+            // Optional presentation must not interrupt the shop after a balance change.
+            _log.LogError(ex, "Failed to render currency HUD for player {SteamId}.", player.SteamID);
+        }
+    }
+
+    private void RenderHudCore(IJBPlayer player, Dictionary<string, decimal> balances)
     {
         if (_hudText is null || !player.Player.IsValid)
             return;
@@ -151,20 +231,25 @@ public sealed class CurrencyHudManager
     private string FormatMessage(IJBPlayer player, Dictionary<string, decimal> balances)
     {
         var sb = new StringBuilder();
-        sb.Append(player.Localizer["currency_hud_header"]);
+        var localizer = player.Localizer;
+        sb.Append(localizer["currency_hud_header"]);
 
         foreach (var currency in _shop.Currencies)
         {
+            if (string.IsNullOrWhiteSpace(currency))
+                continue;
+
             var amount = balances.GetValueOrDefault(currency, 0);
 
             var formattedCurrency =
                 char.ToUpper(currency[0]) + currency.Substring(1).ToLower();
+            var formattedAmount = amount.ToString("0.##", CultureInfo.InvariantCulture);
 
             sb.Append('\n');
-            sb.Append(player.Localizer[
+            sb.Append(localizer[
                 "currency_hud_line",
                 formattedCurrency,
-                amount
+                formattedAmount
             ]);
         }
 

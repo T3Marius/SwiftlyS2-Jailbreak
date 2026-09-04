@@ -1,13 +1,12 @@
 using Jailbreak.Contract;
 using Microsoft.Extensions.Options;
-using SwiftlyS2.Core.Menus.OptionsBase;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Commands;
 using SwiftlyS2.Shared.Helpers;
-using SwiftlyS2.Shared.Menus;
 using SwiftlyS2.Shared.Natives;
 using SwiftlyS2.Shared.Players;
 using SwiftlyS2.Shared.SchemaDefinitions;
+using T3Menu.Contract;
 
 namespace Jailbreak;
 
@@ -60,7 +59,11 @@ public sealed class GuardGunsManager
         if (settings == null)
             return;
 
-        _core.Scheduler.NextWorldUpdate(() => GiveGuardLoadout(player.Player, settings.PrimaryWeapon, settings.SecondaryWeapon));
+        _core.Scheduler.NextWorldUpdate(() =>
+            GiveGuardLoadout(
+                player.Player,
+                settings.PrimaryWeapon,
+                settings.SecondaryWeapon));
     }
 
     private void GunsCommand(ICommandContext ctx)
@@ -75,80 +78,113 @@ public sealed class GuardGunsManager
         if (!CanUseGunsMenu(player))
             return;
 
-        _core.MenusAPI.OpenMenuForPlayer(player.Player, PrimaryGunsMenu(player));
+        PrimaryGunsMenu(player).Open(player.Player);
     }
 
-    private IMenuAPI PrimaryGunsMenu(IJBPlayer player)
+    private Menu PrimaryGunsMenu(IJBPlayer player)
     {
-        var builder = CreateBuilder(player, "guard_guns_primary_menu.title");
+        var menu = CreateMenu(player, "guard_guns_primary_menu.title");
 
         foreach (var weapon in SpecialDayWeapons.PrimaryWeapons.OrderBy(GetWeaponLabel))
         {
-            AddButton(builder, GetWeaponLabel(weapon), () =>
+            AddButton(menu, GetWeaponLabel(weapon), () =>
             {
                 _core.Scheduler.NextWorldUpdate(() =>
                 {
                     if (CanUseGunsMenu(player))
-                        _core.MenusAPI.OpenMenuForPlayer(player.Player, SecondaryGunsMenu(player, weapon));
+                    {
+                        SecondaryGunsMenu(player, weapon)
+                            .Open(player.Player);
+                    }
                 });
             });
         }
 
-        return builder.Build();
+        return menu;
     }
 
-    private IMenuAPI SecondaryGunsMenu(IJBPlayer player, ItemDefinitionIndex primaryWeapon)
+    private Menu SecondaryGunsMenu(
+        IJBPlayer player,
+        ItemDefinitionIndex primaryWeapon)
     {
-        var builder = CreateBuilder(player, "guard_guns_secondary_menu.title");
+        var menu = CreateMenu(player, "guard_guns_secondary_menu.title");
 
         foreach (var weapon in SpecialDayWeapons.SecondaryWeapons.OrderBy(GetWeaponLabel))
         {
-            AddButton(builder, GetWeaponLabel(weapon), () =>
+            AddButton(menu, GetWeaponLabel(weapon), () =>
             {
                 _core.Scheduler.NextWorldUpdate(() =>
                 {
                     if (!CanUseGunsMenu(player))
                         return;
 
-                    _database.SaveSettings(player.SteamID, primaryWeapon, weapon);
-                    GiveGuardLoadout(player.Player, primaryWeapon, weapon);
+                    _database.SaveSettings(
+                        player.SteamID,
+                        primaryWeapon,
+                        weapon);
+
+                    GiveGuardLoadout(
+                        player.Player,
+                        primaryWeapon,
+                        weapon);
+
                     player.SendMessage(
                         MessageType.Chat,
                         "guard_guns_selected",
                         true,
-                        args: [GetWeaponLabel(primaryWeapon), GetWeaponLabel(weapon)]);
-                    _core.MenusAPI.CloseActiveMenu(player.Player);
+                        args:
+                        [
+                            GetWeaponLabel(primaryWeapon),
+                            GetWeaponLabel(weapon)
+                        ]);
+
+                    MenuManager.CloseActiveMenu(player.Player);
                 });
             });
         }
 
-        return builder.Build();
+        return menu;
     }
 
     private bool CanUseGunsMenu(IJBPlayer player)
     {
         if (_specialDayManager.IsSpecialDayActive)
         {
-            player.SendMessage(MessageType.Chat, "special_day_active_blocked", true);
+            player.SendMessage(
+                MessageType.Chat,
+                "special_day_active_blocked",
+                true);
+
             return false;
         }
 
         if (player.Team != JBTeam.Guard)
         {
-            player.SendMessage(MessageType.Chat, "guard_guns_only_guard", true);
+            player.SendMessage(
+                MessageType.Chat,
+                "guard_guns_only_guard",
+                true);
+
             return false;
         }
 
         if (!player.Player.IsValid || !player.Player.IsAlive)
         {
-            player.SendMessage(MessageType.Chat, "guard_guns_must_be_alive", true);
+            player.SendMessage(
+                MessageType.Chat,
+                "guard_guns_must_be_alive",
+                true);
+
             return false;
         }
 
         return true;
     }
 
-    private void GiveGuardLoadout(IPlayer player, ItemDefinitionIndex primaryWeapon, ItemDefinitionIndex secondaryWeapon)
+    private void GiveGuardLoadout(
+        IPlayer player,
+        ItemDefinitionIndex primaryWeapon,
+        ItemDefinitionIndex secondaryWeapon)
     {
         if (!player.IsValid || !player.IsAlive)
             return;
@@ -160,9 +196,13 @@ public sealed class GuardGunsManager
         GiveWeapon(player, "weapon_knife");
     }
 
-    private void GiveWeaponByDefinition(IPlayer player, ItemDefinitionIndex weapon)
+    private void GiveWeaponByDefinition(
+        IPlayer player,
+        ItemDefinitionIndex weapon)
     {
-        var classname = _core.Helpers.GetClassnameByDefinitionIndex(weapon);
+        var classname = _core.Helpers
+            .GetClassnameByDefinitionIndex(weapon);
+
         if (!string.IsNullOrEmpty(classname))
             GiveWeapon(player, classname);
     }
@@ -180,7 +220,9 @@ public sealed class GuardGunsManager
         }
     }
 
-    private static void GiveWeapon(IPlayer player, string weaponName)
+    private static void GiveWeapon(
+        IPlayer player,
+        string weaponName)
     {
         var pawn = player.Pawn;
         if (pawn == null || !pawn.IsValid)
@@ -189,32 +231,42 @@ public sealed class GuardGunsManager
         pawn.ItemServices?.GiveItem<CBaseEntity>(weaponName);
     }
 
-    private IMenuBuilderAPI CreateBuilder(IJBPlayer player, string titleKey)
+    private static Menu CreateMenu(
+        IJBPlayer player,
+        string titleKey)
     {
-        return _core.MenusAPI.CreateBuilder().Design
-            .SetMenuTitle(player.Localizer[titleKey]);
+        return new Menu(player.Localizer[titleKey])
+        {
+            HasExitButton = true,
+            Navigation = MenuNavigation.KeyPress
+        };
     }
 
     private string GetWeaponLabel(ItemDefinitionIndex weapon)
     {
-        var classname = _core.Helpers.GetClassnameByDefinitionIndex(weapon);
+        var classname = _core.Helpers
+            .GetClassnameByDefinitionIndex(weapon);
+
         if (string.IsNullOrEmpty(classname))
             return weapon.ToString();
 
         return classname
-            .Replace("weapon_", "", StringComparison.OrdinalIgnoreCase)
+            .Replace(
+                "weapon_",
+                "",
+                StringComparison.OrdinalIgnoreCase)
             .Replace('_', ' ')
             .ToUpperInvariant();
     }
 
-    private static void AddButton(IMenuBuilderAPI builder, string label, Action action)
+    private static void AddButton(
+        Menu menu,
+        string label,
+        Action action)
     {
-        var option = new ButtonMenuOption(label);
-        option.Click += (_, _) =>
+        menu.AddItem(label, (_, _) =>
         {
             action();
-            return ValueTask.CompletedTask;
-        };
-        builder.AddOption(option);
+        });
     }
 }

@@ -52,6 +52,7 @@ public sealed class Events
     private CancellationTokenSource? _wardenCheckCts;
     private CancellationTokenSource? _doorsCheckCts;
     private CancellationTokenSource? _checkPrisonersVoiceCts;
+    private CancellationTokenSource? _roundStartUnmuteCts;
     private readonly Random _random = new();
     private bool _isRoundEnding;
     private bool _isMapUnloading;
@@ -141,6 +142,7 @@ public sealed class Events
         _doorsCheckCts?.Cancel();
         _doorsCheckCts = null;
 
+        CancelRoundStartUnmute();
         StopCheckPrisonerVoiceTimer();
     }
     public void SetHudTextService(IHudTextService? hudText)
@@ -169,10 +171,22 @@ public sealed class Events
         }
 
         var warden = _players.GetWarden()?.Player.Name ?? _core.Localizer["none"];
-        var deputy = _players.GetDeputy()?.Player.Name ?? _core.Localizer["none"];
+        var teamPlayers = _players.GetAllPlayers()
+            .Where(player => player.Team is JBTeam.Guard or JBTeam.Prisoner)
+            .ToList();
+        var totalGuards = teamPlayers.Count(player => player.Team == JBTeam.Guard);
+        var aliveGuards = teamPlayers.Count(player => player.Team == JBTeam.Guard && player.Player.IsAlive);
+        var totalPrisoners = teamPlayers.Count(player => player.Team == JBTeam.Prisoner);
+        var alivePrisoners = teamPlayers.Count(player => player.Team == JBTeam.Prisoner && player.Player.IsAlive);
 
         // A global HudText handle has one string for everyone.
-        var text = _core.Localizer["current_ct_roles.hud", warden, deputy];
+        var text = _core.Localizer[
+            "current_ct_roles.hud",
+            warden,
+            aliveGuards,
+            totalGuards,
+            alivePrisoners,
+            totalPrisoners];
 
         if (_currentWardenHud is null)
         {
@@ -242,6 +256,7 @@ public sealed class Events
     private void OnMapUnload(IOnMapUnloadEvent _)
     {
         _isMapUnloading = true;
+        CancelRoundStartUnmute();
         // The map is destroying CustomHud entities. Do not issue HUD native calls here.
         _currentWardenHud = null;
         _roundWinnerHud = null;
@@ -267,6 +282,7 @@ public sealed class Events
             return HookResult.Continue;
 
         ApplyTeamLoadout(player);
+        RefreshCurrentCtRolesDisplay();
         return HookResult.Continue;
     }
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull e)
@@ -293,6 +309,8 @@ public sealed class Events
             var syncedPlayer = _players.SyncPlayer(rawPlayer);
             if (syncedPlayer != null)
                 ApplyTeamLoadout(syncedPlayer);
+
+            RefreshCurrentCtRolesDisplay();
         });
 
         return HookResult.Continue;
@@ -306,6 +324,7 @@ public sealed class Events
         _drawManager.CleanupPlayer(e.UserIdPlayer);
         _cuffsManager.CleanupPlayer(e.UserIdPlayer);
         _players.RemovePlayer(e.UserIdPlayer);
+        RefreshCurrentCtRolesDisplay();
         return HookResult.Continue;
     }
 
@@ -313,6 +332,7 @@ public sealed class Events
     {
         _isMapUnloading = false;
         _isRoundEnding = false;
+        CancelRoundStartUnmute();
         RemoveRoundWinnerHud();
         _drawManager.ClearRoundAccess();
 
@@ -345,25 +365,35 @@ public sealed class Events
         }
         else if (_voiceConfig.KeepPrisonersMutedForSecondsOnRoundStart > 0)
         {
+            var mutedAny = false;
             foreach (var p in _players.GetPlayersByTeam(JBTeam.Prisoner).Where(p => !p.IsMuted))
             {
                 if (_core.Permission.PlayerHasPermissions(p.SteamID, _voiceConfig.SkipVoicePenalties))
                     continue;
 
                 p.Mute();
-                _players.SendMessage(MessageType.Chat, "prisoners_muted_roundstart", true, args: [_voiceConfig.KeepPrisonersMutedForSecondsOnRoundStart]);
+                mutedAny = true;
             }
 
-            _core.Scheduler.DelayBySeconds(_voiceConfig.KeepPrisonersMutedForSecondsOnRoundStart, () =>
+            if (mutedAny)
+                _players.SendMessage(MessageType.Chat, "prisoners_muted_roundstart", true, args: [_voiceConfig.KeepPrisonersMutedForSecondsOnRoundStart]);
+
+            _roundStartUnmuteCts = _core.Scheduler.DelayBySeconds(_voiceConfig.KeepPrisonersMutedForSecondsOnRoundStart, () =>
             {
+                var unmutedAny = false;
                 foreach (var p in _players.GetPlayersByTeam(JBTeam.Prisoner).Where(p => p.IsMuted))
                 {
                     if (_core.Permission.PlayerHasPermissions(p.SteamID, _voiceConfig.SkipVoicePenalties))
                         continue;
 
                     p.Unmute();
-                    _players.SendMessage(MessageType.Chat, "prisoners_unmuted", true);
+                    unmutedAny = true;
                 }
+
+                if (unmutedAny)
+                    _players.SendMessage(MessageType.Chat, "prisoners_unmuted", true);
+
+                _roundStartUnmuteCts = null;
             });
         }
         _cellManager.CellsOpen = false;
@@ -374,6 +404,7 @@ public sealed class Events
 
         _doorsCheckCts?.Cancel();
         _doorsCheckCts = null;
+        CancelRoundStartUnmute();
 
         var currentWarden = _players.GetWarden();
         if (currentWarden != null)
@@ -539,28 +570,38 @@ public sealed class Events
 
     private HookResult OnPlayerDeath(EventPlayerDeath e)
     {
-        if (e.AttackerPlayer == null || e.UserIdPlayer == null)
+        if (e.UserIdPlayer == null)
             return HookResult.Continue;
 
-        var attacker = _players.SyncPlayer(e.AttackerPlayer);
         var victim = _players.SyncPlayer(e.UserIdPlayer);
-
-        if (attacker == null || victim == null)
+        if (victim == null)
             return HookResult.Continue;
 
         if (_specialDayManager.IsSpecialDayActive || _lastRequestManager.IsLastRequestActive)
             return HookResult.Continue;
 
-        if (victim.IsWarden && attacker.Team == JBTeam.Prisoner)
+        if (victim.IsWarden)
         {
             _cuffsManager.OnWardenRemove(victim);
-            victim.SetWarden(false, "killed", e.AttackerPlayer.Name);
+
+            var attacker = e.AttackerPlayer == null
+                ? null
+                : _players.SyncPlayer(e.AttackerPlayer);
+
+            if (attacker != null
+                && PlayerIdentity.GetKey(attacker.Player) != PlayerIdentity.GetKey(victim.Player))
+                victim.SetWarden(false, "killed", attacker.Player.Name);
+            else
+                victim.SetWarden(false);
+
             _soundManager.Play(JailbreakSound.WardenRemoved, JailbreakSoundReason.Killed);
             _wardenTagManager.RefreshNow();
 
             // Try to auto-assign a new warden after a short delay, same as round start.
             StartWardenCheckTimer();
         }
+
+        RefreshCurrentCtRolesDisplay();
 
         return HookResult.Continue;
     }
@@ -727,5 +768,11 @@ public sealed class Events
                 prisoner.Unmute();
             }
         }
+    }
+
+    private void CancelRoundStartUnmute()
+    {
+        _roundStartUnmuteCts?.Cancel();
+        _roundStartUnmuteCts = null;
     }
 }
