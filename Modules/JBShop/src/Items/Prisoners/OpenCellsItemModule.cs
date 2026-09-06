@@ -22,7 +22,8 @@ public sealed class OpenCellsItemModule : ItemModuleBase, IModuleInitializable
                 price: config.Price,
                 kind: ShopItemKind.Consumable,
                 description: config.Description,
-                currency: string.IsNullOrWhiteSpace(config.Currency) ? null : config.Currency)))
+                currency: string.IsNullOrWhiteSpace(config.Currency) ? null : config.Currency)
+            { MaxPurchasesPerRound = config.MaxPurchasesPerRound }))
         {
             throw new InvalidOperationException($"Could not register shop item '{config.Id}'.");
         }

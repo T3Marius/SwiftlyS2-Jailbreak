@@ -23,6 +23,9 @@ public sealed class ShopManager : IJBShop
     private readonly Dictionary<ulong, CachedPlayerState> _playerStates = [];
     private readonly Dictionary<ulong, object> _playerLocks = [];
     private readonly object _stateLock = new();
+    private readonly HashSet<ulong> _purchasesInProgress = [];
+    // Separate from the connection cache so reconnecting cannot reset the allowance.
+    private readonly Dictionary<ulong, Dictionary<string, int>> _roundPurchases = [];
 
     private IEconomyAPIv1? _economy;
     private Guid? _playerSpawnHookId;
@@ -43,7 +46,7 @@ public sealed class ShopManager : IJBShop
     }
 
     public bool IsEconomyAvailable => _economy != null;
-    public IReadOnlyCollection<ShopCategory> Categories => _categories.Values.OrderBy(category => category.Order).ToArray();
+    public IReadOnlyCollection<ShopCategory> Categories => _categories.Values.OrderBy(category => category.Order).ThenBy(category => category.Name, StringComparer.OrdinalIgnoreCase).ToArray();
     public IReadOnlyCollection<IShopItem> Items => _items.Values.ToArray();
     public IReadOnlyCollection<IItemModule> Modules => _moduleManager.Modules;
     public IReadOnlyCollection<string> Currencies => _categories.Values
@@ -91,6 +94,7 @@ public sealed class ShopManager : IJBShop
 
         lock (_stateLock)
         {
+            _roundPurchases.Clear();
             _playerStates.Clear();
             _playerLocks.Clear();
         }
@@ -114,14 +118,15 @@ public sealed class ShopManager : IJBShop
         }
 
         _log.LogInformation("Jailbreak shop connected to Economy API.");
-        CurrencyAvailabilityChanged?.Invoke();
+        Notify(CurrencyAvailabilityChanged, handler => handler());
     }
 
     public bool RegisterCategory(ShopCategory category)
     {
         if (string.IsNullOrWhiteSpace(category.Id)
             || string.IsNullOrWhiteSpace(category.Name)
-            || string.IsNullOrWhiteSpace(category.Currency))
+            || string.IsNullOrWhiteSpace(category.Currency)
+            || !Enum.IsDefined(category.Scope))
             return false;
 
         var normalized = category with
@@ -135,7 +140,7 @@ public sealed class ShopManager : IJBShop
             return false;
 
         EnsureCurrency(normalized.Currency);
-        CurrencyAvailabilityChanged?.Invoke();
+        Notify(CurrencyAvailabilityChanged, handler => handler());
         return true;
     }
 
@@ -152,7 +157,9 @@ public sealed class ShopManager : IJBShop
             UnregisterItem(itemId);
         }
 
-        return _categories.Remove(categoryId);
+        var removed = _categories.Remove(categoryId);
+        Notify(CurrencyAvailabilityChanged, handler => handler());
+        return removed;
     }
 
     public bool RegisterItem(IShopItem item)
@@ -160,6 +167,11 @@ public sealed class ShopManager : IJBShop
         if (string.IsNullOrWhiteSpace(item.Id)
             || string.IsNullOrWhiteSpace(item.CategoryId)
             || string.IsNullOrWhiteSpace(item.Name)
+            || item.Id.Length > 128
+            || item.Id != item.Id.Trim()
+            || !Enum.IsDefined(item.Kind)
+            || item.EquipSlot?.Length > 128
+            || item.MaxPurchasesPerRound < 0
             || item.Price < 0
             || !_categories.ContainsKey(item.CategoryId))
             return false;
@@ -176,7 +188,7 @@ public sealed class ShopManager : IJBShop
         if (!string.IsNullOrWhiteSpace(item.Currency))
         {
             EnsureCurrency(item.Currency!);
-            CurrencyAvailabilityChanged?.Invoke();
+            Notify(CurrencyAvailabilityChanged, handler => handler());
         }
 
         foreach (var player in _players.GetAllPlayers())
@@ -203,7 +215,9 @@ public sealed class ShopManager : IJBShop
                 SafeUnequipRuntime(player, category, item);
         }
 
-        return _items.Remove(itemId);
+        var removed = _items.Remove(itemId);
+        Notify(CurrencyAvailabilityChanged, handler => handler());
+        return removed;
     }
 
     public bool RegisterModule(IItemModule module) =>
@@ -266,6 +280,14 @@ public sealed class ShopManager : IJBShop
 
     public ShopBalanceResult TransferBalance(IJBPlayer sender, IJBPlayer recipient, string currency, decimal amount)
     {
+        // Stable ordering also serializes transfers with shop purchases and administrative changes.
+        lock (GetPlayerLock(Math.Min(sender.SteamID, recipient.SteamID)))
+        lock (GetPlayerLock(Math.Max(sender.SteamID, recipient.SteamID)))
+            return TransferBalanceCore(sender, recipient, currency, amount);
+    }
+
+    private ShopBalanceResult TransferBalanceCore(IJBPlayer sender, IJBPlayer recipient, string currency, decimal amount)
+    {
         var economy = _economy;
         if (economy == null)
             return new(ShopBalanceStatus.EconomyUnavailable);
@@ -286,8 +308,8 @@ public sealed class ShopManager : IJBShop
             economy.TransferFunds(sender.Player, recipient.Player, registeredCurrency, amount);
             var senderBalance = GetBalance(sender, registeredCurrency);
             var recipientBalance = GetBalance(recipient, registeredCurrency);
-            PlayerCurrencyChanged?.Invoke(sender, registeredCurrency, senderBalance);
-            PlayerCurrencyChanged?.Invoke(recipient, registeredCurrency, recipientBalance);
+            Notify(PlayerCurrencyChanged, handler => handler(sender, registeredCurrency, senderBalance));
+            Notify(PlayerCurrencyChanged, handler => handler(recipient, registeredCurrency, recipientBalance));
             return new(ShopBalanceStatus.Success, senderBalance);
         }
         catch (Exception ex)
@@ -301,6 +323,20 @@ public sealed class ShopManager : IJBShop
 
     public ShopPurchaseResult Purchase(IJBPlayer player, string itemId)
     {
+        lock (GetPlayerLock(player.SteamID))
+        {
+            lock (_stateLock)
+            {
+                if (!_purchasesInProgress.Add(player.SteamID))
+                    return Result(ShopPurchaseStatus.ItemUnavailable, itemId);
+            }
+            try { return PurchaseCore(player, itemId); }
+            finally { lock (_stateLock) _purchasesInProgress.Remove(player.SteamID); }
+        }
+    }
+
+    private ShopPurchaseResult PurchaseCore(IJBPlayer player, string itemId)
+    {
         if (!_items.TryGetValue(itemId, out var item))
             return Result(ShopPurchaseStatus.ItemNotFound, itemId);
 
@@ -312,7 +348,7 @@ public sealed class ShopManager : IJBShop
         if (economy == null)
             return Result(ShopPurchaseStatus.EconomyUnavailable, itemId, currency, item.Price);
 
-        if (!player.Player.IsValid || player.Player.IsFakeClient)
+        if (!IsValidEconomyPlayer(player))
             return Result(ShopPurchaseStatus.InvalidPlayer, itemId, currency, item.Price);
 
         if (!CanAccessCategory(player, category.Id))
@@ -325,6 +361,15 @@ public sealed class ShopManager : IJBShop
         {
             var state = GetPlayerState(player.SteamID);
             var storesOwnership = StoresOwnership(item.Kind);
+
+            lock (_stateLock)
+            {
+                if (item.MaxPurchasesPerRound > 0
+                    && _roundPurchases.TryGetValue(player.SteamID, out var purchases)
+                    && purchases.GetValueOrDefault(item.Id) >= item.MaxPurchasesPerRound)
+                    return Result(ShopPurchaseStatus.RoundLimitReached, item.Id, currency, item.Price);
+            }
+
 
             if (storesOwnership && state.OwnedItemIds.Contains(item.Id))
                 return Result(ShopPurchaseStatus.AlreadyOwned, item.Id, currency, item.Price, GetBalance(player, currency));
@@ -345,8 +390,16 @@ public sealed class ShopManager : IJBShop
 
             if (item.Price > 0)
             {
-                economy.SubtractPlayerBalance(player.Player, currency, item.Price);
-                PlayerCurrencyChanged?.Invoke(player, currency, GetBalance(player, currency));
+                try
+                {
+                    economy.SubtractPlayerBalance(player.Player, currency, item.Price);
+                }
+                catch (Exception ex)
+                {
+                    _log.LogError(ex, "Shop payment failed. Item={ItemId}, SteamId={SteamId}", item.Id, player.SteamID);
+                    return Result(ShopPurchaseStatus.PaymentFailed, item.Id, currency, item.Price);
+                }
+                Notify(PlayerCurrencyChanged, handler => handler(player, currency, GetBalance(player, currency)));
             }
 
             ShopActionResult activation;
@@ -362,8 +415,8 @@ public sealed class ShopManager : IJBShop
 
             if (!activation.Success)
             {
-                Refund(player, currency, item.Price);
-                return Result(ShopPurchaseStatus.ActivationFailed, item.Id, currency, item.Price, GetBalance(player, currency), activation.Error);
+                var refunded = Refund(player, currency, item.Price);
+                return Result(refunded ? ShopPurchaseStatus.ActivationFailed : ShopPurchaseStatus.RefundFailed, item.Id, currency, item.Price, GetBalance(player, currency), activation.Error);
             }
 
             if (storesOwnership)
@@ -375,17 +428,24 @@ public sealed class ShopManager : IJBShop
                 }
                 catch (Exception ex)
                 {
-                    Refund(player, currency, item.Price);
+                    var refunded = Refund(player, currency, item.Price);
                     _log.LogError(ex, "Failed to persist shop ownership. Item={ItemId}, SteamId={SteamId}", item.Id, player.SteamID);
-                    return Result(ShopPurchaseStatus.PersistenceFailed, item.Id, currency, item.Price, GetBalance(player, currency), ex.Message);
+                    return Result(refunded ? ShopPurchaseStatus.PersistenceFailed : ShopPurchaseStatus.RefundFailed, item.Id, currency, item.Price, GetBalance(player, currency), ex.Message);
                 }
+            }
+
+            lock (_stateLock)
+            {
+                if (!_roundPurchases.TryGetValue(player.SteamID, out var purchases))
+                    _roundPurchases[player.SteamID] = purchases = new(StringComparer.OrdinalIgnoreCase);
+                purchases[item.Id] = purchases.GetValueOrDefault(item.Id) + 1;
             }
 
             if (item.Kind == ShopItemKind.Equippable && item.AutoEquipOnPurchase)
                 Equip(player, item.Id);
 
             var result = Result(ShopPurchaseStatus.Success, item.Id, currency, item.Price, GetBalance(player, currency));
-            ItemPurchased?.Invoke(context, result);
+            Notify(ItemPurchased, handler => handler(context, result));
             return result;
         }
     }
@@ -401,11 +461,15 @@ public sealed class ShopManager : IJBShop
 
     public ShopActionResult Equip(IJBPlayer player, string itemId)
     {
+        if (!IsValidEconomyPlayer(player))
+            return ShopActionResult.Failed("Player is not valid.");
         if (!_items.TryGetValue(itemId, out var item)
             || item.Kind != ShopItemKind.Equippable
             || string.IsNullOrWhiteSpace(item.EquipSlot)
             || !_categories.TryGetValue(item.CategoryId, out var category))
             return ShopActionResult.Failed("Item cannot be equipped.");
+        if (!CanAccessCategory(player, category.Id))
+            return ShopActionResult.Failed("Item is restricted to another team.");
 
         var playerLock = GetPlayerLock(player.SteamID);
         lock (playerLock)
@@ -427,7 +491,9 @@ public sealed class ShopManager : IJBShop
                 && _categories.TryGetValue(previousItem.CategoryId, out var previousCategory))
             {
                 previousContext = new ShopContext(player, previousCategory, previousItem, ResolveCurrency(previousCategory, previousItem));
-                _moduleManager.Unequip(previousContext);
+                var unequipResult = _moduleManager.Unequip(previousContext);
+                if (!unequipResult.Success)
+                    return unequipResult;
             }
 
             ShopActionResult equipResult;
@@ -463,14 +529,16 @@ public sealed class ShopManager : IJBShop
             }
 
             if (previousContext != null)
-                ItemUnequipped?.Invoke(previousContext);
-            ItemEquipped?.Invoke(context);
+                Notify(ItemUnequipped, handler => handler(previousContext));
+            Notify(ItemEquipped, handler => handler(context));
             return ShopActionResult.Succeeded();
         }
     }
 
     public ShopActionResult Unequip(IJBPlayer player, string itemId)
     {
+        if (!IsValidEconomyPlayer(player))
+            return ShopActionResult.Failed("Player is not valid.");
         if (!_items.TryGetValue(itemId, out var item)
             || item.Kind != ShopItemKind.Equippable
             || string.IsNullOrWhiteSpace(item.EquipSlot)
@@ -490,9 +558,18 @@ public sealed class ShopManager : IJBShop
             if (!result.Success)
                 return result;
 
-            _database.RemoveEquippedItem(player.SteamID, item.EquipSlot!);
+            try
+            {
+                _database.RemoveEquippedItem(player.SteamID, item.EquipSlot!);
+            }
+            catch (Exception ex)
+            {
+                _moduleManager.Equip(context);
+                _log.LogError(ex, "Failed to persist shop unequip. Item={ItemId}, SteamId={SteamId}", item.Id, player.SteamID);
+                return ShopActionResult.Failed("Could not save equipment changes.");
+            }
             state.EquippedItems.Remove(item.EquipSlot!);
-            ItemUnequipped?.Invoke(context);
+            Notify(ItemUnequipped, handler => handler(context));
             return ShopActionResult.Succeeded();
         }
     }
@@ -512,6 +589,7 @@ public sealed class ShopManager : IJBShop
 
     private HookResult OnRoundStart(EventRoundStart e)
     {
+        lock (_stateLock) _roundPurchases.Clear();
         _moduleManager.OnRoundStart();
         return HookResult.Continue;
     }
@@ -552,7 +630,11 @@ public sealed class ShopManager : IJBShop
     private void ReapplyItem(IJBPlayer player, IShopItem item, ShopCategory? knownCategory = null)
     {
         var category = knownCategory ?? GetCategory(item.CategoryId);
-        if (category == null)
+        if (category == null || !IsValidEconomyPlayer(player)
+            || !CanAccessCategory(player, category.Id)
+            || !ReferenceEquals(GetItem(item.Id), item)
+            || !GetPlayerState(player.SteamID).OwnedItemIds.Contains(item.Id)
+            || !GetPlayerState(player.SteamID).EquippedItems.Values.Contains(item.Id, StringComparer.OrdinalIgnoreCase))
             return;
 
         try
@@ -640,7 +722,13 @@ public sealed class ShopManager : IJBShop
         }
     }
 
-    private ShopBalanceResult ChangeBalance(
+    private ShopBalanceResult ChangeBalance(IJBPlayer player, string currency, decimal amount, BalanceOperation operation)
+    {
+        lock (GetPlayerLock(player.SteamID))
+            return ChangeBalanceCore(player, currency, amount, operation);
+    }
+
+    private ShopBalanceResult ChangeBalanceCore(
         IJBPlayer player,
         string currency,
         decimal amount,
@@ -665,6 +753,8 @@ public sealed class ShopManager : IJBShop
                     economy.AddPlayerBalance(player.Player, registeredCurrency, amount);
                     break;
                 case BalanceOperation.Subtract:
+                    if (!economy.HasSufficientFunds(player.Player, registeredCurrency, amount))
+                        return new(ShopBalanceStatus.InsufficientFunds, GetBalance(player, registeredCurrency));
                     economy.SubtractPlayerBalance(player.Player, registeredCurrency, amount);
                     break;
                 case BalanceOperation.Set:
@@ -672,7 +762,7 @@ public sealed class ShopManager : IJBShop
                     break;
             }
             var newBalance = GetBalance(player, registeredCurrency);
-            PlayerCurrencyChanged?.Invoke(player, registeredCurrency, newBalance);
+            Notify(PlayerCurrencyChanged, handler => handler(player, registeredCurrency, newBalance));
 
 
             return new(ShopBalanceStatus.Success, newBalance);
@@ -700,13 +790,31 @@ public sealed class ShopManager : IJBShop
     private static string ResolveCurrency(ShopCategory category, IShopItem item) =>
         string.IsNullOrWhiteSpace(item.Currency) ? category.Currency : item.Currency!;
 
-    private void Refund(IJBPlayer player, string currency, decimal amount)
+    private bool Refund(IJBPlayer player, string currency, decimal amount)
     {
-        if (amount <= 0)
-            return;
+        if (amount <= 0) return true;
+        try
+        {
+            if (_economy == null) throw new InvalidOperationException("Economy unavailable during refund.");
+            _economy.AddPlayerBalance(player.Player, currency, amount);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Shop refund failed; manual reconciliation required. SteamId={SteamId}, Currency={Currency}, Amount={Amount}", player.SteamID, currency, amount);
+            return false;
+        }
+        Notify(PlayerCurrencyChanged, handler => handler(player, currency, GetBalance(player, currency)));
+        return true;
+    }
 
-        _economy?.AddPlayerBalance(player.Player, currency, amount);
-        PlayerCurrencyChanged?.Invoke(player, currency, GetBalance(player, currency));
+    private void Notify<T>(T? subscribers, Action<T> invoke) where T : Delegate
+    {
+        if (subscribers == null) return;
+        foreach (T subscriber in subscribers.GetInvocationList())
+        {
+            try { invoke(subscriber); }
+            catch (Exception ex) { _log.LogError(ex, "Shop event subscriber failed."); }
+        }
     }
 
     private static ShopPurchaseResult Result(

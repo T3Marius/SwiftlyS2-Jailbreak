@@ -31,7 +31,8 @@ public sealed class ShopItemModuleManager
         }
         catch (Exception ex)
         {
-            _modules.Remove(module.Id);
+            // Remove items registered before Initialize failed while their module can still clean up.
+            shop.UnregisterModule(module.Id);
             _log.LogError(ex, "Failed to initialize shop item module. Module={ModuleId}", module.Id);
             return false;
         }
@@ -61,8 +62,9 @@ public sealed class ShopItemModuleManager
     {
         try
         {
-            return Resolve(context.Item)?.CanPurchase(context)
-                ?? context.Item.CanPurchase(context);
+            var module = Resolve(context.Item);
+            return module != null ? module.CanPurchase(context)
+                : string.IsNullOrWhiteSpace(context.Item.ModuleId) && context.Item.CanPurchase(context);
         }
         catch (Exception ex)
         {
@@ -140,7 +142,9 @@ public sealed class ShopItemModuleManager
         try
         {
             var module = Resolve(context.Item);
-            return module != null ? invokeModule(module) : invokeItem();
+            return module != null ? invokeModule(module)
+                : string.IsNullOrWhiteSpace(context.Item.ModuleId) ? invokeItem()
+                : ShopActionResult.Failed("Item module is unavailable.");
         }
         catch (Exception ex)
         {

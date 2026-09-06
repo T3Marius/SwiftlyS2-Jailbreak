@@ -30,7 +30,10 @@ public enum ShopPurchaseStatus
     AlreadyOwned = 7,
     InsufficientFunds = 8,
     ActivationFailed = 9,
-    PersistenceFailed = 10
+    PersistenceFailed = 10,
+    PaymentFailed = 11,
+    RefundFailed = 12,
+    RoundLimitReached = 13
 }
 
 public enum ShopBalanceStatus
@@ -89,6 +92,9 @@ public interface IShopItem
     string Description { get; }
     decimal Price { get; }
 
+    /// <summary>Successful purchases per player per round. Zero means unlimited.</summary>
+    int MaxPurchasesPerRound => 0;
+
     /// <summary>Null or empty uses the category currency.</summary>
     string? Currency { get; }
 
@@ -121,6 +127,7 @@ public abstract class ShopItemBase : IShopItem
     public abstract string Name { get; }
     public virtual string Description => "";
     public abstract decimal Price { get; }
+    public virtual int MaxPurchasesPerRound { get; init; }
     public virtual string? Currency => null;
     public virtual ShopItemKind Kind => ShopItemKind.Consumable;
     public virtual string? EquipSlot => null;

@@ -8,6 +8,9 @@ public abstract class ShopItemConfig
     public string Description { get; set; } = "";
     public decimal Price { get; set; }
 
+    // Per player per round. 0 = unlimited; changes apply after plugin reload.
+    public int MaxPurchasesPerRound { get; set; }
+
     // Empty uses the currency configured by the item's category.
     public string Currency { get; set; } = "";
     public string Value { get; set; } = "";
@@ -46,6 +49,7 @@ public sealed class DisguiseItemConfig : ShopItemConfig
     {
         Id = "jbshop.prisoners.disguise";
         Name = "Disguise";
+        MaxPurchasesPerRound = 1;
         Value = "agents/models/sunucukur/guards/g_variant_b/g_variant_b.vmdl";
         Description = "Disguise yourself as a guard. Be careful, they can still identify you!";
         Price = 500;
@@ -58,7 +62,8 @@ public sealed class BreakCuffsItemConfig : ShopItemConfig
     {
         Id = "jbshop.prisoners.break_cuffs";
         Name = "Break Cuffs";
-        Description = "Break free from your cuffs. Can only be purchased once per round.";
+        MaxPurchasesPerRound = 1;
+        Description = "Break free from your cuffs.";
         Price = 500;
     }
 }
