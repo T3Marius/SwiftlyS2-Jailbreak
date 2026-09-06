@@ -86,7 +86,8 @@ public sealed class LastRequestManager
         _playerDeathHookId = _core.GameEvent.HookPost<EventPlayerDeath>(OnPlayerDeath);
         _playerDisconnectHookId = _core.GameEvent.HookPost<EventPlayerDisconnect>(OnPlayerDisconnect);
         _roundEndHookId = _core.GameEvent.HookPost<EventRoundEnd>(OnRoundEnd);
-        _core.GameHooks.Entities.TakeDamage.Post += OnEntityTakeDamage;
+        _core.GameHooks.Entities.TakeDamage.Pre += OnEntityTakeDamage;
+        _core.GameHooks.Items.CanAcquire.Post += OnItemServicesCanAcquire;
         _core.Event.OnMapUnload += OnMapUnload;
         _core.Event.OnClientDisconnected += OnClientDisconnected;
         _core.Event.OnClientPutInServer += OnClientPutInServer;
@@ -98,7 +99,8 @@ public sealed class LastRequestManager
         Unhook(ref _playerDeathHookId);
         Unhook(ref _playerDisconnectHookId);
         Unhook(ref _roundEndHookId);
-        _core.GameHooks.Entities.TakeDamage.Post -= OnEntityTakeDamage;
+        _core.GameHooks.Entities.TakeDamage.Pre -= OnEntityTakeDamage;
+        _core.GameHooks.Items.CanAcquire.Post -= OnItemServicesCanAcquire;
         _core.Event.OnMapUnload -= OnMapUnload;
         _core.Event.OnClientDisconnected -= OnClientDisconnected;
         _core.Event.OnClientPutInServer -= OnClientPutInServer;
@@ -251,6 +253,7 @@ public sealed class LastRequestManager
             // start is still cleaned up if Start throws after registering hooks.
             _currentStarted = true;
             lastRequest.Start(context);
+            ResetParticipantHealth(lastRequest, context);
             _soundManager.Play(JailbreakSound.LastRequestStarted);
             StartFightBeaconSound();
             _players.SendMessage(MessageType.Chat, "last_request_started", true, args: [lastRequest.Name, context.Prisoner.Player.Name]);
@@ -394,7 +397,7 @@ public sealed class LastRequestManager
         EndLastRequest(null, null, announce: false);
     }
 
-    private void OnEntityTakeDamage(ref TakeDamageEntityPostContext ctx)
+    private void OnEntityTakeDamage(ref TakeDamageEntityPreContext ctx)
     {
         var e = ctx.Params;
         var lastRequest = CurrentLastRequest;
@@ -408,20 +411,79 @@ public sealed class LastRequestManager
         var rawAttacker = attackerPawn?.ToPlayer();
         var attacker = rawAttacker == null ? null : _players.SyncPlayer(rawAttacker);
 
-        var victimIsParticipant = victim != null && IsParticipant(lastRequest, _currentContext, victim);
-        var attackerIsParticipant = attacker != null && IsParticipant(lastRequest, _currentContext, attacker);
-
-        if (!victimIsParticipant && !attackerIsParticipant)
+        if (!LastRequestRules.CanDamage(lastRequest, _currentContext, victim, attacker, _currentStarted))
+        {
+            BlockDamage(ref ctx);
             return;
+        }
 
-        if (_countdownActive || !victimIsParticipant || !attackerIsParticipant)
-            BlockDamage(ctx);
+        if (attacker != null && IsParticipant(lastRequest, _currentContext, attacker)
+            && !IsAllowedDamageWeapon(lastRequest, _currentContext, attacker, e.Info))
+            BlockDamage(ref ctx);
+    }
+
+    private void OnItemServicesCanAcquire(ref CanAcquireItemPostContext ctx)
+    {
+        if (CurrentLastRequest is not { } request || _currentContext is not { } context
+            || ctx.Params.Player is not { } rawPlayer)
+            return;
+        var player = _players.SyncPlayer(rawPlayer);
+        if (player != null && IsParticipant(request, context, player)
+            && !LastRequestRules.IsWeaponAllowed(request, context, (ItemDefinitionIndex)ctx.Params.EconItemView.ItemDefinitionIndex))
+            ctx.Return = AcquireResult.NotAllowedByProhibition;
+    }
+
+    private bool IsAllowedDamageWeapon(ILastRequest request, LastRequestStartContext context,
+        IJBPlayer attacker, CTakeDamageInfo info)
+    {
+        // Resolve the damage source before the held weapon: a thrown grenade can
+        // hit after its owner has switched weapons.
+        var source = info.Ability.Value;
+        var inflictor = info.Inflictor.Value;
+        // Fire persists after the thrower switches weapons. Never classify it
+        // as damage from the gun they happen to be holding now.
+        if (inflictor?.IsValid == true && inflictor.DesignerName == "inferno")
+        {
+            IEnumerable<ItemDefinitionIndex> fireWeapons = context.SelectedWeapon is { } selectedFire
+                ? new[] { selectedFire } : request.AllowedWeapons;
+            return (context.SelectedWeapon == null && request.AllowAllWeapons)
+                || fireWeapons.Any(weapon => _core.Helpers.GetClassnameByDefinitionIndex(weapon)
+                    is "weapon_molotov" or "weapon_incgrenade");
+        }
+        var name = source?.IsValid == true ? source.DesignerName : null;
+        if (inflictor?.IsValid == true && inflictor.DesignerName.EndsWith("_projectile", StringComparison.Ordinal))
+            name = "weapon_" + inflictor.DesignerName[..^"_projectile".Length];
+        if (string.IsNullOrEmpty(name) || !name.StartsWith("weapon_", StringComparison.Ordinal))
+            name = attacker.Player.PlayerPawn?.WeaponServices?.ActiveWeapon.Value?.DesignerName;
+        if (string.IsNullOrEmpty(name)) return false;
+        if (name.Contains("knife", StringComparison.OrdinalIgnoreCase)
+            && context.SelectedWeapon == null && request.AllowedWeapons.Overlaps(LastRequestWeapons.AllKnives))
+            return true;
+        IEnumerable<ItemDefinitionIndex> allowed = context.SelectedWeapon is { } selected ? new[] { selected } : request.AllowedWeapons;
+        return (context.SelectedWeapon == null && request.AllowAllWeapons)
+            || allowed.Any(weapon => _core.Helpers.GetClassnameByDefinitionIndex(weapon) == name);
+    }
+
+    private void EnforceWeapons()
+    {
+        if (!_currentStarted || CurrentLastRequest is not { } request || _currentContext is not { } context)
+            return;
+        foreach (var player in GetLoadoutPlayers(request, context))
+        {
+            var services = player.Player.PlayerPawn?.WeaponServices;
+            if (services == null) continue;
+            foreach (var weapon in services.MyValidWeapons.ToArray())
+                if (weapon.IsValid && !LastRequestRules.IsWeaponAllowed(request, context,
+                    (ItemDefinitionIndex)weapon.As<CEconEntity>().AttributeManager.Item.ItemDefinitionIndex))
+                    services.RemoveWeapon(weapon);
+        }
     }
 
     private void OnTick()
     {
         WasLastRequestActiveThisFrame = IsLastRequestActive;
         UpdateDuelBeam();
+        EnforceWeapons();
     }
 
     private void DisableCurrentWarden()
@@ -452,10 +514,10 @@ public sealed class LastRequestManager
     {
         if (_currentContext != null)
         {
-            _beaconManager.StopPlayerBeacon(_currentContext.Prisoner.SteamID);
+            _beaconManager.StopPlayerBeacon(PlayerIdentity.GetKey(_currentContext.Prisoner.Player));
 
             if (_currentContext.Guard != null)
-                _beaconManager.StopPlayerBeacon(_currentContext.Guard.SteamID);
+                _beaconManager.StopPlayerBeacon(PlayerIdentity.GetKey(_currentContext.Guard.Player));
         }
 
         RemoveDuelBeam();
@@ -606,7 +668,7 @@ public sealed class LastRequestManager
     private static string FormatVariant(IJBPlayer player, LastRequestStartContext context)
     {
         if (context.SelectedVariant == null)
-            return player.Localizer["none"];
+            return player.Localizer["last_request_type_normal"];
 
         return string.IsNullOrWhiteSpace(context.SelectedVariant.Description)
             ? context.SelectedVariant.Name
@@ -758,10 +820,30 @@ public sealed class LastRequestManager
         _soundManager.Play(JailbreakSound.LastRequestAvailable);
     }
 
+    private void ResetParticipantHealth(ILastRequest lastRequest, LastRequestStartContext context)
+    {
+        foreach (var player in GetLoadoutPlayers(lastRequest, context))
+        {
+            if (!IsAlive(player))
+                continue;
+
+            var pawn = player.Player.PlayerPawn;
+            if (pawn == null || !pawn.IsValid)
+                continue;
+
+            pawn.MaxHealth = 100;
+            pawn.Health = 100;
+            pawn.MaxHealthUpdated();
+            pawn.HealthUpdated();
+        }
+    }
+
     private void ApplyStartLoadout(ILastRequest lastRequest, LastRequestStartContext context)
     {
         _core.Scheduler.NextWorldUpdate(() =>
         {
+            if (!ReferenceEquals(CurrentLastRequest, lastRequest) || !ReferenceEquals(_currentContext, context))
+                return;
             foreach (var player in GetLoadoutPlayers(lastRequest, context))
             {
                 if (!player.Player.IsValid || !player.Player.IsAlive)
@@ -817,10 +899,10 @@ public sealed class LastRequestManager
     {
         var winnerWins = 0;
 
-        if (winner != null)
+        if (winner != null && PlayerIdentity.UsesSteamKey(winner.Player))
             winnerWins = _statsDB.AddLastRequestWin(winner.SteamID, winner.Player.Name).LastRequestWins;
 
-        if (loser != null && (winner == null || loser.SteamID != winner.SteamID))
+        if (loser != null && PlayerIdentity.UsesSteamKey(loser.Player) && !LastRequestRules.SamePlayer(loser, winner))
             _statsDB.AddLastRequestLoss(loser.SteamID, loser.Player.Name);
 
         return winnerWins;
@@ -834,30 +916,28 @@ public sealed class LastRequestManager
 
     private static bool IsParticipant(ILastRequest lastRequest, LastRequestStartContext context, IJBPlayer player)
     {
-        return player.SteamID == context.Prisoner.SteamID
-            || context.Guard?.SteamID == player.SteamID
-            || (lastRequest.OpponentMode == LastRequestOpponentMode.PrisonerVsAllGuards && player.Team == JBTeam.Guard);
+        return LastRequestRules.IsParticipant(lastRequest, context, player);
     }
 
     private static bool ShouldEndOnDeath(LastRequestStartContext context, IJBPlayer victim)
     {
-        if (victim.SteamID == context.Prisoner.SteamID)
+        if (LastRequestRules.SamePlayer(victim, context.Prisoner))
             return true;
 
-        return context.Guard?.SteamID == victim.SteamID;
+        return LastRequestRules.SamePlayer(context.Guard, victim);
     }
 
     private static bool ShouldEndOnDisconnect(LastRequestStartContext context, IJBPlayer player)
     {
-        if (player.SteamID == context.Prisoner.SteamID)
+        if (LastRequestRules.SamePlayer(player, context.Prisoner))
             return true;
 
-        return context.Guard?.SteamID == player.SteamID;
+        return LastRequestRules.SamePlayer(context.Guard, player);
     }
 
     private static IJBPlayer? GetDisconnectWinner(LastRequestStartContext context, IJBPlayer disconnectedPlayer)
     {
-        if (disconnectedPlayer.SteamID == context.Prisoner.SteamID)
+        if (LastRequestRules.SamePlayer(disconnectedPlayer, context.Prisoner))
             return context.Guard;
 
         return context.Prisoner;
@@ -865,10 +945,10 @@ public sealed class LastRequestManager
 
     private static IJBPlayer? GetDeathWinner(LastRequestStartContext context, IJBPlayer victim, IJBPlayer? attacker)
     {
-        if (victim.SteamID == context.Prisoner.SteamID)
-            return attacker ?? context.Guard;
+        if (LastRequestRules.SamePlayer(victim, context.Prisoner))
+            return context.Guard ?? attacker;
 
-        if (context.Guard?.SteamID == victim.SteamID)
+        if (LastRequestRules.SamePlayer(context.Guard, victim))
             return context.Prisoner;
 
         return attacker;
@@ -896,7 +976,7 @@ public sealed class LastRequestManager
         return $"{color}{player.Player.Name}[silver]";
     }
 
-    private static void BlockDamage(TakeDamageEntityPostContext ctx)
+    private static void BlockDamage(ref TakeDamageEntityPreContext ctx)
     {
         var e = ctx.Params;
         e.Info.Damage = 0;

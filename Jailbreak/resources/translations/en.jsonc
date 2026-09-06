@@ -90,6 +90,7 @@
     "last_request_already_active": "A Last Request is already active.",
     "last_request_all_guards": "all guards",
     "last_request_cannot_start": "[red]{0}[silver] cannot be started right now.",
+    "last_request_type_normal": "Normal",
     "last_request_active_hud": "{0}\n{1}\nType: {2}",
     "last_request_countdown_hud": "» {0} starts in {1} seconds «",
     "jbstats_lr_menu.title": "Last Request Stats",

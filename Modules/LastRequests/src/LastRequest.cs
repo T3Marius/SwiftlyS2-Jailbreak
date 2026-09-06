@@ -20,7 +20,7 @@ namespace LastRequests;
     Author = "T3Marius",
     Name = "[JB Core] LastRequests",
     Id = "LastRequests",
-    Version = "0.1.4"
+    Version = "0.1.5"
 )]
 public sealed class Main : BasePlugin
 {
@@ -99,7 +99,7 @@ public sealed class KnifeFightLastRequest : LastRequestBase
 
 
     private bool _oneHitHooked;
-    private readonly HashSet<ulong> _modifiedPlayers = [];
+    private readonly HashSet<(int Slot, ulong Session)> _modifiedPlayers = [];
 
     public KnifeFightLastRequest(ISwiftlyCore core, IJailbreak jail)
         : base(core, jail)
@@ -160,7 +160,7 @@ public sealed class KnifeFightLastRequest : LastRequestBase
 
     private void SetGravity(IJBPlayer player, float scale)
     {
-        _modifiedPlayers.Add(player.SteamID);
+        _modifiedPlayers.Add((player.Player.PlayerID, player.Player.SessionId));
         Core.Scheduler.NextWorldUpdate(() =>
         {
             var pawn = player.Player.PlayerPawn;
@@ -175,7 +175,7 @@ public sealed class KnifeFightLastRequest : LastRequestBase
 
     private void SetSpeed(IJBPlayer player, float scale)
     {
-        _modifiedPlayers.Add(player.SteamID);
+        _modifiedPlayers.Add((player.Player.PlayerID, player.Player.SessionId));
         Core.Scheduler.NextWorldUpdate(() =>
         {
             var pawn = player.Player.PlayerPawn;
@@ -194,7 +194,7 @@ public sealed class KnifeFightLastRequest : LastRequestBase
 
         foreach (var player in Jailbreak.Players.GetAllPlayers())
         {
-            if (!_modifiedPlayers.Contains(player.SteamID))
+            if (!_modifiedPlayers.Contains((player.Player.PlayerID, player.Player.SessionId)))
                 continue;
 
             Core.Scheduler.NextWorldUpdate(() =>
@@ -219,7 +219,7 @@ public sealed class KnifeFightLastRequest : LastRequestBase
         if (_oneHitHooked)
             return;
 
-        Core.GameHooks.Entities.TakeDamage.Post += OnEntityTakeDamage;
+        Core.GameHooks.Entities.TakeDamage.Pre += OnEntityTakeDamage;
         _oneHitHooked = true;
     }
 
@@ -228,11 +228,11 @@ public sealed class KnifeFightLastRequest : LastRequestBase
         if (!_oneHitHooked)
             return;
 
-        Core.GameHooks.Entities.TakeDamage.Post -= OnEntityTakeDamage;
+        Core.GameHooks.Entities.TakeDamage.Pre -= OnEntityTakeDamage;
         _oneHitHooked = false;
     }
 
-    private void OnEntityTakeDamage(ref TakeDamageEntityPostContext e)
+    private void OnEntityTakeDamage(ref TakeDamageEntityPreContext e)
     {
         var ctx = e.Params;
         if (!ctx.Entity.DesignerName.StartsWith("player", StringComparison.OrdinalIgnoreCase))
@@ -254,7 +254,7 @@ public sealed class KnifeFightLastRequest : LastRequestBase
         if (attacker == null || victim == null || !IsParticipant(attacker) || !IsParticipant(victim))
             return;
 
-        if (!IsKnifeDamage(attacker, ctx.Info))
+        if (LastRequestRules.SamePlayer(attacker, victim) || ctx.Info.Damage <= 0 || !IsKnifeDamage(attacker, ctx.Info))
             return;
 
         ctx.Info.Damage = OneHitDamage;
@@ -263,8 +263,8 @@ public sealed class KnifeFightLastRequest : LastRequestBase
 
     private bool IsParticipant(IJBPlayer player)
     {
-        return player.SteamID == Prisoner.SteamID
-            || Guard?.SteamID == player.SteamID;
+        return LastRequestRules.SamePlayer(player, Prisoner)
+            || LastRequestRules.SamePlayer(Guard, player);
     }
 
     private static bool IsKnifeDamage(IJBPlayer attacker, CTakeDamageInfo info)
@@ -359,11 +359,11 @@ public sealed class ShotForShotLastRequest : LastRequestBase
         if (_guard == null || _prisoner == null)
             return HookResult.Continue;
 
-        if (shooter.SteamID == _guard.SteamID)
+        if (LastRequestRules.SamePlayer(shooter, _guard))
         {
             SetAmmo(_prisoner, 1);
         }
-        else if (shooter.SteamID == _prisoner.SteamID)
+        else if (LastRequestRules.SamePlayer(shooter, _prisoner))
         {
             SetAmmo(_guard, 1);
         }
@@ -506,14 +506,14 @@ public sealed class MagForMagLastRequest : LastRequestBase
         if (shooter == null || _currentShooter == null || _guard == null || _prisoner == null)
             return HookResult.Continue;
 
-        if (shooter.SteamID != _currentShooter.SteamID || !IsSelectedWeapon(shooter))
+        if (!LastRequestRules.SamePlayer(shooter, _currentShooter) || !IsSelectedWeapon(shooter))
             return HookResult.Continue;
 
         _shotsFiredThisTurn++;
         if (_shotsFiredThisTurn < _magazineSize)
             return HookResult.Continue;
 
-        _currentShooter = _currentShooter.SteamID == _prisoner.SteamID
+        _currentShooter = LastRequestRules.SamePlayer(_currentShooter, _prisoner)
             ? _guard
             : _prisoner;
 
@@ -531,8 +531,8 @@ public sealed class MagForMagLastRequest : LastRequestBase
         if (_prisoner == null || _guard == null || activePlayer == null)
             return;
 
-        SetAmmo(_prisoner, activePlayer.SteamID == _prisoner.SteamID ? _magazineSize : 0);
-        SetAmmo(_guard, activePlayer.SteamID == _guard.SteamID ? _magazineSize : 0);
+        SetAmmo(_prisoner, LastRequestRules.SamePlayer(activePlayer, _prisoner) ? _magazineSize : 0);
+        SetAmmo(_guard, LastRequestRules.SamePlayer(activePlayer, _guard) ? _magazineSize : 0);
     }
 
     private void SetAmmo(IJBPlayer player, int ammo)
@@ -658,8 +658,6 @@ public sealed class DodgeballLastRequest : LastRequestBase
     public override void Start(LastRequestStartContext context)
     {
         base.Start(context);
-        SetHealth(Guard!, 1);
-        SetHealth(Prisoner, 1);
 
         _grenadeThrownId = Core.GameEvent.HookPost<EventGrenadeThrown>(OnGrenadeThrown);
     }
@@ -678,7 +676,7 @@ public sealed class DodgeballLastRequest : LastRequestBase
         if (e.UserIdPlayer is not IPlayer player)
             return HookResult.Continue;
 
-        if (player.SteamID != Prisoner.SteamID && player.SteamID != Guard?.SteamID)
+        if (!LastRequestRules.SamePlayer(player, Prisoner.Player) && !LastRequestRules.SamePlayer(player, Guard?.Player))
             return HookResult.Continue;
 
         player.Pawn?.ItemServices?.GiveItem<CBaseEntity>("weapon_decoy");
@@ -686,17 +684,6 @@ public sealed class DodgeballLastRequest : LastRequestBase
         return HookResult.Continue;
     }
 
-    private void SetHealth(IJBPlayer player, int health)
-    {
-        var pawn = player.Player.PlayerPawn;
-        if (pawn == null)
-            return;
-
-        pawn.Health = health;
-        pawn.MaxHealth = health;
-        pawn.HealthUpdated();
-        pawn.MaxHealthUpdated();
-    }
 
 
 }

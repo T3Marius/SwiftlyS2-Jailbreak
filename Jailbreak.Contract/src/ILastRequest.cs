@@ -152,14 +152,14 @@ namespace Jailbreak.Contract
 
         public virtual void OnPlayerDisconnected(IJBPlayer player)
         {
-            if (_prisoner != null && player.SteamID == _prisoner.SteamID)
+            if (_prisoner != null && LastRequestRules.SamePlayer(player, _prisoner))
             {
                 LastEndReason = LastRequestEndReason.PrisonerDisconnected;
                 End(Guard, _prisoner);
                 return;
             }
 
-            if (Guard != null && player.SteamID == Guard.SteamID)
+            if (Guard != null && LastRequestRules.SamePlayer(player, Guard))
             {
                 LastEndReason = LastRequestEndReason.GuardDisconnected;
                 End(_prisoner, Guard);
@@ -168,14 +168,14 @@ namespace Jailbreak.Contract
 
         public virtual void OnPlayerDied(IJBPlayer victim, IJBPlayer? attacker)
         {
-            if (_prisoner != null && victim.SteamID == _prisoner.SteamID)
+            if (_prisoner != null && LastRequestRules.SamePlayer(victim, _prisoner))
             {
                 LastEndReason = LastRequestEndReason.PrisonerDied;
-                End(attacker ?? Guard, _prisoner);
+                End(Guard ?? attacker, _prisoner);
                 return;
             }
 
-            if (Guard != null && victim.SteamID == Guard.SteamID)
+            if (Guard != null && LastRequestRules.SamePlayer(victim, Guard))
             {
                 LastEndReason = LastRequestEndReason.GuardDied;
                 End(_prisoner, Guard);

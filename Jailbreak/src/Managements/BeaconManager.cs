@@ -115,19 +115,19 @@ public sealed class BeaconManager
         if (!player.IsValid || !player.IsAlive || player.PlayerPawn == null)
             return;
 
-        StopPlayerBeacon(player.SteamID);
+        StopPlayerBeacon(PlayerIdentity.GetKey(player));
 
         var effect = BeaconEffect.ForPlayer(player, PlayerSegments, PlayerBaseRadius, durationSeconds, color, rainbow);
         SpawnEffect(effect);
-        _playerEffects[player.SteamID] = effect;
+        _playerEffects[PlayerIdentity.GetKey(player)] = effect;
     }
 
-    public void StopPlayerBeacon(ulong steamId)
+    public void StopPlayerBeacon(ulong playerKey)
     {
-        if (!_playerEffects.TryGetValue(steamId, out var effect))
+        if (!_playerEffects.TryGetValue(playerKey, out var effect))
             return;
 
-        _playerEffects.Remove(steamId);
+        _playerEffects.Remove(playerKey);
         RemoveEffect(effect);
     }
 
@@ -256,8 +256,8 @@ public sealed class BeaconManager
         effect.Despawn();
         _effects.Remove(effect);
 
-        if (effect.PlayerSteamId.HasValue)
-            _playerEffects.Remove(effect.PlayerSteamId.Value);
+        if (effect.PlayerKey.HasValue)
+            _playerEffects.Remove(effect.PlayerKey.Value);
 
         if (ReferenceEquals(_pingEffect, effect))
             _pingEffect = null;
@@ -276,7 +276,7 @@ public sealed class BeaconManager
         public int Segments { get; }
         public Color Color { get; }
         public bool Rainbow { get; }
-        public ulong? PlayerSteamId { get; }
+        public ulong? PlayerKey { get; }
         public List<CHandle<CBeam>> BeamHandles { get; } = [];
 
         private BeaconEffect(Vector origin, IPlayer? player, int segments, float radius, float animationSeconds, float lifetimeSeconds, Color color, bool rainbow)
@@ -290,7 +290,7 @@ public sealed class BeaconManager
             Segments = segments;
             Color = color;
             Rainbow = rainbow;
-            PlayerSteamId = player?.SteamID;
+            PlayerKey = player == null ? null : PlayerIdentity.GetKey(player);
         }
 
         public static BeaconEffect ForLocation(Vector origin, int segments, float radius, float animationSeconds, float lifetimeSeconds, Color color, bool rainbow)
